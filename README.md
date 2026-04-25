@@ -7,6 +7,12 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 - [yarn](https://classic.yarnpkg.com/en/docs/install#windows-stable)
 - [NodeJS@v24.15.0](https://nodejs.org/en/download)
 
+### Installing the Dependencies
+
+```
+yarn install
+```
+
 ### Running the Project
 
 First, run the development server:
