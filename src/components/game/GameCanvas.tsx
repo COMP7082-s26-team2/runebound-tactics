@@ -19,7 +19,7 @@ export default function GameCanvas() {
             debug: true,
         });
 
-        // --- INIT ---
+        // init hook
         engine.init = () => {
             console.log("Engine initialized");
 
@@ -35,7 +35,7 @@ export default function GameCanvas() {
             });
         };
 
-        // --- RENDER PIPELINE ---
+        // render pipeline hooks
         engine.preDraw = (ctx) => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         };
@@ -47,7 +47,7 @@ export default function GameCanvas() {
         // start engine
         engine.start();
 
-        // cleanup (VERY important in Next.js)
+        // cleanup
         return () => {
             engine.stop();
         };

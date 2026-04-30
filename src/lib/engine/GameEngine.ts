@@ -101,7 +101,7 @@ export class GameEngine {
 
         if (frameTime > 0.25) frameTime = 0.25;
 
-        // --- FPS tracking ---
+        // fps tracking
         this.fpsCounter++;
         this.fpsTimer += frameTime;
 
@@ -113,7 +113,7 @@ export class GameEngine {
 
         this.accumulator += frameTime;
 
-        // --- Fixed Update Loop (UPS tracking) ---
+        // ups tracking and fixed update loop
         while (this.accumulator >= this.fixedDelta) {
             this.update(this.fixedDelta);
             this.components.update(this.fixedDelta);
@@ -123,7 +123,6 @@ export class GameEngine {
             this.accumulator -= this.fixedDelta;
         }
 
-        // UPS per second
         this.upsTimer += frameTime;
         if (this.upsTimer >= 1) {
             this.ups = this.upsCounter;
@@ -133,7 +132,7 @@ export class GameEngine {
 
         const alpha = this.accumulator / this.fixedDelta;
 
-        // --- Render ---
+        // render
         this.preDraw(this.ctx);
         this.draw(this.ctx, alpha);
         this.components.draw(this.ctx, alpha);
