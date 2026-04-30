@@ -2,8 +2,14 @@
 
 import { useEffect, useRef } from "react";
 import { GameEngine } from "@/lib/engine/GameEngine";
+import { debug } from "console";
 
-export default function GameCanvas() {
+
+export interface GameCanvasOptions {
+    debug?: boolean;
+}
+
+export default function GameCanvas({ debug = false }: GameCanvasOptions) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
@@ -16,7 +22,7 @@ export default function GameCanvas() {
             width: 800,
             height: 600,
             fixedDelta: 1 / 60,
-            debug: true,
+            debug,
         });
 
         // init hook
