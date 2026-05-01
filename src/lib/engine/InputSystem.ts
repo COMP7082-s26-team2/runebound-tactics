@@ -4,7 +4,11 @@ type MouseInputFunction = (button: number) => boolean;
 type KeyInputHandlerFunction = (e: KeyboardEvent) => void;
 type MouseInputHandlerFunction = (e: MouseEvent) => void;
 
-type WindowListenerArray = [EventTarget, string, (...args: unknown[]) => unknown];
+type WindowListenerArray = [
+    EventTarget,
+    string,
+    (...args: unknown[]) => unknown,
+];
 
 class InputSystem {
     // Key states
