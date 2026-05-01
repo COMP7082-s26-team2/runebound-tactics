@@ -63,11 +63,17 @@ class InputSystem {
         return this._mouseY;
     }
 
-    isMouseButtonHeld: MouseInputFunction = (button) => {};
+    isMouseButtonHeld: MouseInputFunction = (button) => {
+        return this.mouseHeld.has(button);
+    };
 
-    isMouseButtonJustPressed: MouseInputFunction = (button) => {};
+    isMouseButtonJustPressed: MouseInputFunction = (button) => {
+        return this.mouseJustPressed.has(button);
+    };
 
-    isMouseButtonJustReleased: MouseInputFunction = (button) => {};
+    isMouseButtonJustReleased: MouseInputFunction = (button) => {
+        return this.mouseJustReleased.has(button);
+    };
 
     private onKeyDown: KeyInputHandlerFunction = (e) => {
         // ignore key-repeat events since held is already set
