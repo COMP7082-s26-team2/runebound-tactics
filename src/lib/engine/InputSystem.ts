@@ -15,8 +15,8 @@ class InputSystem {
     private pressOrder = new Map();
 
     // Mouse state
-    private mouseX = 0;
-    private mouseY = 0;
+    private _mouseX = 0;
+    private _mouseY = 0;
     private mouseHeld = new Set();
     private mouseJustPressed = new Set();
     private mouseJustReleased = new Set();
@@ -51,6 +51,14 @@ class InputSystem {
     isActionJustReleased: ActionInputFunction = (name) => {};
 
     getAxis = (negAction: string, posAction: string): number => {};
+
+    get mouseX(): number {
+        return this._mouseX;
+    }
+
+    get mouseY(): number {
+        return this._mouseY;
+    }
 }
 
 export default InputSystem;
