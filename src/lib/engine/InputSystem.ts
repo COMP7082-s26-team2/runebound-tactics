@@ -1,3 +1,6 @@
+type KeyInputFunction = (code: string) => void;
+type ActionInputFunction = (name: string) => boolean;
+
 class InputSystem {
     // Key states
     // KeyboardEvent.code values
@@ -24,6 +27,30 @@ class InputSystem {
     // Cleanup
     private listeners: unknown[][] = [];
     private canvas: HTMLCanvasElement | null = null;
+
+    init = (canvas: HTMLCanvasElement | null = null) => {};
+
+    destroy = () => {};
+
+    update = () => {};
+
+    defineAction = (name: string, codes: string[]) => {};
+
+    removeAction = (name: string) => {};
+
+    isKeyHeld: KeyInputFunction = (code) => {};
+
+    isKeyJustPressed: KeyInputFunction = (code) => {};
+
+    isKeyJustReleased: KeyInputFunction = (code) => {};
+
+    isActionHeld: ActionInputFunction = (name) => {};
+
+    isActionJustPressed: ActionInputFunction = (name) => {};
+
+    isActionJustReleased: ActionInputFunction = (name) => {};
+
+    getAxis = (negAction: string, posAction: string): number => {};
 }
 
 export default InputSystem;
