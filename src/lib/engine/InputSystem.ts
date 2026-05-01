@@ -53,11 +53,32 @@ class InputSystem {
         return this.justReleased.has(code);
     };
 
-    isActionHeld: ActionInputFunction = (name) => {};
+    isActionHeld: ActionInputFunction = (name) => {
+        const codes = this.actions.get(name);
+        if (!codes) return false;
 
-    isActionJustPressed: ActionInputFunction = (name) => {};
+        return codes.some((curCode) => this.held.has(curCode));
+    };
 
-    isActionJustReleased: ActionInputFunction = (name) => {};
+    isActionJustPressed: ActionInputFunction = (name) => {
+        const codes = this.actions.get(name);
+        if (!codes) return false;
+
+        return codes.some((curCode) => this.justPressed.has(curCode));
+    };
+
+    isActionJustReleased: ActionInputFunction = (name) => {
+        const codes = this.actions.get(name);
+        if (!codes) return false;
+
+        // some codes just released AND no other bound code is still held
+        const anyJustReleased = codes.some((curCode) =>
+            this.justReleased.has(curCode),
+        );
+        const noneStillheld = codes.every((curCode) => !this.held.has(curCode));
+
+        return anyJustReleased && noneStillheld;
+    };
 
     getAxis = (negAction: string, posAction: string): number => {};
 
