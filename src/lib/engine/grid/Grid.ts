@@ -1,7 +1,5 @@
 export type GridCoord = { q: number; r: number };
 
-export type GridPositionData = GridCoord;
-
 export interface Grid {
     gridToWorld(coord: GridCoord): { x: number; y: number };
 

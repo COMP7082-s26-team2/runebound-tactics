@@ -1,33 +1,33 @@
 import { EntityId } from "./EntityManager";
 
 export class ComponentStore<T> {
-    private components: Map<number, T> = new Map();
+    private _components: Map<EntityId, T> = new Map();
 
     set(entityId: EntityId, component: T): void {
-        this.components.set(entityId, component);
+        this._components.set(entityId, component);
     }
 
     remove(entityId: EntityId): void {
-        this.components.delete(entityId);
+        this._components.delete(entityId);
     }
 
     get(entityId: EntityId): T | undefined {
-        return this.components.get(entityId);
+        return this._components.get(entityId);
     }
 
     entries(): IterableIterator<[EntityId, T]> {
-        return this.components.entries();
+        return this._components.entries();
     }
 
     has(entityId: EntityId): boolean {
-        return this.components.has(entityId);
+        return this._components.has(entityId);
     }
 
     clear(): void {
-        this.components.clear();
+        this._components.clear();
     }
 
     size(): number {
-        return this.components.size;
+        return this._components.size;
     }
 }

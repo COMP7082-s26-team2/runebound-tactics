@@ -2,9 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import { GameEngine, World } from "@/lib/";
-import { UnitRenderSystem } from "@/lib/game/components/UnitRenderSystem";
-import { GridRenderSystem } from "@/lib/game/components/GridRenderSystem";
-import { SquareGrid } from "@/lib/engine/SquareGrid";
+import { UnitRenderSystem } from "@/lib/game/systems/UnitRenderSystem";
+import { GridRenderSystem } from "@/lib/game/systems/GridRenderSystem";
+import { SquareGrid } from "@/lib/engine/grid/SquareGrid";
 
 export interface GameCanvasOptions {
     debug?: boolean;
@@ -21,7 +21,7 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
         const engine = new GameEngine({
             canvas,
             width: 800,
-            height: 600,
+            height: 800,
             fixedDelta: 1 / 60,
             debug,
         });
@@ -55,8 +55,8 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
                 { color: "green" },
             );
 
-            engine.addComponent(new GridRenderSystem(world, 10, 10, 50));
-            engine.addComponent(new UnitRenderSystem(world, 10, 10, 50));
+            engine.addComponent(new GridRenderSystem(world, 10, 10, 80));
+            engine.addComponent(new UnitRenderSystem(world, 10, 10, 80));
         };
 
         // render pipeline hooks
@@ -82,7 +82,7 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
     return (
         <canvas
             ref={canvasRef}
-            style={{ width: "100%", height: "100%", display: "block" }}
+            style={{ width: "800px", height: "800px", display: "block" }}
         />
     );
 }

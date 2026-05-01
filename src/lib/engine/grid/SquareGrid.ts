@@ -1,19 +1,19 @@
 import { Grid, GridCoord } from "./Grid";
 
 export class SquareGrid implements Grid {
-    constructor(private cellSize: number) { }
+    constructor(private _cellSize: number) {}
 
     gridToWorld({ q, r }: GridCoord) {
         return {
-            x: q * this.cellSize,
-            y: r * this.cellSize,
+            x: q * this._cellSize,
+            y: r * this._cellSize,
         };
     }
 
     worldToGrid(x: number, y: number): GridCoord {
         return {
-            q: Math.floor(x / this.cellSize),
-            r: Math.floor(y / this.cellSize),
+            q: Math.floor(x / this._cellSize),
+            r: Math.floor(y / this._cellSize),
         };
     }
 
@@ -31,6 +31,6 @@ export class SquareGrid implements Grid {
     }
 
     getCellSize() {
-        return this.cellSize;
+        return this._cellSize;
     }
 }

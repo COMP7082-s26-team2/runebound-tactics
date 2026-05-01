@@ -1,9 +1,10 @@
-import { Grid, GridCoord, GridPositionData } from "@/lib/engine/Grid";
-import { ComponentManager } from "@/lib/engine/ComponentManager";
-import { EntityId, EntityManager } from "./EntityManager";
-import { ComponentStore } from "./ComponentStore";
-import { AppearanceData } from "../render";
-import { UnitStatsData } from "../game";
+import { Grid, GridCoord } from "@/lib/engine/grid/Grid";
+import { ComponentManager } from "@/lib/engine/core/ComponentManager";
+import { EntityId, EntityManager } from "@/lib/engine/core/ecs/EntityManager";
+import { ComponentStore } from "@/lib/engine/core/ecs/ComponentStore";
+import { AppearanceData } from "@/lib/game/components/AppearanceData";
+import { UnitStatsData } from "@/lib/game/components/UnitStatsData";
+import { GridPositionData } from "@/lib/game/components/GridPositionData";
 
 export type OccupancyMap = Map<string, EntityId>;
 
