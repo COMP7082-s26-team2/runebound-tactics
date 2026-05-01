@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { GameEngine } from "@/lib/engine/GameEngine";
-import { debug } from "console";
-
+import { GameEngine } from "@/lib/";
 
 export interface GameCanvasOptions {
     debug?: boolean;
@@ -46,9 +44,7 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         };
 
-        engine.postDraw = (ctx) => {
-
-        };
+        engine.postDraw = (ctx) => {};
 
         // start engine
         engine.start();

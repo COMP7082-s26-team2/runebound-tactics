@@ -1,4 +1,4 @@
-import GameCanvas from "@/components/game/GameCanvas";
+import { GameCanvas } from "@/components/";
 
 export default function Page() {
     return (

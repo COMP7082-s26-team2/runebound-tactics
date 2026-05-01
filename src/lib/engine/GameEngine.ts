@@ -1,5 +1,5 @@
-import { ComponentManager } from "./ComponentManager";
-import { GameComponent } from "./GameComponent";
+import { ComponentManager } from "@/lib/engine/ComponentManager";
+import { GameComponent } from "@/lib/engine/GameComponent";
 
 export type UpdateFn = (dt: number) => void;
 export type RenderFn = (ctx: CanvasRenderingContext2D, alpha: number) => void;
@@ -41,11 +41,11 @@ export class GameEngine {
     private upsTimer = 0;
 
     // lifecycle hooks
-    public init: InitFn = () => { };
-    public update: UpdateFn = () => { };
-    public preDraw: DrawFn = () => { };
-    public draw: RenderFn = () => { };
-    public postDraw: DrawFn = () => { };
+    public init: InitFn = () => {};
+    public update: UpdateFn = () => {};
+    public preDraw: DrawFn = () => {};
+    public draw: RenderFn = () => {};
+    public postDraw: DrawFn = () => {};
 
     constructor({
         canvas,
@@ -73,7 +73,6 @@ export class GameEngine {
     private removeComponent(component: GameComponent): void {
         this.components.remove(component);
     }
-
 
     public start(): void {
         if (this.running) return;
@@ -146,6 +145,7 @@ export class GameEngine {
         requestAnimationFrame(this.loop);
     };
 
+    // todo: move to debug overlay
     private renderDebug(ctx: CanvasRenderingContext2D): void {
         ctx.save();
 
