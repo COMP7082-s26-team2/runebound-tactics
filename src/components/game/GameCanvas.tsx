@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { GameEngine } from "@/lib/";
+import { GameEngine, World } from "@/lib/";
+import { UnitRenderSystem } from "@/lib/game/components/UnitRenderSystem";
+import { GridRenderSystem } from "@/lib/game/components/GridRenderSystem";
+import { SquareGrid } from "@/lib/engine/SquareGrid";
 
 export interface GameCanvasOptions {
     debug?: boolean;
@@ -27,21 +30,42 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
         engine.init = () => {
             console.log("Engine initialized");
 
-            // Example component
-            engine.addComponent({
-                update(dt) {
-                    // game logic
+            const grid = new SquareGrid(50);
+            const world = new World(grid);
+            world.spawnUnit(
+                { q: 2, r: 3 },
+                {
+                    attack: 10,
+                    health: 100,
+                    movement: 3,
+                    name: "Warrior",
+                    defense: 5,
                 },
-                draw(ctx, alpha) {
-                    ctx.fillStyle = "blue";
-                    ctx.fillRect(100, 100, 50, 50);
+                { color: "red" },
+            );
+            world.spawnUnit(
+                { q: 5, r: 6 },
+                {
+                    attack: 10,
+                    health: 100,
+                    movement: 3,
+                    name: "Archer",
+                    defense: 5,
                 },
-            });
+                { color: "green" },
+            );
+
+            engine.addComponent(new GridRenderSystem(world, 10, 10, 50));
+            engine.addComponent(new UnitRenderSystem(world, 10, 10, 50));
         };
 
         // render pipeline hooks
         engine.preDraw = (ctx) => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+        };
+
+        engine.draw = (ctx) => {
+            engine.components.draw(ctx, 1);
         };
 
         engine.postDraw = (ctx) => {};
