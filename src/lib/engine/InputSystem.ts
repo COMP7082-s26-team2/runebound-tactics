@@ -1,4 +1,4 @@
-type KeyInputFunction = (code: string) => void;
+type KeyInputFunction = (code: string) => boolean;
 type ActionInputFunction = (name: string) => boolean;
 
 class InputSystem {
