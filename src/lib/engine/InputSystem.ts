@@ -88,10 +88,33 @@ class InputSystem {
         this.justReleased.add(e.code);
         this.justPressed.delete(e.code);
     };
-    
-    private onMouseMove: MouseInputHandlerFunction = (e) => {};
-    private onMouseDown: MouseInputHandlerFunction = (e) => {};
-    private onMouseUp: MouseInputHandlerFunction = (e) => {};
+
+    private onMouseMove: MouseInputHandlerFunction = (e) => {
+        if (this.canvas) {
+            const rect = this.canvas.getBoundingClientRect();
+
+            const scaleX = this.canvas.width / rect.width;
+            const scaleY = this.canvas.height / rect.height;
+
+            this._mouseX = (e.clientX - rect.left) * scaleX;
+            this._mouseY = (e.clientY - rect.top) * scaleY;
+        } else {
+            this._mouseX = e.clientX;
+            this._mouseY = e.clientY;
+        }
+    };
+
+    private onMouseDown: MouseInputHandlerFunction = (e) => {
+        this.mouseHeld.add(e.button);
+        this.mouseJustPressed.add(e.button);
+        this.mouseJustReleased.delete(e.button);
+    };
+
+    private onMouseUp: MouseInputHandlerFunction = (e) => {
+        this.mouseHeld.delete(e.button);
+        this.mouseJustReleased.add(e.button);
+        this.mouseJustPressed.delete(e.button);
+    };
 }
 
 export default InputSystem;
