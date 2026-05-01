@@ -1,68 +1,65 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-import InputSystem from "@/lib/engine/InputSystem";
-
-const input = new InputSystem();
-
-input.defineAction("left", ["ArrowLeft", "KeyA"]);
-input.defineAction("right", ["ArrowRight", "KeyD"]);
-input.defineAction("up", ["ArrowUp", "KeyW"]);
-input.defineAction("down", ["ArrowDown", "KeyS"]);
+import Image from "next/image";
 
 export default function Home() {
-    const [log, setLog] = useState<string[]>([]);
-    const rafRef = useRef<number>(0);
-
-    useEffect(() => {
-        input.init();
-
-        const loop = () => {
-            const lines: string[] = [];
-
-            if (input.isActionHeld("left")) lines.push("left held");
-            if (input.isActionHeld("right")) lines.push("right held");
-            if (input.isActionHeld("up")) lines.push("up held");
-            if (input.isActionHeld("down")) lines.push("down held");
-
-            if (input.isActionJustPressed("left")) lines.push("left justPressed");
-            if (input.isActionJustPressed("right")) lines.push("right justPressed");
-            if (input.isActionJustPressed("up")) lines.push("up justPressed");
-            if (input.isActionJustPressed("down")) lines.push("down justPressed");
-
-            if (input.isActionJustReleased("left")) lines.push("left justReleased");
-            if (input.isActionJustReleased("right")) lines.push("right justReleased");
-            if (input.isActionJustReleased("up")) lines.push("up justReleased");
-            if (input.isActionJustReleased("down")) lines.push("down justReleased");
-
-            const hAxis = input.getAxis("left", "right");
-            const vAxis = input.getAxis("up", "down");
-            lines.push(`axis h=${hAxis} v=${vAxis}`);
-
-            lines.push(`mouse (${Math.round(input.mouseX)}, ${Math.round(input.mouseY)})`);
-            if (input.isMouseButtonHeld(0)) lines.push("LMB held");
-            if (input.isMouseButtonJustPressed(0)) lines.push("LMB justPressed");
-            if (input.isMouseButtonJustReleased(0)) lines.push("LMB justReleased");
-
-            setLog([...lines]);
-            input.update();
-            rafRef.current = requestAnimationFrame(loop);
-        };
-
-        rafRef.current = requestAnimationFrame(loop);
-
-        return () => {
-            cancelAnimationFrame(rafRef.current);
-            input.destroy();
-        };
-    }, []);
-
-    return (
-        <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-            <pre className="text-sm text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-900 p-4 rounded min-w-64">
-                {log.length ? log.join("\n") : "press keys or move mouse"}
-            </pre>
+  return (
+    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
+        <Image
+          className="dark:invert"
+          src="/next.svg"
+          alt="Next.js logo"
+          width={100}
+          height={20}
+          priority
+        />
+        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
+          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
+            To get started, edit the page.tsx file.
+          </h1>
+          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
+            Looking for a starting point or more instructions? Head over to{" "}
+            <a
+              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+              className="font-medium text-zinc-950 dark:text-zinc-50"
+            >
+              Templates
+            </a>{" "}
+            or the{" "}
+            <a
+              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+              className="font-medium text-zinc-950 dark:text-zinc-50"
+            >
+              Learning
+            </a>{" "}
+            center.
+          </p>
         </div>
-    );
+        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
+          <a
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
+            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Image
+              className="dark:invert"
+              src="/vercel.svg"
+              alt="Vercel logomark"
+              width={16}
+              height={16}
+            />
+            Deploy Now
+          </a>
+          <a
+            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
+            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Documentation
+          </a>
+        </div>
+      </main>
+    </div>
+  );
 }
-
