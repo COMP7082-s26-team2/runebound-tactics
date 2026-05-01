@@ -33,7 +33,39 @@ class InputSystem {
     private listeners: WindowListenerArray[] = [];
     private canvas: HTMLCanvasElement | null = null;
 
-    init = (canvas: HTMLCanvasElement | null = null) => {};
+    init = (canvas: HTMLCanvasElement | null = null) => {
+        // remove any previous listeners
+        this.destroy();
+
+        this.canvas = canvas;
+
+        const onKeyDown: KeyInputHandlerFunction = (e) => this.onKeyDown(e);
+        const onKeyUp: KeyInputHandlerFunction = (e) => this.onKeyUp(e);
+
+        const mouseTarget = canvas ?? window;
+
+        const onMouseMove: MouseInputHandlerFunction = (e) =>
+            this.onMouseMove(e);
+        const onMouseDown: MouseInputHandlerFunction = (e) =>
+            this.onMouseDown(e);
+        const onMouseUp: MouseInputHandlerFunction = (e) => this.onMouseUp(e);
+        const onContextMenu: MouseInputHandlerFunction = (e) =>
+            e.preventDefault();
+
+        const mouseListeners: [string, MouseInputHandlerFunction][] = [
+            ["mousemove", onMouseMove],
+            ["mousedown", onMouseDown],
+            ["mouseup", onMouseUp],
+            ["contextmenu", onContextMenu],
+        ];
+
+        window.addEventListener("keydown", onKeyDown);
+        window.addEventListener("keyup", onKeyUp);
+
+        for (const [type, handler] of mouseListeners) {
+            mouseTarget.addEventListener(type, handler as EventListener);
+        }
+    };
 
     destroy = () => {
         for (const listener of this.listeners) {
