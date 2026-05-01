@@ -41,11 +41,17 @@ class InputSystem {
 
     removeAction = (name: string) => {};
 
-    isKeyHeld: KeyInputFunction = (code) => {};
+    isKeyHeld: KeyInputFunction = (code) => {
+        return this.held.has(code);
+    };
 
-    isKeyJustPressed: KeyInputFunction = (code) => {};
+    isKeyJustPressed: KeyInputFunction = (code) => {
+        return this.justPressed.has(code);
+    };
 
-    isKeyJustReleased: KeyInputFunction = (code) => {};
+    isKeyJustReleased: KeyInputFunction = (code) => {
+        return this.justReleased.has(code);
+    };
 
     isActionHeld: ActionInputFunction = (name) => {};
 
