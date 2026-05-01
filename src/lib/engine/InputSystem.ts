@@ -69,11 +69,29 @@ class InputSystem {
 
     isMouseButtonJustReleased: MouseInputFunction = (button) => {};
 
-    private onKeyDown: KeyInputHandlerFunction = (e) => {}
-    private onKeyUp: KeyInputHandlerFunction = (e) => {}
-    private onMouseMove: MouseInputHandlerFunction = (e) => {}
-    private onMouseDown: MouseInputHandlerFunction = (e) => {}
-    private onMouseUp: MouseInputHandlerFunction = (e) => {}
+    private onKeyDown: KeyInputHandlerFunction = (e) => {
+        // ignore key-repeat events since held is already set
+        if (e.repeat) return;
+
+        this.held.add(e.code);
+
+        this.justPressed.add(e.code);
+
+        this.pressOrder.set(e.code, ++this.pressCounter);
+
+        // remove from justReleased in case both fire in the same frame (rare case)
+        this.justReleased.delete(e.code);
+    };
+
+    private onKeyUp: KeyInputHandlerFunction = (e) => {
+        this.held.delete(e.code);
+        this.justReleased.add(e.code);
+        this.justPressed.delete(e.code);
+    };
+    
+    private onMouseMove: MouseInputHandlerFunction = (e) => {};
+    private onMouseDown: MouseInputHandlerFunction = (e) => {};
+    private onMouseUp: MouseInputHandlerFunction = (e) => {};
 }
 
 export default InputSystem;
