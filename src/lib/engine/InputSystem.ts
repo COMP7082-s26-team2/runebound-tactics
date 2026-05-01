@@ -4,6 +4,8 @@ type MouseInputFunction = (button: number) => boolean;
 type KeyInputHandlerFunction = (e: KeyboardEvent) => void;
 type MouseInputHandlerFunction = (e: MouseEvent) => void;
 
+type WindowListenerArray = [Window, string, (...args: unknown[]) => unknown];
+
 class InputSystem {
     // Key states
     // KeyboardEvent.code values
@@ -28,14 +30,36 @@ class InputSystem {
     private actions = new Map<string, string[]>();
 
     // Cleanup
-    private listeners: unknown[][] = [];
+    // NOTE: old code
+    // private listeners: unknown[][] = [];
+    private listeners: WindowListenerArray[] = [];
     private canvas: HTMLCanvasElement | null = null;
 
     init = (canvas: HTMLCanvasElement | null = null) => {};
 
-    destroy = () => {};
+    destroy = () => {
+        for (const listener of this.listeners) {
+            // const [target, type, fn] = listener as [string, string, () => void];
+            const [target, type, fn] = listener as WindowListenerArray;
 
-    update = () => {};
+            target.removeEventListener(type, fn);
+
+            this.listeners = [];
+            this.canvas = null;
+            this.held.clear();
+            this.update();
+            this.pressOrder.clear();
+            this.pressCounter = 0;
+            this.mouseHeld.clear();
+        }
+    };
+
+    update = () => {
+        this.justPressed.clear();
+        this.justReleased.clear();
+        this.mouseJustPressed.clear();
+        this.mouseJustReleased.clear();
+    };
 
     defineAction = (name: string, codes: string[]) => {
         this.actions.set(name, [...codes]);
