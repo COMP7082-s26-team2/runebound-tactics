@@ -13,7 +13,7 @@ export class ComponentManager {
     }
 
     remove(component: GameComponent): void {
-        this.components = this.components.filter(c => c !== component);
+        this.components = this.components.filter((c) => c !== component);
         component.destroy?.();
     }
 
