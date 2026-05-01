@@ -137,7 +137,30 @@ class InputSystem {
         return anyJustReleased && noneStillheld;
     };
 
-    getAxis = (negAction: string, posAction: string): number => {};
+    getAxis = (negAction: string, posAction: string): number => {
+        // both held: find the most recent pressed bound key for each action
+        const _latestOrder = (name: string) => {
+            const codes = this.actions.get(name) ?? [];
+
+            let max = -1;
+
+            for (const curCode of codes) {
+                const t = this.pressOrder.get(curCode) ?? -1;
+                if (t > max) max = t;
+            }
+
+            return max;
+        };
+
+        const negHeld = this.isActionHeld(negAction);
+        const posHeld = this.isActionHeld(posAction);
+
+        if (!negHeld && !posHeld) return 0;
+        if (negHeld && !posHeld) return -1;
+        if (!negHeld && posHeld) return +1;
+
+        return _latestOrder(posAction) > _latestOrder(negAction) ? +1 : -1;
+    };
 
     get mouseX(): number {
         return this._mouseX;
