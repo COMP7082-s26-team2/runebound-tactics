@@ -12,11 +12,10 @@ input.defineAction("down", ["ArrowDown", "KeyS"]);
 
 export default function Home() {
     const [log, setLog] = useState<string[]>([]);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
     const rafRef = useRef<number>(0);
 
     useEffect(() => {
-        input.init(canvasRef.current);
+        input.init();
 
         const loop = () => {
             const lines: string[] = [];
@@ -40,14 +39,7 @@ export default function Home() {
             const vAxis = input.getAxis("up", "down");
             lines.push(`axis h=${hAxis} v=${vAxis}`);
 
-            const mx = Math.round(input.mouseX);
-            const my = Math.round(input.mouseY);
-            const canvas = canvasRef.current;
-            const insideCanvas =
-                canvas !== null &&
-                mx >= 0 && mx <= canvas.width &&
-                my >= 0 && my <= canvas.height;
-            lines.push(`mouse canvas pos: (${mx}, ${my}) — ${insideCanvas ? "inside canvas" : "outside canvas"}`);
+            lines.push(`mouse (${Math.round(input.mouseX)}, ${Math.round(input.mouseY)})`);
             if (input.isMouseButtonHeld(0)) lines.push("LMB held");
             if (input.isMouseButtonJustPressed(0)) lines.push("LMB justPressed");
             if (input.isMouseButtonJustReleased(0)) lines.push("LMB justReleased");
@@ -67,13 +59,7 @@ export default function Home() {
 
     return (
         <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-            <canvas
-                ref={canvasRef}
-                width={800}
-                height={600}
-                className="border border-zinc-400 dark:border-zinc-600 bg-zinc-900"
-            />
-            <pre className="text-sm text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-900 p-4 rounded min-w-64 mt-4">
+            <pre className="text-sm text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-900 p-4 rounded min-w-64">
                 {log.length ? log.join("\n") : "press keys or move mouse"}
             </pre>
         </div>
