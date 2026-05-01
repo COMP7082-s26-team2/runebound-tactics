@@ -23,9 +23,9 @@ export class GameEngine {
     private _width: number;
     private _height: number;
 
-    private _lastTime = 0;
-    private _accumulator = 0;
-    private _running = false;
+    private _lastTime: number = 0;
+    private _accumulator: number = 0;
+    private _running: boolean = false;
 
     private _fixedDelta: number;
     private _debug: boolean;
@@ -41,11 +41,11 @@ export class GameEngine {
     private _upsTimer = 0;
 
     // lifecycle hooks
-    public init: InitFn = () => {};
-    public update: UpdateFn = () => {};
-    public preDraw: DrawFn = () => {};
-    public draw: RenderFn = () => {};
-    public postDraw: DrawFn = () => {};
+    public init: InitFn = () => { };
+    public update: UpdateFn = () => { };
+    public preDraw: DrawFn = () => { };
+    public draw: RenderFn = () => { };
+    public postDraw: DrawFn = () => { };
 
     constructor({
         canvas,
@@ -92,7 +92,8 @@ export class GameEngine {
         this._running = false;
     }
 
-    private loop (timestamp: number): void {
+    // callback to be passed within the requestAnimationFrame
+    private loop = (timestamp: number): void => {
         if (!this._running) return;
 
         let frameTime = (timestamp - this._lastTime) / 1000;
