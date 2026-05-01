@@ -37,9 +37,13 @@ class InputSystem {
 
     update = () => {};
 
-    defineAction = (name: string, codes: string[]) => {};
+    defineAction = (name: string, codes: string[]) => {
+        this.actions.set(name, [...codes]);
+    };
 
-    removeAction = (name: string) => {};
+    removeAction = (name: string) => {
+        this.actions.delete(name);
+    };
 
     isKeyHeld: KeyInputFunction = (code) => {
         return this.held.has(code);
