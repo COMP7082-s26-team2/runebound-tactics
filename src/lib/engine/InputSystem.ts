@@ -17,6 +17,13 @@ class InputSystem {
     private mouseHeld = new Set();
     private mouseJustPressed = new Set();
     private mouseJustReleased = new Set();
+
+    // Action map
+    private actions = new Map<string, string[]>();
+
+    // Cleanup
+    private listeners: unknown[][] = [];
+    private canvas: HTMLCanvasElement | null = null;
 }
 
 export default InputSystem;
