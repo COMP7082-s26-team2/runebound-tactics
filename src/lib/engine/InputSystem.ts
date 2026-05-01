@@ -30,8 +30,6 @@ class InputSystem {
     private actions = new Map<string, string[]>();
 
     // Cleanup
-    // NOTE: old code
-    // private listeners: unknown[][] = [];
     private listeners: WindowListenerArray[] = [];
     private canvas: HTMLCanvasElement | null = null;
 
@@ -39,7 +37,6 @@ class InputSystem {
 
     destroy = () => {
         for (const listener of this.listeners) {
-            // const [target, type, fn] = listener as [string, string, () => void];
             const [target, type, fn] = listener as WindowListenerArray;
 
             target.removeEventListener(type, fn);
