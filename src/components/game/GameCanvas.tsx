@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { GameEngine } from "@/lib/engine";
+import { GameEngine } from "@/lib/";
 
 export interface GameCanvasOptions {
     debug?: boolean;
