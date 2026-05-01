@@ -1,6 +1,8 @@
 type KeyInputFunction = (code: string) => boolean;
 type ActionInputFunction = (name: string) => boolean;
 type MouseInputFunction = (button: number) => boolean;
+type KeyInputHandlerFunction = (e: KeyboardEvent) => void;
+type MouseInputHandlerFunction = (e: MouseEvent) => void;
 
 class InputSystem {
     // Key states
@@ -66,6 +68,12 @@ class InputSystem {
     isMouseButtonJustPressed: MouseInputFunction = (button) => {};
 
     isMouseButtonJustReleased: MouseInputFunction = (button) => {};
+
+    private onKeyDown: KeyInputHandlerFunction = (e) => {}
+    private onKeyUp: KeyInputHandlerFunction = (e) => {}
+    private onMouseMove: MouseInputHandlerFunction = (e) => {}
+    private onMouseDown: MouseInputHandlerFunction = (e) => {}
+    private onMouseUp: MouseInputHandlerFunction = (e) => {}
 }
 
 export default InputSystem;
