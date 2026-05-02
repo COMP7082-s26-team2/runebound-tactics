@@ -9,4 +9,21 @@ class TurnSystem {
     private _loop: boolean | null = null;
     private _acted = new Set<string>();
     private _skipped = new Set<string>();
+
+    get activeParticipant() {
+        return this._participants[this._index] ?? null;
+    }
+
+    get activeId() {
+        return this.activeParticipant?.id ?? null;
+    }
+
+    get turnIndex() {
+        return this._index;
+    }
+
+    get started() {
+        return this._started;
+    }
+
 }
