@@ -4,27 +4,27 @@ type EventBusSubFunction = (
 ) => void;
 
 class EventBus {
-    private listeners = new Map<string, Set<(...args: unknown[]) => unknown>>();
+    private _listeners = new Map<string, Set<(...args: unknown[]) => unknown>>();
 
     on: EventBusSubFunction = (event, callback) => {
-        if (!this.listeners.has(event)) {
-            this.listeners.set(event, new Set());
+        if (!this._listeners.has(event)) {
+            this._listeners.set(event, new Set());
         }
 
-        this.listeners.get(event)?.add(callback);
+        this._listeners.get(event)?.add(callback);
 
         return () => this.off(event, callback);
     };
 
     off: EventBusSubFunction = (event, callback) => {
-        const set = this.listeners.get(event);
+        const set = this._listeners.get(event);
 
         if (!set) return;
 
         set.delete(callback);
 
         if (set.size === 0) {
-            this.listeners.delete(event);
+            this._listeners.delete(event);
         }
     };
 
@@ -38,7 +38,7 @@ class EventBus {
     };
 
     emit = (event: string, data: unknown) => {
-        const set = this.listeners.get(event);
+        const set = this._listeners.get(event);
 
         if (!set) return;
 
@@ -48,7 +48,7 @@ class EventBus {
     };
 
     hasListeners = (event: string) => {
-        const set = this.listeners.get(event);
+        const set = this._listeners.get(event);
 
         return set != null && set.size > 0;
     };
