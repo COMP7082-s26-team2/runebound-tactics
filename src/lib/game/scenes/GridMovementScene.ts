@@ -35,13 +35,13 @@ export class GridMovementScene extends Scene {
 
         this._world.spawnUnit(
             { q: 2, r: 3 },
-            { attack: 10, health: 100, movement: 3, name: "Warrior", defense: 5, attackRange: 1, team: "player" },
+            { attack: 10, health: 100, movement: 5, name: "Warrior", defense: 5, attackRange: 1 },
             { color: "red" },
         );
 
         this._world.spawnUnit(
             { q: 5, r: 6 },
-            { attack: 8, health: 80, movement: 2, name: "Skeleton", defense: 2, attackRange: 1, team: "enemy" },
+            { attack: 8, health: 80, movement: 2, name: "Skeleton", defense: 2, attackRange: 1 },
             { color: "purple" },
         );
 

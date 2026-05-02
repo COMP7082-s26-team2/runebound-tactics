@@ -42,8 +42,6 @@ export class SelectionSystem implements GameComponent {
 
     private _handleIdleClick(occupant: EntityId | null): void {
         if (occupant === null) return;
-        const stats = this._world.unitStats.get(occupant);
-        if (stats?.team !== "player") return;
         this._select(occupant);
     }
 
@@ -192,8 +190,6 @@ export class SelectionSystem implements GameComponent {
 
         for (const [candidateId] of this._world.unitStats.entries()) {
             if (candidateId === entityId) continue;
-            const candidateStats = this._world.unitStats.get(candidateId);
-            if (!candidateStats || candidateStats.team === stats.team) continue;
             const candidatePos = this._world.gridPositions.get(candidateId);
             if (!candidatePos) continue;
             if (this._world.grid.distance(pos, candidatePos) <= stats.attackRange) {
