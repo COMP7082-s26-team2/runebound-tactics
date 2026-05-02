@@ -14,6 +14,19 @@ class TurnSystem {
     private _skipped = new Set<string>();
     private _eventBus: EventBus | null = null;
 
+    constructor(
+        participants: Participant[] = [],
+        eventBus = null,
+        loop = true,
+    ) {
+        this._eventBus = eventBus;
+        this._loop = loop;
+
+        for (const p of participants) {
+            this._validateAndAdd(p);
+        }
+    }
+
     get activeParticipant() {
         return this._participants[this._index] ?? null;
     }
