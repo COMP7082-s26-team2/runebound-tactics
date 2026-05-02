@@ -1,9 +1,12 @@
 import { GameComponent } from "@/lib/engine/core/GameComponent";
 import { EntityId } from "@/lib/engine/core/ecs/EntityManager";
 import { GridCoord } from "@/lib/engine/grid/Grid";
+import { TweenManager, Vec2 } from "@/lib/engine/core/TweenManager";
 import { World, cellKey } from "@/lib/engine/world/World";
 import { GameState } from "@/lib/game/state/GameState";
 import { InputSystem } from "@/lib/game/systems/InputSystem";
+
+const STEP_DURATION = 0.15; // seconds per grid cell
 
 export class SelectionSystem implements GameComponent {
     constructor(
@@ -11,6 +14,7 @@ export class SelectionSystem implements GameComponent {
         private _cellSize: number,
         private _state: GameState,
         private _input: InputSystem,
+        private _tweens: TweenManager,
     ) {}
 
     update(_dt: number): void {
@@ -36,10 +40,6 @@ export class SelectionSystem implements GameComponent {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // State handlers
-    // -------------------------------------------------------------------------
-
     private _handleIdleClick(occupant: EntityId | null): void {
         if (occupant === null) return;
         const stats = this._world.unitStats.get(occupant);
@@ -52,7 +52,7 @@ export class SelectionSystem implements GameComponent {
         key: string,
         occupant: EntityId | null,
     ): void {
-        // Clicking an attackable enemy → attack, then enter awaiting-move
+        // attack
         if (occupant !== null && this._state.attackableEntities.has(occupant)) {
             this._attack(this._state.selectedEntity!, occupant);
             this._computeReachable(this._state.selectedEntity!);
@@ -61,34 +61,91 @@ export class SelectionSystem implements GameComponent {
             return;
         }
 
-        // Clicking a reachable tile → move and end turn
+        // move
         if (this._state.reachableTiles.has(key)) {
-            this._world.moveUnit(this._state.selectedEntity!, coord);
+            this._moveUnit(this._state.selectedEntity!, coord);
             this._deselect();
             return;
         }
 
-        // Clicking anywhere else → deselect
         this._deselect();
     }
 
     private _handleAwaitingMoveClick(coord: GridCoord, key: string): void {
-        // Unit has already attacked — only movement left, then turn ends
+        // move then end turn
         if (this._state.reachableTiles.has(key)) {
-            this._world.moveUnit(this._state.selectedEntity!, coord);
+            this._moveUnit(this._state.selectedEntity!, coord);
         }
         this._deselect();
     }
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
 
     private _select(entityId: EntityId): void {
         this._state.selectedEntity = entityId;
         this._state.phase = "selected";
         this._computeReachable(entityId);
         this._computeAttackable(entityId);
+    }
+
+    private _moveUnit(entityId: EntityId, targetCoord: GridCoord): void {
+        const path = this._computePath(entityId, targetCoord);
+
+        // sample visual pos so an interrupted tween starts from there
+        const oldCoord = this._world.gridPositions.get(entityId)!;
+        const currentVisualPos = this._tweens.getPosition(entityId, {
+            x: oldCoord.q * this._cellSize,
+            y: oldCoord.r * this._cellSize,
+        });
+
+        this._world.moveUnit(entityId, targetCoord);
+
+        // convert grid path to pixel waypoints
+        const waypoints: Vec2[] = [
+            currentVisualPos,
+            ...path.slice(1).map((c) => ({
+                x: c.q * this._cellSize,
+                y: c.r * this._cellSize,
+            })),
+        ];
+
+        this._tweens.startPath(entityId, waypoints, STEP_DURATION);
+    }
+
+    // BFS to find the grid path to target
+    private _computePath(entityId: EntityId, target: GridCoord): GridCoord[] {
+        const start = this._world.gridPositions.get(entityId);
+        const stats = this._world.unitStats.get(entityId);
+        if (!start || !stats) return [];
+
+        const targetKey = cellKey(target);
+        const parentMap = new Map<string, GridCoord | null>();
+        const queue: Array<{ coord: GridCoord; steps: number }> = [
+            { coord: start, steps: 0 },
+        ];
+        parentMap.set(cellKey(start), null);
+
+        outer: while (queue.length > 0) {
+            const { coord, steps } = queue.shift()!;
+            if (steps >= stats.movement) continue;
+
+            for (const neighbor of this._world.grid.getNeighbors(coord)) {
+                const key = cellKey(neighbor);
+                if (parentMap.has(key)) continue;
+                if (this._world.occupancyMap.has(key)) continue;
+                parentMap.set(key, coord);
+                if (key === targetKey) break outer;
+                queue.push({ coord: neighbor, steps: steps + 1 });
+            }
+        }
+
+        // reconstruct path from parent pointers
+        const path: GridCoord[] = [];
+        let current: GridCoord | null | undefined = target;
+        while (current != null) {
+            path.unshift(current);
+            current = parentMap.get(cellKey(current));
+        }
+
+        return path.length > 0 ? path : [start, target];
     }
 
     private _deselect(): void {
@@ -98,13 +155,12 @@ export class SelectionSystem implements GameComponent {
         this._state.attackableEntities.clear();
     }
 
-    /** BFS flood-fill up to stats.movement steps, skipping occupied cells. */
     private _computeReachable(entityId: EntityId): void {
         const stats = this._world.unitStats.get(entityId);
         const start = this._world.gridPositions.get(entityId);
         if (!stats || !start) return;
 
-        const visited = new Map<string, number>(); // cellKey → steps used
+        const visited = new Map<string, number>();
         const queue: Array<{ coord: GridCoord; steps: number }> = [
             { coord: start, steps: 0 },
         ];
@@ -117,18 +173,16 @@ export class SelectionSystem implements GameComponent {
             for (const neighbor of this._world.grid.getNeighbors(coord)) {
                 const key = cellKey(neighbor);
                 if (visited.has(key)) continue;
-                // blocked by any unit (allies and enemies alike)
                 if (this._world.occupancyMap.has(key)) continue;
                 visited.set(key, steps + 1);
                 queue.push({ coord: neighbor, steps: steps + 1 });
             }
         }
 
-        visited.delete(cellKey(start)); // can't "move" to own tile
+        visited.delete(cellKey(start));
         this._state.reachableTiles = new Set(visited.keys());
     }
 
-    /** Mark all enemies within attackRange of the selected entity. */
     private _computeAttackable(entityId: EntityId): void {
         const stats = this._world.unitStats.get(entityId);
         const pos = this._world.gridPositions.get(entityId);
@@ -148,7 +202,6 @@ export class SelectionSystem implements GameComponent {
         }
     }
 
-    /** Apply damage and remove the target if health drops to 0. */
     private _attack(attackerId: EntityId, targetId: EntityId): void {
         const atkStats = this._world.unitStats.get(attackerId);
         const defStats = this._world.unitStats.get(targetId);

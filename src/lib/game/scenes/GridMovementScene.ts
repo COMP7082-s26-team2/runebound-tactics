@@ -1,4 +1,5 @@
 import { Scene } from "@/lib/engine/core/Scene";
+import { TweenManager } from "@/lib/engine/core/TweenManager";
 import { World } from "@/lib/engine/world/World";
 import { SquareGrid } from "@/lib/engine/grid/SquareGrid";
 import { GridRenderSystem } from "@/lib/game/systems/GridRenderSystem";
@@ -46,8 +47,10 @@ export class GridMovementScene extends Scene {
 
         this.components.add(new GridRenderSystem(this._world, GRID_COLS, GRID_ROWS, CELL_SIZE));
         this.components.add(new MovementRangeSystem(this._world, CELL_SIZE, this.state));
-        this.components.add(new UnitRenderSystem(this._world, GRID_COLS, GRID_ROWS, CELL_SIZE));
-        this.components.add(new SelectionSystem(this._world, CELL_SIZE, this.state, this.input));
+        const tweens = new TweenManager();
+        this.components.add(tweens);
+        this.components.add(new UnitRenderSystem(this._world, GRID_COLS, GRID_ROWS, CELL_SIZE, tweens));
+        this.components.add(new SelectionSystem(this._world, CELL_SIZE, this.state, this.input, tweens));
         this.components.add(this.input);
     }
 
