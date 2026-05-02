@@ -1,5 +1,6 @@
 import { ComponentManager } from "./ComponentManager";
 import { GameComponent } from "./GameComponent";
+import { SceneManager } from "./SceneManager";
 
 export type UpdateFn = (dt: number) => void;
 export type RenderFn = (ctx: CanvasRenderingContext2D, alpha: number) => void;
@@ -19,6 +20,7 @@ export class GameEngine {
     private _ctx: CanvasRenderingContext2D;
 
     public components = new ComponentManager();
+    public scenes = new SceneManager();
 
     private _width: number;
     private _height: number;
@@ -117,6 +119,7 @@ export class GameEngine {
         while (this._accumulator >= this._fixedDelta) {
             this.update(this._fixedDelta);
             this.components.update(this._fixedDelta);
+            this.scenes.update(this._fixedDelta);
 
             this._upsCounter++;
 
@@ -136,6 +139,7 @@ export class GameEngine {
         this.preDraw(this._ctx);
         this.draw(this._ctx, alpha);
         this.components.draw(this._ctx, alpha);
+        this.scenes.draw(this._ctx, alpha);
 
         if (this._debug) {
             this.renderDebug(this._ctx);

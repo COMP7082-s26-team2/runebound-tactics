@@ -1,3 +1,3 @@
-export * from "./components/GridPositionData";
-export * from "./components/UnitStatsData";
-export * from "./components/AppearanceData";
+export * from "./components";
+export * from "./systems";
+export * from "./scenes";
