@@ -43,6 +43,56 @@ class TurnSystem {
         return this._started;
     }
 
+    addParticipant = (participant: Participant) => {
+        this._validateAndAdd(participant);
+        this._emit("turn:participant-added", { participant });
+    };
+
+    removeParticipant = (id: string) => {
+        const participantIndex = this._participants.findIndex(
+            (p) => p.id === id,
+        );
+
+        if (participantIndex < 0) return;
+
+        const participant = this._participants[participantIndex];
+
+        if (this._started && participantIndex === this._index) {
+            this._advance();
+        }
+
+        this._participants.splice(participantIndex, 1);
+        if (this._index >= this._participants.length) {
+            this._index = 0;
+        }
+
+        this._emit("turn:participant-removed", { participant });
+    };
+
+    getParticipant = (id: string) => {
+        return this._participants.find((p) => p.id === id);
+    };
+
+    isActive = (id: string) => {
+        return this.activeId === id;
+    };
+
+    markActed = (token: string) => {
+        this._acted.add(token);
+    };
+
+    hasActed = (token: string) => {
+        return this._acted.has(token);
+    };
+
+    getActedTokens = () => {
+        return new Set(this._acted);
+    };
+
+    clearActed = () => {
+        this._acted.clear();
+    };
+
     private _advance = () => {
         const total = this._participants.length;
         let next = (this._index + 1) % total;
