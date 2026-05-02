@@ -1,3 +1,4 @@
+import EventBus from "./EventBus";
 import InputSystem from "./InputSystem";
 
-export { InputSystem };
+export { EventBus, InputSystem };
