@@ -40,6 +40,8 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
                     movement: 3,
                     name: "Warrior",
                     defense: 5,
+                    attackRange: 1,
+                    team: "player",
                 },
                 { color: "red" },
             );
@@ -51,6 +53,8 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
                     movement: 3,
                     name: "Archer",
                     defense: 5,
+                    attackRange: 1,
+                    team: "enemy",
                 },
                 { color: "green" },
             );

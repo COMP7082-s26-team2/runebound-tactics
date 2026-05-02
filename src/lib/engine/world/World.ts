@@ -49,4 +49,14 @@ export class World {
         this.gridPositions.set(entityId, newCoord);
         this.occupancyMap.set(cellKey(newCoord), entityId);
     }
+
+    removeUnit(entityId: EntityId): void {
+        const coord = this.gridPositions.get(entityId);
+        if (coord) this.occupancyMap.delete(cellKey(coord));
+        this.gridPositions.remove(entityId);
+        this.unitStats.remove(entityId);
+        this.unitAppearance.remove(entityId);
+        this.entityManager.removeEntity(entityId);
+    }
+    
 }

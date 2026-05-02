@@ -26,7 +26,7 @@ export default function GridMovementCanvas({
             debug,
         });
 
-        const scene = new GridMovementScene();
+        const scene = new GridMovementScene(canvas);
         engine.scenes.register("main", scene);
         engine.scenes.switch("main");
 
