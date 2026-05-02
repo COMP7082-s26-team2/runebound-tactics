@@ -1,4 +1,4 @@
 import InputSystemInstance from "./InputSystemInstance";
+import EventBusInstance from "./EventBusInstance";
 
-export { InputSystemInstance };
-export * from "./EventBusInstance";
+export { EventBusInstance, InputSystemInstance };
