@@ -2,7 +2,7 @@
 
 ## Overview
 
-The database is designed to support the core systems of **Runebound Tactics**, a multiplayer turn-based tactical strategy game. The schema handles player accounts, guild/clan systems, matchmaking, turn management, units, resources, cards, and gameplay action logging. The design is normalized to reduce redundancy while keeping multiplayer state consistent.
+The database is designed to support the core systems of **Runebound Tactics**, a multiplayer turn-based tactical strategy game. The schema handles player accounts, guild systems, matchmaking, turn management, units, resources, cards, and gameplay action logging. The design is normalized to reduce redundancy while keeping multiplayer state consistent.
 
 ---
 
