@@ -3,7 +3,7 @@ import { World } from "@/lib/engine/world/World";
 import { GameState } from "@/lib/game/state/GameState";
 
 export class MovementRangeSystem implements GameComponent {
-    readonly zIndex = 1; // above grid tiles, below unit sprites
+    readonly zIndex = 2; // above grid tiles, below unit sprites
 
     constructor(
         private _world: World,

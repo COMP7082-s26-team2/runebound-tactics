@@ -27,6 +27,9 @@ export class UnitRenderSystem implements GameComponent {
                 : fallback;
 
             const appearance = this._world.unitAppearance.get(entityId);
+
+            // todo: fetch sprites from here when implemented, for now just colored rectangles
+
             ctx.fillStyle = appearance?.color ?? "gray";
             ctx.fillRect(x, y, this._cellSize, this._cellSize);
         }

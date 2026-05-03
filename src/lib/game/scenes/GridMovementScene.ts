@@ -45,12 +45,12 @@ export class GridMovementScene extends Scene {
             { color: "purple" },
         );
 
-        this.components.add(new GridRenderSystem(this._world, GRID_COLS, GRID_ROWS, CELL_SIZE));
-        this.components.add(new MovementRangeSystem(this._world, CELL_SIZE, this.state));
         const tweens = new TweenManager();
         this.components.add(tweens);
         this.components.add(new UnitRenderSystem(this._world, GRID_COLS, GRID_ROWS, CELL_SIZE, tweens));
         this.components.add(new SelectionSystem(this._world, CELL_SIZE, this.state, this.input, tweens));
+        this.components.add(new GridRenderSystem(this._world, GRID_COLS, GRID_ROWS, CELL_SIZE));
+        this.components.add(new MovementRangeSystem(this._world, CELL_SIZE, this.state));
         this.components.add(this.input);
     }
 
