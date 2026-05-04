@@ -1,14 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import InputSystem from "@/lib/engine/InputSystem";
-
-const input = new InputSystem();
-
-input.defineAction("left", ["ArrowLeft", "KeyA"]);
-input.defineAction("right", ["ArrowRight", "KeyD"]);
-input.defineAction("up", ["ArrowUp", "KeyW"]);
-input.defineAction("down", ["ArrowDown", "KeyS"]);
+import { InputSystem } from "@/lib/game/";
 
 export default function InputTest() {
     const [log, setLog] = useState<string[]>([]);
@@ -16,7 +9,13 @@ export default function InputTest() {
     const rafRef = useRef<number>(0);
 
     useEffect(() => {
-        input.init(canvasRef.current);
+        const input = new InputSystem(canvasRef.current);
+        input.init();
+
+        input.defineAction("left", ["ArrowLeft", "KeyA"]);
+        input.defineAction("right", ["ArrowRight", "KeyD"]);
+        input.defineAction("up", ["ArrowUp", "KeyW"]);
+        input.defineAction("down", ["ArrowDown", "KeyS"]);
 
         const loop = () => {
             const lines: string[] = [];
@@ -26,15 +25,21 @@ export default function InputTest() {
             if (input.isActionHeld("up")) lines.push("up held");
             if (input.isActionHeld("down")) lines.push("down held");
 
-            if (input.isActionJustPressed("left")) lines.push("left justPressed");
-            if (input.isActionJustPressed("right")) lines.push("right justPressed");
+            if (input.isActionJustPressed("left"))
+                lines.push("left justPressed");
+            if (input.isActionJustPressed("right"))
+                lines.push("right justPressed");
             if (input.isActionJustPressed("up")) lines.push("up justPressed");
-            if (input.isActionJustPressed("down")) lines.push("down justPressed");
+            if (input.isActionJustPressed("down"))
+                lines.push("down justPressed");
 
-            if (input.isActionJustReleased("left")) lines.push("left justReleased");
-            if (input.isActionJustReleased("right")) lines.push("right justReleased");
+            if (input.isActionJustReleased("left"))
+                lines.push("left justReleased");
+            if (input.isActionJustReleased("right"))
+                lines.push("right justReleased");
             if (input.isActionJustReleased("up")) lines.push("up justReleased");
-            if (input.isActionJustReleased("down")) lines.push("down justReleased");
+            if (input.isActionJustReleased("down"))
+                lines.push("down justReleased");
 
             const hAxis = input.getAxis("left", "right");
             const vAxis = input.getAxis("up", "down");
@@ -45,15 +50,21 @@ export default function InputTest() {
             const canvas = canvasRef.current;
             const insideCanvas =
                 canvas !== null &&
-                mx >= 0 && mx <= canvas.width &&
-                my >= 0 && my <= canvas.height;
-            lines.push(`mouse canvas pos: (${mx}, ${my}) — ${insideCanvas ? "inside canvas" : "outside canvas"}`);
+                mx >= 0 &&
+                mx <= canvas.width &&
+                my >= 0 &&
+                my <= canvas.height;
+            lines.push(
+                `mouse canvas pos: (${mx}, ${my}) — ${insideCanvas ? "inside canvas" : "outside canvas"}`,
+            );
             if (input.isMouseButtonHeld(0)) lines.push("LMB held");
-            if (input.isMouseButtonJustPressed(0)) lines.push("LMB justPressed");
-            if (input.isMouseButtonJustReleased(0)) lines.push("LMB justReleased");
+            if (input.isMouseButtonJustPressed(0))
+                lines.push("LMB justPressed");
+            if (input.isMouseButtonJustReleased(0))
+                lines.push("LMB justReleased");
 
             setLog([...lines]);
-            input.update();
+            input.update(0);
             rafRef.current = requestAnimationFrame(loop);
         };
 
