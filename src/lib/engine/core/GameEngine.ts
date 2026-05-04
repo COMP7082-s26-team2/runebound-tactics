@@ -43,11 +43,11 @@ export class GameEngine {
     private _upsTimer = 0;
 
     // lifecycle hooks
-    public init: InitFn = () => { };
-    public update: UpdateFn = () => { };
-    public preDraw: DrawFn = () => { };
-    public draw: RenderFn = () => { };
-    public postDraw: DrawFn = () => { };
+    public init: InitFn = () => {};
+    public update: UpdateFn = () => {};
+    public preDraw: DrawFn = () => {};
+    public draw: RenderFn = () => {};
+    public postDraw: DrawFn = () => {};
 
     constructor({
         canvas,
