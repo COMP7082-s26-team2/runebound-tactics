@@ -16,7 +16,7 @@ class TurnSystem {
 
     constructor(
         participants: Participant[] = [],
-        eventBus = null,
+        eventBus: EventBus | null = null,
         loop = true,
     ) {
         this._eventBus = eventBus;
@@ -28,7 +28,7 @@ class TurnSystem {
     }
 
     get activeParticipant() {
-        return this._participants[this._index] ?? null;
+        return this._started ? (this._participants[this._index] ?? null) : null;
     }
 
     get activeId() {
