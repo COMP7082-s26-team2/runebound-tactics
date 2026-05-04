@@ -2,9 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import { GameEngine, World } from "@/lib/";
-import { UnitRenderSystem } from "@/lib/game/systems/UnitRenderSystem";
-import { GridRenderSystem } from "@/lib/game/systems/GridRenderSystem";
-import { SquareGrid } from "@/lib/engine/grid/SquareGrid";
+import { UnitRenderSystem } from "@/lib/game/";
+import { GridRenderSystem } from "@/lib/game/";
+import { SquareGrid } from "@/lib/engine/";
 
 export interface GameCanvasOptions {
     debug?: boolean;

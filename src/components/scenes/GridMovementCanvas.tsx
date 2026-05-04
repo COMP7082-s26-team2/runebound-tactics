@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { GameEngine } from "@/lib/";
-import { GridMovementScene } from "@/lib/game/scenes/GridMovementScene";
+import { GridMovementScene } from "@/lib/game/";
 
 export interface GridMovementCanvasProps {
     debug?: boolean;
