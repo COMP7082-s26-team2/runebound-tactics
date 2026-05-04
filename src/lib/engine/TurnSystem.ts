@@ -223,3 +223,5 @@ class TurnSystem {
         this._eventBus?.emit(event, payload);
     };
 }
+
+export default TurnSystem;
