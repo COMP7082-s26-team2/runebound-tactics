@@ -153,6 +153,14 @@ class TurnSystem {
         }
     };
 
+    reset = () => {
+        this._index = 0;
+        this._round = 0;
+        this._started = false;
+        this._acted.clear();
+        this._skipped.clear();
+    };
+
     private _advance = () => {
         const total = this._participants.length;
         let next = (this._index + 1) % total;
