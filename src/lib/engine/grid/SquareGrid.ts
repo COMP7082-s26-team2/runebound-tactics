@@ -1,13 +1,11 @@
 import { Grid, GridCoord } from "./Grid";
+import { Vector2D } from "@/lib/engine/core";
 
 export class SquareGrid implements Grid {
     constructor(private _cellSize: number) {}
 
-    gridToWorld({ q, r }: GridCoord) {
-        return {
-            x: q * this._cellSize,
-            y: r * this._cellSize,
-        };
+    gridToWorld({ q, r }: GridCoord): Vector2D {
+        return Vector2D.of(q * this._cellSize, r * this._cellSize);
     }
 
     worldToGrid(x: number, y: number): GridCoord {
@@ -19,10 +17,10 @@ export class SquareGrid implements Grid {
 
     getNeighbors({ q, r }: GridCoord): GridCoord[] {
         return [
-            { q: q + 1, r },
-            { q: q - 1, r },
-            { q, r: r + 1 },
-            { q, r: r - 1 },
+            { q: q + 1, r }, // right
+            { q: q - 1, r }, // left
+            { q, r: r + 1 }, // down
+            { q, r: r - 1 }, // up
         ];
     }
 

@@ -1,6 +1,5 @@
-import { GameComponent } from "@/lib/engine/core/GameComponent";
-import { World } from "@/lib/engine/world/World";
-import { GameState } from "@/lib/game/state/GameState";
+import { GameComponent, World } from "@/lib/engine";
+import { GameState } from "@/lib/game/state";
 
 export class MovementRangeSystem implements GameComponent {
     readonly zIndex = 2; // above grid tiles, below unit sprites

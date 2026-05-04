@@ -1,14 +1,13 @@
 import { GameComponent } from "./GameComponent";
 import { EntityId } from "./ecs/EntityManager";
-
-export type Vec2 = { x: number; y: number };
+import { Vector2D } from "./Vector2D";
 
 function easeOutCubic(t: number): number {
     return 1 - Math.pow(1 - t, 3);
 }
 
 interface Tween {
-    waypoints: Vec2[]; // [currentFrom, nextTo, ...remaining]
+    waypoints: Vector2D[]; // [currentFrom, nextTo, ...remaining]
     stepDuration: number;
     elapsed: number;
     onComplete?: () => void;
@@ -20,8 +19,8 @@ export class TweenManager implements GameComponent {
     /** Single-segment convenience — keeps existing call sites working. */
     start(
         entityId: EntityId,
-        from: Vec2,
-        to: Vec2,
+        from: Vector2D,
+        to: Vector2D,
         duration: number,
         onComplete?: () => void,
     ): void {
@@ -34,7 +33,7 @@ export class TweenManager implements GameComponent {
      */
     startPath(
         entityId: EntityId,
-        waypoints: Vec2[],
+        waypoints: Vector2D[],
         stepDuration: number,
         onComplete?: () => void,
     ): void {
@@ -48,17 +47,12 @@ export class TweenManager implements GameComponent {
     }
 
     /** Returns the current interpolated pixel position, or `fallback` if no tween is active. */
-    getPosition(entityId: EntityId, fallback: Vec2): Vec2 {
+    getPosition(entityId: EntityId, fallback: Vector2D): Vector2D {
         const tween = this._tweens.get(entityId);
         if (!tween || tween.waypoints.length < 2) return fallback;
 
         const t = easeOutCubic(Math.min(tween.elapsed / tween.stepDuration, 1));
-        const from = tween.waypoints[0];
-        const to = tween.waypoints[1];
-        return {
-            x: from.x + (to.x - from.x) * t,
-            y: from.y + (to.y - from.y) * t,
-        };
+        return tween.waypoints[0].lerp(tween.waypoints[1], t);
     }
 
     isMoving(entityId: EntityId): boolean {

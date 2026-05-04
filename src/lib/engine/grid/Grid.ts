@@ -1,7 +1,9 @@
+import { Vector2D } from "@/lib/engine/core";
+
 export type GridCoord = { q: number; r: number };
 
 export interface Grid {
-    gridToWorld(coord: GridCoord): { x: number; y: number };
+    gridToWorld(coord: GridCoord): Vector2D;
 
     worldToGrid(x: number, y: number): GridCoord;
 

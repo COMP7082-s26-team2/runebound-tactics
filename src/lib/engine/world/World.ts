@@ -1,10 +1,12 @@
-import { Grid, GridCoord } from "@/lib/engine/grid/Grid";
-import { ComponentManager } from "@/lib/engine/core/ComponentManager";
+import { Grid, GridCoord } from "@/lib/engine/grid";
+import { ComponentManager } from "@/lib/engine/core";
 import { EntityId, EntityManager } from "@/lib/engine/core/ecs/EntityManager";
 import { ComponentStore } from "@/lib/engine/core/ecs/ComponentStore";
-import { AppearanceData } from "@/lib/game/components/AppearanceData";
-import { UnitStatsData } from "@/lib/game/components/UnitStatsData";
-import { GridPositionData } from "@/lib/game/components/GridPositionData";
+import {
+    AppearanceData,
+    UnitStatsData,
+    GridPositionData,
+} from "@/lib/game/components";
 
 export type OccupancyMap = Map<string, EntityId>;
 
@@ -58,5 +60,4 @@ export class World {
         this.unitAppearance.remove(entityId);
         this.entityManager.removeEntity(entityId);
     }
-    
 }

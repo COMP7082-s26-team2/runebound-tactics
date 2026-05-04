@@ -1,5 +1,4 @@
-import { World } from "@/lib/engine/world/World";
-import { GameComponent } from "@/lib/engine/core/GameComponent";
+import { World, GameComponent } from "@/lib/engine";
 
 export class GridRenderSystem implements GameComponent {
     constructor(

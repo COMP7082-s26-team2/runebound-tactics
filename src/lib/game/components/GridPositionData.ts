@@ -1,3 +1,3 @@
-import { GridCoord } from "@/lib/engine/grid/Grid";
+import { GridCoord } from "@/lib/engine/grid/";
 
 export type GridPositionData = GridCoord;

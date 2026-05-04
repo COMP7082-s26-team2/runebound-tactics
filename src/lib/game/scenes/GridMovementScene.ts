@@ -1,13 +1,19 @@
-import { Scene } from "@/lib/engine/core/Scene";
-import { TweenManager } from "@/lib/engine/core/TweenManager";
-import { World } from "@/lib/engine/world/World";
-import { SquareGrid } from "@/lib/engine/grid/SquareGrid";
-import { GridRenderSystem } from "@/lib/game/systems/GridRenderSystem";
-import { UnitRenderSystem } from "@/lib/game/systems/UnitRenderSystem";
-import { MovementRangeSystem } from "@/lib/game/systems/MovementRangeSystem";
-import { SelectionSystem } from "@/lib/game/systems/SelectionSystem";
-import { InputSystem } from "@/lib/game/systems/InputSystem";
+import { Scene, TweenManager, World, SquareGrid } from "@/lib/engine";
+import {
+    GridRenderSystem,
+    UnitRenderSystem,
+    MovementRangeSystem,
+    SelectionSystem,
+    InputSystem,
+} from "@/lib/game/systems";
 import { GameState } from "@/lib/game/state/GameState";
+
+/**
+ * A simple scene demonstrating grid-based movement and combat.
+ * - Click a unit to select it and see its movement range (blue) and attackable enemies (red).
+ * - Click a highlighted tile to move, or an attackable enemy to attack.
+ * - Units are represented as colored squares for now.
+ */
 
 const GRID_COLS = 10;
 const GRID_ROWS = 10;
@@ -35,22 +41,56 @@ export class GridMovementScene extends Scene {
 
         this._world.spawnUnit(
             { q: 2, r: 3 },
-            { attack: 10, health: 100, movement: 5, name: "Warrior", defense: 5, attackRange: 1 },
+            {
+                attack: 10,
+                health: 100,
+                movement: 5,
+                name: "Warrior",
+                defense: 5,
+                attackRange: 1,
+            },
             { color: "red" },
         );
 
         this._world.spawnUnit(
             { q: 5, r: 6 },
-            { attack: 8, health: 80, movement: 2, name: "Skeleton", defense: 2, attackRange: 1 },
+            {
+                attack: 8,
+                health: 80,
+                movement: 2,
+                name: "Skeleton",
+                defense: 2,
+                attackRange: 1,
+            },
             { color: "purple" },
         );
 
         const tweens = new TweenManager();
         this.components.add(tweens);
-        this.components.add(new UnitRenderSystem(this._world, GRID_COLS, GRID_ROWS, CELL_SIZE, tweens));
-        this.components.add(new SelectionSystem(this._world, CELL_SIZE, this.state, this.input, tweens));
-        this.components.add(new GridRenderSystem(this._world, GRID_COLS, GRID_ROWS, CELL_SIZE));
-        this.components.add(new MovementRangeSystem(this._world, CELL_SIZE, this.state));
+        this.components.add(
+            new UnitRenderSystem(
+                this._world,
+                GRID_COLS,
+                GRID_ROWS,
+                CELL_SIZE,
+                tweens,
+            ),
+        );
+        this.components.add(
+            new SelectionSystem(
+                this._world,
+                CELL_SIZE,
+                this.state,
+                this.input,
+                tweens,
+            ),
+        );
+        this.components.add(
+            new GridRenderSystem(this._world, GRID_COLS, GRID_ROWS, CELL_SIZE),
+        );
+        this.components.add(
+            new MovementRangeSystem(this._world, CELL_SIZE, this.state),
+        );
         this.components.add(this.input);
     }
 

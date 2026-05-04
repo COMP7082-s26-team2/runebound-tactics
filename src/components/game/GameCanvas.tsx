@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This component is for MVP purposes only. It will be replaced with a more robust implementation in the future.
+ */
+
 import { useEffect, useRef } from "react";
 import { GameEngine, World } from "@/lib/";
 import { UnitRenderSystem } from "@/lib/game/";

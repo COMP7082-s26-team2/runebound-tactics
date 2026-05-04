@@ -1,4 +1,4 @@
-import { EntityId } from "@/lib/engine/core/ecs/EntityManager";
+import { EntityId } from "@/lib/engine";
 
 /**
  * idle          — nothing selected

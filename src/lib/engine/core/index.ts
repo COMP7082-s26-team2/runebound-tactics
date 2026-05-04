@@ -4,3 +4,4 @@ export * from "./GameEngine";
 export * from "./Scene";
 export * from "./SceneManager";
 export * from "./TweenManager";
+export * from "./Vector2D";

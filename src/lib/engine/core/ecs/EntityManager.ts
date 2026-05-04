@@ -1,7 +1,6 @@
 export type EntityId = number;
 
 export class EntityManager {
-
     private _nextId: EntityId = 1;
     private _entities: Set<EntityId> = new Set();
 

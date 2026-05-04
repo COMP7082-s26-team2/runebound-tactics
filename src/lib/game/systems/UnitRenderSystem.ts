@@ -1,6 +1,4 @@
-import { World } from "@/lib/engine/world/World";
-import { GameComponent } from "@/lib/engine/core/GameComponent";
-import { TweenManager } from "@/lib/engine/core/TweenManager";
+import { World, GameComponent, TweenManager } from "@/lib/engine";
 
 export class UnitRenderSystem implements GameComponent {
     readonly zIndex = 2; // above grid (0) and movement highlights (1)
@@ -18,10 +16,7 @@ export class UnitRenderSystem implements GameComponent {
             const coord = this._world.gridPositions.get(entityId);
             if (!coord) continue;
 
-            const fallback = {
-                x: coord.q * this._cellSize,
-                y: coord.r * this._cellSize,
-            };
+            const fallback = this._world.grid.gridToWorld(coord);
             const { x, y } = this._tweens
                 ? this._tweens.getPosition(entityId, fallback)
                 : fallback;

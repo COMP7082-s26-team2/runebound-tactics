@@ -1,10 +1,14 @@
-import { GameComponent } from "@/lib/engine/core/GameComponent";
-import { EntityId } from "@/lib/engine/core/ecs/EntityManager";
-import { GridCoord } from "@/lib/engine/grid/Grid";
-import { TweenManager, Vec2 } from "@/lib/engine/core/TweenManager";
-import { World, cellKey } from "@/lib/engine/world/World";
-import { GameState } from "@/lib/game/state/GameState";
-import { InputSystem } from "@/lib/game/systems/InputSystem";
+import {
+    GameComponent,
+    EntityId,
+    GridCoord,
+    TweenManager,
+    Vector2D,
+    World,
+    cellKey,
+} from "@/lib/engine";
+import { GameState } from "@/lib/game/state";
+import { InputSystem } from "@/lib/game/systems";
 
 const STEP_DURATION = 0.15; // seconds per grid cell
 
@@ -89,20 +93,17 @@ export class SelectionSystem implements GameComponent {
 
         // sample visual pos so an interrupted tween starts from there
         const oldCoord = this._world.gridPositions.get(entityId)!;
-        const currentVisualPos = this._tweens.getPosition(entityId, {
-            x: oldCoord.q * this._cellSize,
-            y: oldCoord.r * this._cellSize,
-        });
+        const currentVisualPos = this._tweens.getPosition(
+            entityId,
+            this._world.grid.gridToWorld(oldCoord),
+        );
 
         this._world.moveUnit(entityId, targetCoord);
 
         // convert grid path to pixel waypoints
-        const waypoints: Vec2[] = [
+        const waypoints: Vector2D[] = [
             currentVisualPos,
-            ...path.slice(1).map((c) => ({
-                x: c.q * this._cellSize,
-                y: c.r * this._cellSize,
-            })),
+            ...path.slice(1).map((c) => this._world.grid.gridToWorld(c)),
         ];
 
         this._tweens.startPath(entityId, waypoints, STEP_DURATION);
@@ -192,7 +193,10 @@ export class SelectionSystem implements GameComponent {
             if (candidateId === entityId) continue;
             const candidatePos = this._world.gridPositions.get(candidateId);
             if (!candidatePos) continue;
-            if (this._world.grid.distance(pos, candidatePos) <= stats.attackRange) {
+            if (
+                this._world.grid.distance(pos, candidatePos) <=
+                stats.attackRange
+            ) {
                 this._state.attackableEntities.add(candidateId);
             }
         }
