@@ -43,6 +43,14 @@ class TurnSystem {
         return this._started;
     }
 
+    get round() {
+        return this._round;
+    }
+
+    get participants() {
+        return [...this._participants];
+    }
+
     addParticipant = (participant: Participant) => {
         this._validateAndAdd(participant);
         this._emit("turn:participant-added", { participant });
