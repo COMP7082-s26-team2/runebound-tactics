@@ -45,6 +45,9 @@ export class SelectionSystem implements GameComponent {
     }
 
     private _handleIdleClick(occupant: EntityId | null): void {
+        // TESTING
+        console.log("[_handleIdleClick]");
+        
         if (occupant === null) return;
         this._select(occupant);
     }
@@ -54,22 +57,31 @@ export class SelectionSystem implements GameComponent {
         key: string,
         occupant: EntityId | null,
     ): void {
+        // // TESTING
+        // console.log("[_handleSelectedClick]");
+        
         // attack
         if (occupant !== null && this._state.attackableEntities.has(occupant)) {
+            // TESTING
+            console.log("[_handleSelectedClick] Attack");
             this._attack(this._state.selectedEntity!, occupant);
             this._computeReachable(this._state.selectedEntity!);
             this._state.attackableEntities.clear();
             this._state.phase = "awaiting-move";
             return;
         }
-
+        
         // move
         if (this._state.reachableTiles.has(key)) {
+            // TESTING
+            console.log("[_handleSelectedClick] Move");
             this._moveUnit(this._state.selectedEntity!, coord);
             this._deselect();
             return;
         }
-
+        
+        // TESTING
+        console.log("[_handleSelectedClick] Default deselect");
         this._deselect();
     }
 
