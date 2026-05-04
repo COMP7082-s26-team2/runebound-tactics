@@ -93,6 +93,66 @@ class TurnSystem {
         this._acted.clear();
     };
 
+    start = (firstId: string) => {
+        if (this._started) {
+            throw new Error(
+                "[TurnSystem] Already started - call reset() first.",
+            );
+        }
+
+        if (this._participants.length === 0) {
+            throw new Error("[TurnSystem] No participants registered.");
+        }
+
+        if (firstId !== undefined) {
+            const index = this._participants.findIndex((p) => p.id === firstId);
+
+            if (index < 0) {
+                throw new Error(
+                    `[TurnSystem] Unknown participant id "${firstId}"`,
+                );
+            }
+
+            this._index = index;
+        } else {
+            this._index = 0;
+        }
+
+        this._round = 1;
+        this._started = true;
+        this._emit("turn:start", this._turnPayload());
+        this._emit("turn:begin", this._turnPayload());
+    };
+
+    endTurn = () => {
+        if (!this._started) {
+            throw new Error("[TurnSystem] Call start() before endTurn()");
+        }
+
+        this._emit("turn:end", this._turnPayload());
+        this._advance();
+    };
+
+    skipTurn = (id: string) => {
+        const participantIndex = this._participants.findIndex(
+            (p) => p.id === id,
+        );
+
+        if (participantIndex < 0) return;
+
+        this._skipped.add(id);
+
+        this._emit("turn:skip", {
+            participant: this._participants[participantIndex],
+            round: this._round,
+            turnIndex: participantIndex,
+        });
+
+        if (this._started && participantIndex === this._index) {
+            this._advance();
+        }
+    };
+
     private _advance = () => {
         const total = this._participants.length;
         let next = (this._index + 1) % total;
