@@ -5,8 +5,8 @@
  */
 
 import { useEffect, useRef } from "react";
-import { GameEngine } from "@/lib/";
-import { GridMovementScene } from "@/lib/game/";
+import { GameEngine, AssetHandler } from "@/lib/";
+import { GridMovementScene, ASSET_MANIFEST } from "@/lib/game/";
 
 export interface GridMovementCanvasProps {
     debug?: boolean;
@@ -30,7 +30,21 @@ export default function GridMovementCanvas({
             debug,
         });
 
-        const scene = new GridMovementScene(canvas);
+        const assetHandler = new AssetHandler(ASSET_MANIFEST);
+
+        // Preload all assets before the engine starts
+        engine.init = async () => {
+            try {
+                await assetHandler.preload(Object.keys(ASSET_MANIFEST), (loaded, total) => {
+                    console.log(`Assets loaded: ${loaded}/${total}`);
+                });
+                console.log("All assets preloaded successfully");
+            } catch (error) {
+                console.error("Failed to preload assets:", error);
+            }
+        };
+
+        const scene = new GridMovementScene(canvas, assetHandler);
         engine.scenes.register("main", scene);
         engine.scenes.switch("main");
 

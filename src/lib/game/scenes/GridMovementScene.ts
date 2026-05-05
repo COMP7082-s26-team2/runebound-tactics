@@ -1,4 +1,4 @@
-import { Scene, TweenManager, World, SquareGrid } from "@/lib/engine";
+import { Scene, TweenManager, World, SquareGrid, AssetHandler } from "@/lib/engine";
 import {
     GridRenderSystem,
     UnitRenderSystem,
@@ -12,7 +12,7 @@ import { GameState } from "@/lib/game/state/GameState";
  * A simple scene demonstrating grid-based movement and combat.
  * - Click a unit to select it and see its movement range (blue) and attackable enemies (red).
  * - Click a highlighted tile to move, or an attackable enemy to attack.
- * - Units are represented as colored squares for now.
+ * - Units are represented as sprites or colored squares (fallback).
  */
 
 const GRID_COLS = 10;
@@ -24,10 +24,12 @@ export class GridMovementScene extends Scene {
     private _world: World | null = null;
     public input: InputSystem;
     public state = new GameState();
+    private _assetHandler?: AssetHandler;
 
-    constructor(canvas: HTMLCanvasElement) {
+    constructor(canvas: HTMLCanvasElement, assetHandler?: AssetHandler) {
         super();
         this._canvas = canvas;
+        this._assetHandler = assetHandler;
         this.input = new InputSystem(canvas);
     }
 
@@ -45,11 +47,15 @@ export class GridMovementScene extends Scene {
                 attack: 10,
                 health: 100,
                 movement: 5,
-                name: "Warrior",
+                name: "Swordsman",
                 defense: 5,
                 attackRange: 1,
             },
-            { color: "red" },
+            {
+                assetKey: "tilemap:entity:castle:swordsman",
+                animationState: "idle",
+                color: "red",
+            },
         );
 
         this._world.spawnUnit(
@@ -58,11 +64,16 @@ export class GridMovementScene extends Scene {
                 attack: 8,
                 health: 80,
                 movement: 2,
-                name: "Skeleton",
+                name: "Spider",
                 defense: 2,
                 attackRange: 1,
             },
-            { color: "purple" },
+            {
+                assetKey: "tilemap:entity:necropolis:spider",
+                animationState: "idle",
+                facingLeft: true,
+                color: "purple",
+            },
         );
 
         const tweens = new TweenManager();
@@ -74,6 +85,7 @@ export class GridMovementScene extends Scene {
                 GRID_ROWS,
                 CELL_SIZE,
                 tweens,
+                this._assetHandler,
             ),
         );
         this.components.add(
