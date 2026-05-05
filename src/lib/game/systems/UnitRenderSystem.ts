@@ -1,4 +1,4 @@
-import { World, GameComponent, TweenManager, AssetHandler, SpriteSheetDefinition, AnimationState } from "@/lib/engine";
+import { World, GameComponent, TweenManager, AssetHandler, SpriteSheetDefinition, AnimationState, AnimationController } from "@/lib/engine";
 
 /**
  * Resolves the row index for an animation state.
@@ -28,6 +28,7 @@ export class UnitRenderSystem implements GameComponent {
         private _cellSize: number,
         private _tweens?: TweenManager,
         private _assetHandler?: AssetHandler,
+        private _animationController?: AnimationController,
     ) { }
 
     update() {
@@ -70,8 +71,7 @@ export class UnitRenderSystem implements GameComponent {
 
                 if (sheet) {
                     const row = resolveRow(sheet, animationState, assetKey);
-                    // sprite animation feature will vary this frame index
-                    const frameIndex = 0;
+                    const frameIndex = this._animationController?.getFrameIndex(entityId) ?? 0;
                     const sx = frameIndex * sheet.frameWidth;
                     const sy = row * sheet.frameHeight;
                     const sw = sheet.frameWidth;

@@ -1,4 +1,4 @@
-import { Scene, TweenManager, World, SquareGrid, AssetHandler } from "@/lib/engine";
+import { Scene, TweenManager, World, SquareGrid, AssetHandler, AnimationController } from "@/lib/engine";
 import {
     GridRenderSystem,
     UnitRenderSystem,
@@ -7,6 +7,12 @@ import {
     InputSystem,
 } from "@/lib/game/systems";
 import { GameState } from "@/lib/game/state/GameState";
+import {
+    ASSET_MANIFEST,
+    UnitAnimationSystem,
+    ANIMATION_FRAME_DURATIONS,
+    DEFAULT_FRAME_DURATION,
+} from "@/lib/game/assets";
 
 /**
  * A simple scene demonstrating grid-based movement and combat.
@@ -57,19 +63,86 @@ export class GridMovementScene extends Scene {
                 color: "red",
             },
         );
+        this._world.spawnUnit(
+            { q: 3, r: 3 },
+            {
+                attack: 10,
+                health: 100,
+                movement: 6,
+                name: "Griffin",
+                defense: 5,
+                attackRange: 1,
+            },
+            {
+                assetKey: "tilemap:entity:castle:griffin",
+                animationState: "idle",
+                color: "red",
+            },
+        );
 
         this._world.spawnUnit(
             { q: 5, r: 6 },
             {
                 attack: 8,
                 health: 80,
-                movement: 2,
-                name: "Spider",
+                movement: 5,
+                name: "Death Knight",
                 defense: 2,
                 attackRange: 1,
             },
             {
-                assetKey: "tilemap:entity:necropolis:spider",
+                assetKey: "tilemap:entity:necropolis:death_knight",
+                animationState: "idle",
+                facingLeft: true,
+                color: "purple",
+            },
+        );
+        this._world.spawnUnit(
+            { q: 7, r: 6 },
+            {
+                attack: 8,
+                health: 80,
+                movement: 5,
+                name: "Ghost",
+                defense: 2,
+                attackRange: 1,
+            },
+            {
+                assetKey: "tilemap:entity:necropolis:ghost",
+                animationState: "idle",
+                facingLeft: true,
+                color: "purple",
+            },
+        );
+        this._world.spawnUnit(
+            { q: 7, r: 7 },
+            {
+                attack: 8,
+                health: 80,
+                movement: 5,
+                name: "Skeleton",
+                defense: 2,
+                attackRange: 1,
+            },
+            {
+                assetKey: "tilemap:entity:necropolis:skeleton",
+                animationState: "idle",
+                facingLeft: true,
+                color: "purple",
+            },
+        );
+        this._world.spawnUnit(
+            { q: 6, r: 7 },
+            {
+                attack: 8,
+                health: 80,
+                movement: 3,
+                name: "Zombie",
+                defense: 2,
+                attackRange: 1,
+            },
+            {
+                assetKey: "tilemap:entity:necropolis:zombie",
                 animationState: "idle",
                 facingLeft: true,
                 color: "purple",
@@ -77,7 +150,31 @@ export class GridMovementScene extends Scene {
         );
 
         const tweens = new TweenManager();
+        const animationController = new AnimationController(
+            (state) => ANIMATION_FRAME_DURATIONS[state] ?? DEFAULT_FRAME_DURATION,
+        );
+
+        for (const [, entityId] of this._world.occupancyMap.entries()) {
+            const assetKey = this._world.unitAppearance.get(entityId)?.assetKey;
+            const frameCount = assetKey
+                ? (ASSET_MANIFEST[assetKey]?.spriteSheet?.frameCount ?? 1)
+                : 1;
+            animationController.register(entityId, "idle", frameCount);
+        }
+
         this.components.add(tweens);
+        this.components.add(
+            new SelectionSystem(
+                this._world,
+                CELL_SIZE,
+                this.state,
+                this.input,
+                tweens,
+                0.37
+            ),
+        );
+        this.components.add(animationController);
+        this.components.add(new UnitAnimationSystem(this._world, tweens, animationController));
         this.components.add(
             new UnitRenderSystem(
                 this._world,
@@ -86,15 +183,7 @@ export class GridMovementScene extends Scene {
                 CELL_SIZE,
                 tweens,
                 this._assetHandler,
-            ),
-        );
-        this.components.add(
-            new SelectionSystem(
-                this._world,
-                CELL_SIZE,
-                this.state,
-                this.input,
-                tweens,
+                animationController,
             ),
         );
         this.components.add(
