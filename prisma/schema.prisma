@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model player {
+  player_id              BigInt         @id @default(autoincrement())
+  username               String         @unique @db.VarChar(255)
+  password_hash          String         @db.VarChar(255)
+  actions                game_action[]
+  matches_turn           game_match[]   @relation("CurrentTurn")
+  matches_won            game_match[]   @relation("Winner")
+  guild_invites_sent     guild_invite[] @relation("SentInvites")
+  guild_invites_received guild_invite[] @relation("ReceivedInvites")
+  guild_members          guild_member[]
+  match_players          match_player[]
+  decks                  player_deck[]
+  resources              resource[]
+  turns                  turn[]
+  units                  unit[]
+}
+
+model guild {
+  guild_id         BigInt         @id @default(autoincrement())
+  guild_name       String         @unique @db.VarChar(255)
+  description      String?
+  total_wins       Int?           @default(0)
+  total_losses     Int?           @default(0)
+  leaderboard_rank Int?
+  invites          guild_invite[]
+  members          guild_member[]
+}
+
+model guild_member {
+  guild_member_id BigInt  @id @default(autoincrement())
+  guild_id        BigInt?
+  player_id       BigInt?
+  role            String  @db.VarChar(50)
+  guild           guild?  @relation(fields: [guild_id], references: [guild_id], onDelete: Cascade, onUpdate: NoAction)
+  player          player? @relation(fields: [player_id], references: [player_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model guild_invite {
+  guild_invite_id BigInt  @id @default(autoincrement())
+  guild_id        BigInt?
+  player_id       BigInt?
+  initiated_by    BigInt?
+  status          String? @default("pending") @db.VarChar(50)
+  guild           guild?  @relation(fields: [guild_id], references: [guild_id], onDelete: Cascade, onUpdate: NoAction)
+  initiator       player? @relation("SentInvites", fields: [initiated_by], references: [player_id], onDelete: NoAction, onUpdate: NoAction)
+  player          player? @relation("ReceivedInvites", fields: [player_id], references: [player_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model game_match {
+  match_id               BigInt         @id @default(autoincrement())
+  status                 String?        @default("waiting") @db.VarChar(50)
+  current_turn_player_id BigInt?
+  winner_player_id       BigInt?
+  turn_number            Int?           @default(1)
+  actions                game_action[]
+  current_turn_player    player?        @relation("CurrentTurn", fields: [current_turn_player_id], references: [player_id], onDelete: NoAction, onUpdate: NoAction)
+  winner                 player?        @relation("Winner", fields: [winner_player_id], references: [player_id], onDelete: NoAction, onUpdate: NoAction)
+  match_players          match_player[]
+  resources              resource[]
+  turns                  turn[]
+  units                  unit[]
+}
+
+model match_player {
+  match_player_id BigInt      @id @default(autoincrement())
+  match_id        BigInt?
+  player_id       BigInt?
+  team_side       Int?
+  is_ready        Boolean?    @default(false)
+  match           game_match? @relation(fields: [match_id], references: [match_id], onDelete: Cascade, onUpdate: NoAction)
+  player          player?     @relation(fields: [player_id], references: [player_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model unit_type {
+  unit_type_id BigInt  @id @default(autoincrement())
+  name         String  @db.VarChar(255)
+  class_type   String? @db.VarChar(100)
+  role_type    String? @db.VarChar(100)
+  base_hp      Int
+  base_attack  Int
+  move_range   Int
+  attack_range Int
+  units        unit[]
+}
+
+model unit {
+  unit_id         BigInt        @id @default(autoincrement())
+  match_id        BigInt?
+  owner_player_id BigInt?
+  unit_type_id    BigInt?
+  current_hp      Int
+  pos_x           Int
+  pos_y           Int
+  is_alive        Boolean?      @default(true)
+  actions_target  game_action[] @relation("ActionTarget")
+  actions_source  game_action[] @relation("ActionSource")
+  match           game_match?   @relation(fields: [match_id], references: [match_id], onDelete: Cascade, onUpdate: NoAction)
+  player          player?       @relation(fields: [owner_player_id], references: [player_id], onDelete: NoAction, onUpdate: NoAction)
+  type            unit_type?    @relation(fields: [unit_type_id], references: [unit_type_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model turn {
+  turn_id           BigInt      @id @default(autoincrement())
+  match_id          BigInt?
+  player_id         BigInt?
+  turn_number       Int
+  actions_remaining Int?        @default(2)
+  match             game_match? @relation(fields: [match_id], references: [match_id], onDelete: Cascade, onUpdate: NoAction)
+  player            player?     @relation(fields: [player_id], references: [player_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model resource {
+  resource_id    BigInt      @id @default(autoincrement())
+  match_id       BigInt?
+  player_id      BigInt?
+  current_gold   Int?        @default(0)
+  passive_income Int?        @default(10)
+  match          game_match? @relation(fields: [match_id], references: [match_id], onDelete: Cascade, onUpdate: NoAction)
+  player         player?     @relation(fields: [player_id], references: [player_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model card {
+  card_id      BigInt        @id @default(autoincrement())
+  name         String        @db.VarChar(255)
+  effect_type  String?       @db.VarChar(100)
+  cost         Int
+  description  String?
+  player_decks player_deck[]
+}
+
+model player_deck {
+  player_deck_id BigInt  @id @default(autoincrement())
+  player_id      BigInt?
+  card_id        BigInt?
+  card           card?   @relation(fields: [card_id], references: [card_id], onDelete: Cascade, onUpdate: NoAction)
+  player         player? @relation(fields: [player_id], references: [player_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model game_action {
+  action_id      BigInt      @id @default(autoincrement())
+  match_id       BigInt?
+  player_id      BigInt?
+  unit_id        BigInt?
+  target_unit_id BigInt?
+  action_type    String      @db.VarChar(50)
+  from_x         Int?
+  from_y         Int?
+  to_x           Int?
+  to_y           Int?
+  created_at     DateTime?   @default(now()) @db.Timestamp(6)
+  match          game_match? @relation(fields: [match_id], references: [match_id], onDelete: Cascade, onUpdate: NoAction)
+  player         player?     @relation(fields: [player_id], references: [player_id], onDelete: NoAction, onUpdate: NoAction)
+  target_unit    unit?       @relation("ActionTarget", fields: [target_unit_id], references: [unit_id], onDelete: NoAction, onUpdate: NoAction)
+  unit           unit?       @relation("ActionSource", fields: [unit_id], references: [unit_id], onDelete: NoAction, onUpdate: NoAction)
+}
