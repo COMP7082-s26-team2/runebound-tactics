@@ -10,7 +10,7 @@ import {
 import { GameState } from "@/lib/game/state";
 import { InputSystem } from "@/lib/game/systems";
 
-const STEP_DURATION = 0.15; // seconds per grid cell
+const DEFAULT_STEP_DURATION = 0.15;
 
 export class SelectionSystem implements GameComponent {
     constructor(
@@ -19,7 +19,8 @@ export class SelectionSystem implements GameComponent {
         private _state: GameState,
         private _input: InputSystem,
         private _tweens: TweenManager,
-    ) {}
+        private _stepDuration: number = DEFAULT_STEP_DURATION,
+    ) { }
 
     update(_dt: number): void {
         if (!this._input.isMouseButtonJustPressed(0)) return;
@@ -106,7 +107,7 @@ export class SelectionSystem implements GameComponent {
             ...path.slice(1).map((c) => this._world.grid.gridToWorld(c)),
         ];
 
-        this._tweens.startPath(entityId, waypoints, STEP_DURATION);
+        this._tweens.startPath(entityId, waypoints, this._stepDuration);
     }
 
     // BFS to find the grid path to target
