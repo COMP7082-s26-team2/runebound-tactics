@@ -1,16 +1,15 @@
 generator client {
   provider = "prisma-client-js"
-  engineType = "library"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
 }
 
 model player {
   player_id              BigInt         @id @default(autoincrement())
-  username               String         @unique @db.VarChar(255)
-  password_hash          String         @db.VarChar(255)
+  username               String?        @unique @db.VarChar(255)
+  password_hash          String?        @db.VarChar(255)
   actions                game_action[]
   matches_turn           game_match[]   @relation("CurrentTurn")
   matches_won            game_match[]   @relation("Winner")
@@ -26,7 +25,7 @@ model player {
 
 model guild {
   guild_id         BigInt         @id @default(autoincrement())
-  guild_name       String         @unique @db.VarChar(255)
+  guild_name       String?        @unique @db.VarChar(255)
   description      String?
   total_wins       Int?           @default(0)
   total_losses     Int?           @default(0)
@@ -39,7 +38,7 @@ model guild_member {
   guild_member_id BigInt  @id @default(autoincrement())
   guild_id        BigInt?
   player_id       BigInt?
-  role            String  @db.VarChar(50)
+  role            String? @db.VarChar(50)
   guild           guild?  @relation(fields: [guild_id], references: [guild_id], onDelete: Cascade, onUpdate: NoAction)
   player          player? @relation(fields: [player_id], references: [player_id], onDelete: Cascade, onUpdate: NoAction)
 }
@@ -82,13 +81,13 @@ model match_player {
 
 model unit_type {
   unit_type_id BigInt  @id @default(autoincrement())
-  name         String  @db.VarChar(255)
+  name         String? @db.VarChar(255)
   class_type   String? @db.VarChar(100)
   role_type    String? @db.VarChar(100)
-  base_hp      Int
-  base_attack  Int
-  move_range   Int
-  attack_range Int
+  base_hp      Int?
+  base_attack  Int?
+  move_range   Int?
+  attack_range Int?
   units        unit[]
 }
 
@@ -97,9 +96,9 @@ model unit {
   match_id        BigInt?
   owner_player_id BigInt?
   unit_type_id    BigInt?
-  current_hp      Int
-  pos_x           Int
-  pos_y           Int
+  current_hp      Int?
+  pos_x           Int?
+  pos_y           Int?
   is_alive        Boolean?      @default(true)
   actions_target  game_action[] @relation("ActionTarget")
   actions_source  game_action[] @relation("ActionSource")
@@ -112,7 +111,7 @@ model turn {
   turn_id           BigInt      @id @default(autoincrement())
   match_id          BigInt?
   player_id         BigInt?
-  turn_number       Int
+  turn_number       Int?
   actions_remaining Int?        @default(2)
   match             game_match? @relation(fields: [match_id], references: [match_id], onDelete: Cascade, onUpdate: NoAction)
   player            player?     @relation(fields: [player_id], references: [player_id], onDelete: NoAction, onUpdate: NoAction)
@@ -130,9 +129,9 @@ model resource {
 
 model card {
   card_id      BigInt        @id @default(autoincrement())
-  name         String        @db.VarChar(255)
+  name         String?       @db.VarChar(255)
   effect_type  String?       @db.VarChar(100)
-  cost         Int
+  cost         Int?
   description  String?
   player_decks player_deck[]
 }
@@ -151,7 +150,7 @@ model game_action {
   player_id      BigInt?
   unit_id        BigInt?
   target_unit_id BigInt?
-  action_type    String      @db.VarChar(50)
+  action_type    String?     @db.VarChar(50)
   from_x         Int?
   from_y         Int?
   to_x           Int?
