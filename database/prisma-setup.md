@@ -1,78 +1,43 @@
-# Prisma Setup Guide for Developers
+# Prisma Setup Guide for Developers (Supabase)
 
-This guide provides step-by-step instructions to set up and maintain the Prisma ORM in the Runebound Tactics project.
-
-## 🛠️ Prerequisites
-- **Node.js**: v20 or v22 (LTS recommended). 
-  - *Note: Studio has known issues with v25.*
-- **Yarn**: The project's mandated package manager.
-- **Aiven Account**: Access to the project's PostgreSQL database.
-
----
+This guide provides step-by-step instructions to set up the Prisma ORM for the new Supabase backend.
 
 ## 1. Environment Configuration
-Create or update your `.env` file in the project root with the following variables:
+Update your `.env` file with your Supabase connection strings. 
 
 ```env
-# Aiven PostgreSQL Connection
-DATABASE_URL="postgresql://avnadmin:[PASSWORD]@[HOST]:[PORT]/defaultdb?sslmode=no-verify&schema=public"
+# Supabase Pooled Connection (Port 6543) - Used by the Application
+DATABASE_URL="postgresql://postgres.nqwxihvcnbwzbhkitgzq:[PASSWORD]@aws-1-us-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
+
+# Supabase Direct Connection (Port 5432) - Used for Migrations/DDL
+DIRECT_URL="postgresql://postgres.nqwxihvcnbwzbhkitgzq:[PASSWORD]@db.nqwxihvcnbwzbhkitgzq.supabase.co:5432/postgres"
 ```
 
-> [!IMPORTANT]
-> The `sslmode=no-verify&schema=public` parameters are required for the Prisma CLI to correctly introspect the Aiven database without certificate chain errors.
-
----
-
-## 2. Install & Synchronize
-Run these commands to ensure your local environment matches the database schema:
+## 2. Sync & Connect
+Run these commands to synchronize your local code with the current main Supabase database:
 
 ```bash
-# 1. Install dependencies (if not already done)
+# 1. Install project dependencies
 yarn install
 
-# 2. Pull the latest schema from the database
+# 2. Sync: Pull the latest schema from the main database
 yarn prisma db pull
 
-# 3. Generate the type-safe Prisma Client
+# 3. Connect: Refresh the type-safe client (from schema.prisma)
 yarn prisma generate
 ```
 
 ---
 
-## 3. Database Maintenance (Migrations)
-We use a **baselining** strategy objects to protect existing seed data in Aiven.
-
-### To make a change to the schema:
-1. Update `database/schema.sql` (Source of Truth).
-2. Apply changes to Aiven (via SQL editor).
-3. Run `yarn prisma db pull` to sync `schema.prisma`.
-4. Run `yarn prisma generate` to refresh types.
-
-### To initialize migrations on a fresh DB:
-```bash
-yarn prisma migrate dev --name init --create-only
-yarn prisma migrate resolve --applied [MIGRATION_NAME]
-```
-
----
-
-## 4. Usage in Next.js
-Always import the singleton client to avoid connection leaks:
+## 3. Usage in Next.js
+Always import the singleton client from `@/lib/prisma`:
 
 ```typescript
 import prisma from '@/lib/prisma';
 
-// Example: Fetching players
-const players = await prisma.player.findMany();
+// Fetch cards
+const cards = await prisma.card.findMany();
 ```
 
 > [!TIP]
-> **BigInt Handling**: PostgreSQL IDs are `BigInt`. The project includes a global fix in `src/lib/prisma.ts` that automatically converts these to `strings` when sending JSON to the frontend.
-
----
-
-## 5. Troubleshooting
-If you encounter **`Could not load schema metadata`** in Prisma Studio:
-1. It is likely an SSL Proxy issue or Node version conflict.
-2. Use **DBeaver** or the **Aiven Console** for visual data management instead.
-3. Your application code will continue to work perfectly even if Studio fails.
+> **BigInt Handling**: PostgreSQL IDs are automatically converted to `strings` in JSON responses via the fix in `src/lib/prisma.ts`.
