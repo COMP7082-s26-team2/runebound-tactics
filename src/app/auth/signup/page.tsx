@@ -1,5 +1,4 @@
 import RegistrationForm from '@/components/auth/registration-form';
-import { signInWithGoogle, signInWithGithub, signInWithAzure, signInAsGuestForm } from '../actions';
 import Link from 'next/link';
 
 export default function SignUpPage() {
@@ -14,6 +13,8 @@ export default function SignUpPage() {
                 {/* Manual Registration Form */}
                 <RegistrationForm />
 
+                {/* Social Authentication (Commented Out for Now) */}
+                {/* 
                 <div className="relative my-8">
                     <div className="absolute inset-0 flex items-center">
                         <span className="w-full border-t border-[#222222]"></span>
@@ -23,7 +24,6 @@ export default function SignUpPage() {
                     </div>
                 </div>
 
-                {/* Social Authentication */}
                 <div className="grid grid-cols-3 gap-3 mb-6">
                     <form action={signInWithGoogle}>
                         <button className="w-full h-11 bg-[#1a1a1a] hover:bg-[#222222] border border-[#333333] flex items-center justify-center transition-colors group">
@@ -57,13 +57,9 @@ export default function SignUpPage() {
                         </button>
                     </form>
                 </div>
+                */}
 
-                {/* Guest Access */}
-                <form action={signInAsGuestForm} className="mb-8">
-                    <button className="w-full h-12 bg-white text-black hover:bg-[#dddddd] font-bold uppercase tracking-widest text-xs transition-colors">
-                        Connect as Guest
-                    </button>
-                </form>
+                <div className="mb-4"></div>
             </div>
 
             <Link href="/" className="mt-8 text-[#444444] hover:text-[#888888] text-xs uppercase tracking-widest transition-colors">
