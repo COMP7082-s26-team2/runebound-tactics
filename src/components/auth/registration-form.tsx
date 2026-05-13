@@ -15,6 +15,16 @@ export default function RegistrationForm() {
         setSuccess(null);
 
         const formData = new FormData(event.currentTarget);
+        const password = formData.get('password') as string;
+
+        // Client-side Password Validation
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+        if (!passwordRegex.test(password)) {
+            setError('Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a symbol.');
+            setLoading(false);
+            return;
+        }
+
         const result = await signUp(formData);
 
         setLoading(false);
@@ -22,7 +32,8 @@ export default function RegistrationForm() {
         if (result?.error) {
             setError(result.error);
         } else if (result?.success) {
-            setSuccess(result.message || 'Check your email to verify your account.');
+            setSuccess(result.message || 'A verification email has been sent. Please confirm your email to finalize registration.');
+            (event.target as HTMLFormElement).reset();
         }
     }
 
@@ -56,21 +67,23 @@ export default function RegistrationForm() {
                     name="password"
                     type="password"
                     required
-                    minLength={8}
                     className="w-full bg-[#1a1a1a] border border-[#333333] px-4 py-3 text-sm focus:outline-none focus:border-[#555555] transition-colors"
                     placeholder="••••••••"
                 />
+                <p className="text-[9px] text-[#444444] leading-tight">
+                    Must be 8+ chars with uppercase, lowercase, digit, and symbol (@$!%*?&#)
+                </p>
             </div>
 
             {error && (
-                <div className="p-3 bg-[#2d1111] border border-[#4d2222] text-[#ff6666] text-xs font-medium uppercase tracking-tight">
+                <div className="p-3 bg-[#2d1111] border border-[#4d2222] text-[#ff6666] text-[10px] font-medium uppercase tracking-tight leading-normal">
                     Error: {error}
                 </div>
             )}
 
             {success && (
-                <div className="p-3 bg-[#112d11] border border-[#224d22] text-[#66ff66] text-xs font-medium uppercase tracking-tight">
-                    {success}
+                <div className="p-4 bg-[#112d11] border border-[#224d22] text-[#66ff66] text-xs font-bold uppercase tracking-tight leading-relaxed">
+                    SUCCESS: {success}
                 </div>
             )}
 
