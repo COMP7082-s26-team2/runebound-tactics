@@ -24,13 +24,21 @@ export async function signUp(formData: FormData) {
         };
     }
 
-    // 2. Check if username is already taken in the player table
-    const existingPlayer = await prisma.player.findUnique({
+    // 2. Check if username or email is already taken in the player table
+    const existingPlayerByUsername = await prisma.player.findUnique({
         where: { username } as any,
     });
 
-    if (existingPlayer) {
+    if (existingPlayerByUsername) {
         return { error: 'Username is already taken.' };
+    }
+
+    const existingPlayerByEmail = await prisma.player.findUnique({
+        where: { email } as any,
+    });
+
+    if (existingPlayerByEmail) {
+        return { error: 'This email is already registered and confirmed.' };
     }
 
     // 3. Sign up with Supabase Auth
@@ -49,14 +57,51 @@ export async function signUp(formData: FormData) {
         return { error: error.message };
     }
 
-    // NOTE: We no longer create the player record immediately. 
-    // The player record will be created in the auth/callback route 
-    // ONLY after the user verifies their email.
-
     return {
         success: true,
-        message: 'A verification email has been sent. Please confirm your email to finalize your account registration.'
+        message: 'An 8-digit verification code has been sent to your email. Please enter it below to finalize your account.'
     };
+}
+
+export async function verifyOtp(email: string, token: string, username: string) {
+    const supabase = await createServerSideClient();
+
+    // 1. Verify the OTP code with Supabase
+    const { data, error: authError } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'signup',
+    });
+
+    if (authError) {
+        return { error: authError.message };
+    }
+
+    if (!data.user) {
+        return { error: 'Verification failed. User session could not be established.' };
+    }
+
+    // 2. Finalize registration by creating the player profile
+    try {
+        const existingPlayer = await prisma.player.findUnique({
+            where: { auth_id: data.user.id } as any,
+        });
+
+        if (!existingPlayer) {
+            await prisma.player.create({
+                data: {
+                    auth_id: data.user.id,
+                    username: username,
+                    email: email,
+                } as any,
+            });
+        }
+
+        return { success: true };
+    } catch (dbError: any) {
+        console.error('Database error during player creation:', dbError.message);
+        return { error: 'Verification successful, but profile creation failed. Please contact support.' };
+    }
 }
 
 export async function signOut() {
