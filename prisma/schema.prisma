@@ -10,6 +10,7 @@ model player {
   player_id              BigInt         @id @default(autoincrement())
   auth_id                String?        @unique @db.Uuid
   username               String?        @unique @db.VarChar(255)
+  email                  String?        @unique @db.VarChar(255)
   actions                game_action[]
   matches_turn           game_match[]   @relation("CurrentTurn")
   matches_won            game_match[]   @relation("Winner")
