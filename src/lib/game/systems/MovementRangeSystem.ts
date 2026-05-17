@@ -25,6 +25,22 @@ export class MovementRangeSystem implements GameComponent {
             );
         }
 
+        // Reachable movement tiles for attack - green
+        ctx.fillStyle = "rgba(0, 128, 0, 0.4)";
+        // TESTING
+        // console.log("[MovementRangeSystem.draw] reachableAttackableTiles: ", this._state.reachableAttackableTiles);
+        
+        for (const key of this._state.reachableAttackableTiles) {
+            const [q, r] = key.split(",").map(Number);
+
+            ctx.fillRect(
+                q * this._cellSize,
+                r * this._cellSize,
+                this._cellSize,
+                this._cellSize,
+            )
+        }
+
         // Attackable enemy tiles — red (only before the unit has attacked)
         if (this._state.phase === "selected") {
             ctx.fillStyle = "rgba(220, 50, 50, 0.4)";
