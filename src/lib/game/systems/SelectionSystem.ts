@@ -163,6 +163,7 @@ export class SelectionSystem implements GameComponent {
         this._state.phase = "idle";
         this._state.selectedEntity = null;
         this._state.reachableTiles.clear();
+        this._state.reachableAttackableTiles.clear();
         this._state.attackableEntities.clear();
     }
 
