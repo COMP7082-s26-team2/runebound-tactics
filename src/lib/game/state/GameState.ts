@@ -11,5 +11,6 @@ export class GameState {
     phase: TurnPhase = "idle";
     selectedEntity: EntityId | null = null;
     reachableTiles = new Set<string>();
+    reachableAttackableTiles = new Set<string>();
     attackableEntities = new Set<EntityId>();
 }
