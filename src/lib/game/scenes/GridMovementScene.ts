@@ -40,7 +40,7 @@ export class GridMovementScene extends Scene {
         this._world = new World(grid);
 
         this._world.spawnUnit(
-            { q: 2, r: 3 },
+            { q: 2, r: 5 },
             {
                 attack: 10,
                 health: 100,
@@ -54,6 +54,19 @@ export class GridMovementScene extends Scene {
 
         this._world.spawnUnit(
             { q: 5, r: 6 },
+            {
+                attack: 8,
+                health: 80,
+                movement: 2,
+                name: "Skeleton",
+                defense: 2,
+                attackRange: 1,
+            },
+            { color: "purple" },
+        );
+
+        this._world.spawnUnit(
+            { q: 5, r: 8 },
             {
                 attack: 8,
                 health: 80,
