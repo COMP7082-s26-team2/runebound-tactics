@@ -14,6 +14,9 @@ server/node_modules/
 server/.env*
 !server/.env.example
 
+# ─── local design notes ───────────────────────────────────────────────────────
+ai_notes/
+
 # ─── repo-wide ────────────────────────────────────────────────────────────────
 .DS_Store
 *.pem
@@ -31,3 +34,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+node_modules
