@@ -27,9 +27,6 @@ export class MovementRangeSystem implements GameComponent {
 
         // Reachable movement tiles for attack - green
         ctx.fillStyle = "rgba(0, 128, 0, 0.4)";
-        // TESTING
-        // console.log("[MovementRangeSystem.draw] reachableAttackableTiles: ", this._state.reachableAttackableTiles);
-        
         for (const key of this._state.reachableAttackableTiles) {
             const [q, r] = key.split(",").map(Number);
 
