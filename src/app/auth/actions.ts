@@ -109,3 +109,25 @@ export async function signOut() {
     await supabase.auth.signOut();
     redirect('/');
 }
+
+export async function logIn(formData: FormData) {
+    const supabase = await createServerSideClient();
+
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    if (!email || !password) {
+        return { error: 'Please fill in all fields.' };
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+    });
+
+    if (error) {
+        return { error: error.message };
+    }
+
+    return { success: true };
+}
