@@ -189,6 +189,15 @@ export default function RegistrationForm() {
             >
                 {loading ? 'Initializing...' : 'JOIN'}
             </button>
+
+            <div className="text-center mt-4">
+                <a
+                    href="/auth/login"
+                    className="text-[9px] uppercase tracking-[0.1em] text-[#555555] hover:text-[#777777] transition-colors"
+                >
+                    Already have an account? Log in
+                </a>
+            </div>
         </form>
     );
 }
