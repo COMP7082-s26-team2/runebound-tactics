@@ -172,14 +172,7 @@ export class SelectionSystem implements GameComponent {
         const start = this._world.gridPositions.get(entityId);
         if (!stats || !start) return;
 
-        // filter for other entities (treat them all as attackble entities)
-        const attackableEntities = new Set(
-            [...this._world.unitStats.entries()]
-                .filter(([candidateId]) => candidateId !== entityId)
-                .map(([candidateId]) => candidateId)
-        )
-        const reachableAttackableTiles = new Map<string, number>()
-
+        // BFS over unoccupied tiles within movement range
         const visited = new Map<string, number>();
         const queue: Array<{ coord: GridCoord; steps: number }> = [
             { coord: start, steps: 0 },
@@ -193,64 +186,29 @@ export class SelectionSystem implements GameComponent {
             for (const neighbor of this._world.grid.getNeighbors(coord)) {
                 const key = cellKey(neighbor);
                 if (visited.has(key)) continue;
-                
-                // if (this._world.occupancyMap.has(key)) continue;
-                const curNeighborOccupant = this._world.occupancyMap.get(key)
-
-                // TESTING
-                console.log("occupant: ", curNeighborOccupant);
-                
-                if (coord !== start) {
-                // if (curNeighborOccupant) {
-                    // fetch neighbors of tile and check for occupants for forEach
-                    for (const tile of this._world.grid.getNeighbors(neighbor)) {
-                        const neighborKey = cellKey(tile);
-                        if (this._world.occupancyMap.get(neighborKey)) 
-                        reachableAttackableTiles.set(key, steps + 1);
-                    }
-                    // continue
-                // }
-                }
-
-                // if (curNeighborOccupant && attackableEntities.has(curNeighborOccupant)) {
-                // if (curNeighborOccupant) {
-                //     this._world.grid.getNeighbors(coord)
-                //         .forEach(neighbor => {
-                //         })
-                //     continue;
-                // }
-
+                if (this._world.occupancyMap.has(key)) continue;
                 visited.set(key, steps + 1);
                 queue.push({ coord: neighbor, steps: steps + 1 });
             }
         }
 
-        // TESTING
-        console.log("attack tiles: ", reachableAttackableTiles);
-
         visited.delete(cellKey(start));
         this._state.reachableTiles = new Set(visited.keys());
-        this._state.reachableAttackableTiles = new Set(reachableAttackableTiles.keys())
+
+        // Green tiles: reachable empty tiles that are adjacent to an enemy
+        const reachableAttackableTiles = new Set<string>();
+        for (const key of this._state.reachableTiles) {
+            const [q, r] = key.split(",").map(Number);
+            for (const neighbor of this._world.grid.getNeighbors({ q, r })) {
+                const occupant = this._world.occupancyMap.get(cellKey(neighbor));
+                if (occupant !== undefined && occupant !== entityId) {
+                    reachableAttackableTiles.add(key);
+                    break;
+                }
+            }
+        }
+        this._state.reachableAttackableTiles = reachableAttackableTiles;
     }
-
-    // private _computeReachableAttackable(entityId: EntityId): void {
-    //     const stats = this._world.unitStats.get(entityId)
-    //     const pos = this._world.gridPositions.get(entityId)
-
-    //     if (!stats || !pos) return
-
-    //     this._state.reachableAttackableTiles.clear()
-
-    //     for (const [candidateId] of this._world.unitStats.entries()) {
-    //         if (candidateId === entityId) continue
-
-    //         const candidatePpos = this._world.gridPositions.get(candidateId)
-
-    //         if (!candidatePpos) continue
-
-    //         if (this._world.grid.distance(pos, candidatePpos)) {}
-    //     }
-    // }
 
     private _computeAttackable(entityId: EntityId): void {
         const stats = this._world.unitStats.get(entityId);
