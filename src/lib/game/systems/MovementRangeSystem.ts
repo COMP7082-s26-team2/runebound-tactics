@@ -38,8 +38,8 @@ export class MovementRangeSystem implements GameComponent {
             )
         }
 
-        // Attackable enemy tiles — red (only before the unit has attacked)
-        if (this._state.phase === "selected") {
+        // Attackable enemy tiles — red (before attack, or after moving to attack position)
+        if (this._state.phase === "selected" || this._state.phase === "moved") {
             ctx.fillStyle = "rgba(220, 50, 50, 0.4)";
             for (const entityId of this._state.attackableEntities) {
                 const coord = this._world.gridPositions.get(entityId);
