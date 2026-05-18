@@ -23,4 +23,4 @@ class CombatSystem {
     computeAttackable(entityId: EntityId): Set<EntityId> {}
 }
 
-export default CombatSystem;
+export { CombatSystem, type AttackResult };
