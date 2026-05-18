@@ -1,9 +1,15 @@
-import { createServerSideClient } from "@/lib/supabase";
+import { createServerSideClient, assertTokenNotExpired } from "@/lib/supabase";
 import { signOut } from "@/app/auth/actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
 export default async function DashboardPage() {
+    // Enforce strict absolute session expiration boundaries
+    const isExpired = await assertTokenNotExpired();
+    if (isExpired) {
+        redirect('/auth/login');
+    }
+
     const supabase = await createServerSideClient();
     const { data: { session } } = await supabase.auth.getSession();
 
