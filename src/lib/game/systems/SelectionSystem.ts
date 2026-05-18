@@ -41,6 +41,9 @@ export class SelectionSystem implements GameComponent {
             case "awaiting-move":
                 this._handleAwaitingMoveClick(coord, key);
                 break;
+            case "moved":
+                this._handleMovedClick(occupant);
+                break;
         }
     }
 
@@ -57,31 +60,40 @@ export class SelectionSystem implements GameComponent {
         key: string,
         occupant: EntityId | null,
     ): void {
-        // // TESTING
-        // console.log("[_handleSelectedClick]");
-        
-        // attack
+        // attack in place
         if (occupant !== null && this._state.attackableEntities.has(occupant)) {
-            // TESTING
-            console.log("[_handleSelectedClick] Attack");
             this._attack(this._state.selectedEntity!, occupant);
             this._computeReachable(this._state.selectedEntity!);
             this._state.attackableEntities.clear();
             this._state.phase = "awaiting-move";
             return;
         }
-        
-        // move
+
+        // move to attack-position tile, then await attack
+        if (this._state.reachableAttackableTiles.has(key)) {
+            const entityId = this._state.selectedEntity!;
+            this._moveUnit(entityId, coord);
+            this._state.reachableTiles.clear();
+            this._state.reachableAttackableTiles.clear();
+            this._computeAttackable(entityId);
+            this._state.phase = "moved";
+            return;
+        }
+
+        // move and end turn
         if (this._state.reachableTiles.has(key)) {
-            // TESTING
-            console.log("[_handleSelectedClick] Move");
             this._moveUnit(this._state.selectedEntity!, coord);
             this._deselect();
             return;
         }
-        
-        // TESTING
-        console.log("[_handleSelectedClick] Default deselect");
+
+        this._deselect();
+    }
+
+    private _handleMovedClick(occupant: EntityId | null): void {
+        if (occupant !== null && this._state.attackableEntities.has(occupant)) {
+            this._attack(this._state.selectedEntity!, occupant);
+        }
         this._deselect();
     }
 
