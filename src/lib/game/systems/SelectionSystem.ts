@@ -8,7 +8,7 @@ import {
     cellKey,
 } from "@/lib/engine";
 import { GameState } from "@/lib/game/state";
-import { InputSystem } from "@/lib/game/systems";
+import { CombatSystem, InputSystem } from "@/lib/game/systems";
 
 const STEP_DURATION = 0.15; // seconds per grid cell
 
@@ -19,6 +19,7 @@ export class SelectionSystem implements GameComponent {
         private _state: GameState,
         private _input: InputSystem,
         private _tweens: TweenManager,
+        private _combat: CombatSystem
     ) {}
 
     update(_dt: number): void {
@@ -243,19 +244,9 @@ export class SelectionSystem implements GameComponent {
     }
 
     private _attack(attackerId: EntityId, targetId: EntityId): void {
-        const atkStats = this._world.unitStats.get(attackerId);
-        const defStats = this._world.unitStats.get(targetId);
-        if (!atkStats || !defStats) return;
-
-        const damage = Math.max(0, atkStats.attack - defStats.defense);
-        const newHp = defStats.health - damage;
-
-        console.log(`[Attack] ${defStats.name} HP: ${defStats.health} → ${Math.max(0, newHp)}`);
-
-        if (newHp <= 0) {
-            this._world.removeUnit(targetId);
-        } else {
-            this._world.unitStats.set(targetId, { ...defStats, health: newHp });
+        const result = this._combat.resolveAttack(attackerId, targetId)
+        if (result) {
+            this._combat.applyAttackResult(result, attackerId, targetId)
         }
     }
 }
