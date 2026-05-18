@@ -38,7 +38,7 @@ export class MovementRangeSystem implements GameComponent {
             )
         }
 
-        // Attackable enemy tiles — red (before attack, or after moving to attack position)
+        // Attackable enemy tiles — red fill + orange border
         if (this._state.phase === "selected" || this._state.phase === "moved") {
             ctx.fillStyle = "rgba(220, 50, 50, 0.4)";
             for (const entityId of this._state.attackableEntities) {
@@ -51,6 +51,20 @@ export class MovementRangeSystem implements GameComponent {
                     this._cellSize,
                 );
             }
+            ctx.save();
+            ctx.strokeStyle = "rgba(255, 140, 0, 0.95)";
+            ctx.lineWidth = 3;
+            for (const entityId of this._state.attackableEntities) {
+                const coord = this._world.gridPositions.get(entityId);
+                if (!coord) continue;
+                ctx.strokeRect(
+                    coord.q * this._cellSize + 1.5,
+                    coord.r * this._cellSize + 1.5,
+                    this._cellSize - 3,
+                    this._cellSize - 3,
+                );
+            }
+            ctx.restore();
         }
 
         // Yellow outline on the selected unit
