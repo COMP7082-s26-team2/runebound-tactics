@@ -295,7 +295,7 @@ function RoomPanel({
                         <span
                             key={p.sessionId}
                             style={{
-                                background: "#e0e0e0",
+                                background: "#414141",
                                 padding: "2px 8px",
                                 borderRadius: 12,
                                 fontSize: 13,
@@ -330,7 +330,7 @@ function RoomPanel({
                         <span style={{ fontWeight: "bold" }}>{m.sender}</span>
                         <span
                             style={{
-                                color: "#999",
+                                color: "#353535",
                                 fontSize: 11,
                                 marginLeft: 6,
                             }}
