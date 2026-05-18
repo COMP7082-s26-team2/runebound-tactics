@@ -11,8 +11,27 @@ class CombatSystem {
 
     resolveAttack(
         attackerId: EntityId,
-        targetid: EntityId,
-    ): AttackResult | null {}
+        targetId: EntityId,
+    ): AttackResult | null {
+        const attacker = this._world.unitStats.get(attackerId)
+        const defender = this._world.unitStats.get(targetId)
+
+        if (!attacker) {
+            throw new Error(`[CombatSystem.resolveAttack] Attacker ${attackerId} does not exist in world`)
+        }
+
+        if (!defender) {
+            throw new Error(`[CombatSystem.resolveAttack] Target unit ${targetId} does not exist in world`)
+        }
+
+        const damage = Math.max(0, attacker.attack - defender.defense)
+        
+        return {
+            damage,
+            defenderDied: defender.health - damage <= 0,
+            newDefenderHp: Math.max(0, defender.health - damage)
+        }
+    }
 
     applyAttackResult(
         result: AttackResult,
