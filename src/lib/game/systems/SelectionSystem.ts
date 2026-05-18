@@ -76,7 +76,8 @@ export class SelectionSystem implements GameComponent {
             this._moveUnit(entityId, coord);
             this._state.reachableTiles.clear();
             this._state.reachableAttackableTiles.clear();
-            this._computeAttackable(entityId);
+            // this._computeAttackable(entityId);
+            this._state.attackableEntities = this._combat.computeAttackable(entityId)
             this._state.phase = "moved";
             return;
         }
@@ -110,7 +111,8 @@ export class SelectionSystem implements GameComponent {
         this._state.selectedEntity = entityId;
         this._state.phase = "selected";
         this._computeReachable(entityId);
-        this._computeAttackable(entityId);
+        // this._computeAttackable(entityId);
+        this._state.attackableEntities = this._combat.computeAttackable(entityId)
     }
 
     private _moveUnit(entityId: EntityId, targetCoord: GridCoord): void {
