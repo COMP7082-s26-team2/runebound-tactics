@@ -23,7 +23,7 @@ class CombatSystem {
         if (!defender) {
             throw new Error(`[CombatSystem.resolveAttack] Target unit ${targetId} does not exist in world`)
         }
-
+        
         const damage = Math.max(0, attacker.attack - defender.defense)
         
         return {
@@ -32,12 +32,31 @@ class CombatSystem {
             newDefenderHp: Math.max(0, defender.health - damage)
         }
     }
-
+    
     applyAttackResult(
         result: AttackResult,
+        // NOTE: _attackerId is unused but kept for future counter-attack feature implementation
         _attackerId: EntityId,
         targetId: EntityId,
-    ): void {}
+    ): void {
+        const defender = this._world.unitStats.get(targetId)
+        
+        if (!defender) {
+            throw new Error(`[CombatSystem.applyAttackResult] Target unit ${targetId} does not exist in world`)
+        }
+
+        // TESTING
+        console.log(`[CombatSystem.applyAttackResult] ${defender.name} HP: ${defender.health} -> ${result.newDefenderHp}`);
+        
+        if (result.defenderDied) {
+            this._world.removeUnit(targetId)
+        } else {
+            this._world.unitStats.set(targetId, {
+                ...defender,
+                health: result.newDefenderHp
+            })
+        }
+    }
 
     computeAttackable(entityId: EntityId): Set<EntityId> {}
 }
