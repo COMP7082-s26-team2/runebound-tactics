@@ -225,26 +225,6 @@ export class SelectionSystem implements GameComponent {
         this._state.reachableAttackableTiles = reachableAttackableTiles;
     }
 
-    private _computeAttackable(entityId: EntityId): void {
-        const stats = this._world.unitStats.get(entityId);
-        const pos = this._world.gridPositions.get(entityId);
-        if (!stats || !pos) return;
-
-        this._state.attackableEntities.clear();
-
-        for (const [candidateId] of this._world.unitStats.entries()) {
-            if (candidateId === entityId) continue;
-            const candidatePos = this._world.gridPositions.get(candidateId);
-            if (!candidatePos) continue;
-            if (
-                this._world.grid.distance(pos, candidatePos) <=
-                stats.attackRange
-            ) {
-                this._state.attackableEntities.add(candidateId);
-            }
-        }
-    }
-
     private _attack(attackerId: EntityId, targetId: EntityId): void {
         const result = this._combat.resolveAttack(attackerId, targetId)
         if (result) {
