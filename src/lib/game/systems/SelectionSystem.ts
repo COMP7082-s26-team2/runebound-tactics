@@ -250,6 +250,8 @@ export class SelectionSystem implements GameComponent {
         const damage = Math.max(0, atkStats.attack - defStats.defense);
         const newHp = defStats.health - damage;
 
+        console.log(`[Attack] ${defStats.name} HP: ${defStats.health} → ${Math.max(0, newHp)}`);
+
         if (newHp <= 0) {
             this._world.removeUnit(targetId);
         } else {
