@@ -58,23 +58,23 @@ class CombatSystem {
         }
     }
 
-    computeAttackable(entityId: EntityId): Set<EntityId> | undefined {
+    computeAttackable(entityId: EntityId): Set<EntityId> {
         const stats = this._world.unitStats.get(entityId)
         const pos = this._world.gridPositions.get(entityId)
 
+        const attackableEntities = new Set<EntityId>()
+
         if (!stats || !pos) {
             console.warn(`[CombatSystem.computeAttackable] Could not retrieve stats or position for entity ${entityId}`);
-            return;
+            return attackableEntities;
         }
-
-        const attackableEntities = new Set<EntityId>()
 
         for (const [candidateId] of this._world.unitStats.entries()) {
             if (candidateId === entityId) continue;
 
             const candidatePos = this._world.gridPositions.get(candidateId)
 
-            if (!candidatePos) return;
+            if (!candidatePos) continue;
 
             if (this._world.grid.distance(pos, candidatePos) <= stats.attackRange) {
                 attackableEntities.add(candidateId)
