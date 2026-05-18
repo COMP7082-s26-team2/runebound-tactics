@@ -5,6 +5,7 @@ import {
     MovementRangeSystem,
     SelectionSystem,
     InputSystem,
+    CombatSystem,
 } from "@/lib/game/systems";
 import { GameState } from "@/lib/game/state/GameState";
 
@@ -89,6 +90,10 @@ export class GridMovementScene extends Scene {
                 tweens,
             ),
         );
+
+        // CombatSystem not to be added to this.components because it has no lifecycle
+        const combatSystem = new CombatSystem(this._world)
+
         this.components.add(
             new SelectionSystem(
                 this._world,
@@ -96,6 +101,7 @@ export class GridMovementScene extends Scene {
                 this.state,
                 this.input,
                 tweens,
+                combatSystem
             ),
         );
         this.components.add(
