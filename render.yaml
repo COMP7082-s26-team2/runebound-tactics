@@ -5,8 +5,8 @@ services:
     env: node
     plan: free
     # Notice: No rootDir here so Render can see /shared
-    buildCommand: npm install && npm run build --workspace=server
-    startCommand: npm start --workspace=server
+    buildCommand: yarn install && yarn workspace @runebound-tactics/server build
+    startCommand: yarn workspace @runebound-tactics/server start
 
 #  # 2. The Next.js Frontend
 #  - type: web
@@ -14,7 +14,7 @@ services:
 #    name: nextjs-frontend
 #    env: node
 #    plan: free
-#    buildCommand: npm install && npm run build --workspace=client
-#    startCommand: npx serve@latest client/out --port 10000
-#    #staticPublishPath: app/client/out
+#    buildCommand: yarn install && yarn workspace @runebound-tactics/client build
+#    # Using npx serve to host the static output folder
+#    startCommand: npx serve@latest client/out --listen $PORT    
 #    autoDeploy: false
