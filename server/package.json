@@ -4,6 +4,7 @@
     "private": true,
     "scripts": {
         "dev": "tsx watch --tsconfig ../tsconfig.base.json src/index.ts",
+        "prisma_build": "npm prisma generate && tsc",
         "build": "tsc --build",
         "start": "node dist/index.js",
         "typecheck": "tsc --noEmit",
