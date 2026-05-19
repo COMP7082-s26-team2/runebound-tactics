@@ -15,4 +15,5 @@ services:
     env: node
     plan: free
     buildCommand: npm install && npm run build --workspace=client
-    startCommand: npm start --workspace=client
+    staticPublishPath: client/out
+    autoDeploy: false
