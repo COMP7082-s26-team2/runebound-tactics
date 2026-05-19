@@ -9,7 +9,7 @@ services:
     startCommand: npm start --workspace=server
 
   # 2. The Next.js Frontend
-  - type: static 
+  - type: static_site 
     name: nextjs-frontend
     env: node
     plan: free
