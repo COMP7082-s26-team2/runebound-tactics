@@ -10,10 +10,11 @@ services:
 
   # 2. The Next.js Frontend
   - type: web
-    runtime: static
+    # runtime: static
     name: nextjs-frontend
     env: node
     plan: free
     buildCommand: npm install && npm run build --workspace=client
-    staticPublishPath: app/client/out
+    startCommand: npx serve@latest client/out --port 10000
+    #staticPublishPath: app/client/out
     autoDeploy: false
