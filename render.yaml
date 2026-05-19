@@ -1,0 +1,17 @@
+services:
+  # 1. The Colyseus Backend
+  - type: web
+    name: colyseus-backend
+    env: node
+    plan: free
+    # Notice: No rootDir here so Render can see /shared
+    buildCommand: npm install && npm run build --workspace=server
+    startCommand: npm start --workspace=server
+
+  # 2. The Next.js Frontend
+  - type: web
+    name: nextjs-frontend
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build --workspace=client
+    startCommand: npm start --workspace=client
