@@ -1,7 +1,7 @@
 services:
   # 1. The Colyseus Backend
   - type: web
-    name: colyseus-backend
+    name: runebound-colyseus-backend
     env: node
     plan: free
     # Notice: No rootDir here so Render can see /shared
@@ -11,7 +11,7 @@ services:
   # 2. The Next.js Frontend
   - type: web
     runtime: static
-    name: nextjs-frontend
+    name: runebound-nextjs-frontend
     env: node
     plan: free
     buildCommand: npm install && npm run build --workspace=client
