@@ -4,8 +4,9 @@
     "private": true,
     "workspaces": [
         "client",
-        "shared",
-        "server"
+        "database",
+        "server",
+        "shared"
     ],
     "scripts": {
         "dev": "concurrently -n client,server -c cyan,magenta \"yarn workspace @runebound-tactics/client dev\" \"yarn workspace @runebound-tactics/server dev\"",
@@ -17,10 +18,7 @@
         "concurrently": "^9.1.2",
         "typescript": "^5.8.3"
     },
-    "workspaces": [
-      "client",
-      "database",
-      "server",
-      "shared"
-    ]
+    "optionalDependencies": {
+        "lightningcss-linux-x64-gnu": "^1.32.0"
+    }
 }
