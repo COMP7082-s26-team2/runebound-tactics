@@ -1,13 +1,18 @@
 "use client";
 
+import { useLobbyRoom } from "@colyseus/react";
+
 import { BackButton } from "@/components/ui/BackButton";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { LobbyListProvider } from "@/context/colyseus";
+import { client } from "@/lib/multiplayer/client";
 
 function LobbyPage() {
     const router = useRouter();
+
     const [createState, setCreateState] = useState(false);
 
     const handleCreate = () => {
@@ -17,8 +22,9 @@ function LobbyPage() {
 
     const handleJoin = () => {
         console.log(`Join Lobby Modal Show`);
+        router.push("lobbies")
     };
-    
+
     return (
         <>
             <div className="min-h-screen bg-gray-900 flex justify-center flex-col gap-4 p-4">
