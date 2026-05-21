@@ -5,15 +5,14 @@ import { registerRooms } from "./rooms";
 
 export function createGameServer() {
     const httpServer = createServer();
-
-    const gameServer = new Server({
-        transport: new WebSocketTransport({ server: httpServer }),
-    });
-
     const clientOrigin = process.env.CLIENT_ORIGIN ?? "http://localhost:3000";
 
-    // Health check + CORS for HTTP requests (WebSocket upgrades don't need CORS headers)
+    // Register before Colyseus so CORS headers are set before its listeners run.
+    // The headersSent guard protects against any edge case where a prior listener
+    // already completed the response.
     httpServer.on("request", (req, res) => {
+        if (res.headersSent) return;
+
         res.setHeader("Access-Control-Allow-Origin", clientOrigin);
         res.setHeader(
             "Access-Control-Allow-Methods",
@@ -34,6 +33,10 @@ export function createGameServer() {
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ status: "ok" }));
         }
+    });
+
+    const gameServer = new Server({
+        transport: new WebSocketTransport({ server: httpServer }),
     });
 
     registerRooms(gameServer);
