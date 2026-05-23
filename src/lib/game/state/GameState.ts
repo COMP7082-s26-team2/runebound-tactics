@@ -21,7 +21,7 @@ export class GameState {
 
     private _states = new Map<TurnPhase, TurnPhaseState>();
     private _current: TurnPhaseState | null = null;
-    private _name: string | null = null;
+    private _name: TurnPhase | null = null;
     private _started = false;
     // private _context = null;
 
@@ -33,6 +33,20 @@ export class GameState {
         return this._started
     }
 
+
+    transition(nextName: TurnPhase) {
+        if (!this._started) {
+            throw new Error(`[GameState] Call start() before transition()`)
+        }
+
+        if (!this._states.has(nextName)) {
+            throw new Error(`[GameState] Unknown state "${nextName}"`)
+        }
+
+        const prev = this._name
+        this._current?.onExit?.(nextName)
+        this._enter(nextName, prev)
+    }
 
     update(dTime: number) {
         if (!this._started) return
@@ -50,7 +64,7 @@ export class GameState {
         this._started = false
     }
 
-    private _enter(name: TurnPhase, prevName: TurnPhase) {
+    private _enter(name: TurnPhase, prevName: TurnPhase | null) {
         if (!this._states.has(name)) {
             throw new Error(`[GameState] Unknown state "${name}"`)
         }
