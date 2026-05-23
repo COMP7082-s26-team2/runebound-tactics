@@ -32,6 +32,23 @@ export class GameState {
         return this._started
     }
 
+
+    update(dTime: number) {
+        if (!this._started) return
+
+        this._current?.onUpdate?.(dTime)
+    }
+
+    reset() {
+        if (this._started && this._current) {
+            this._current.onExit?.(null)
+        }
+
+        this._current = null
+        this._name = null
+        this._started = false
+    }
+
     private _enter(name: TurnPhase, prevName: TurnPhase) {
         if (!this._states.has(name)) {
             throw new Error(`[GameState] Unknown state "${name}"`)
