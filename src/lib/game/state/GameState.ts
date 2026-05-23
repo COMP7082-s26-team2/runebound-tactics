@@ -9,6 +9,7 @@ export type TurnPhase = "idle" | "selected" | "awaiting-move";
 
 export type TurnPhaseState = {
     onEnter?: (prev: TurnPhase | null) => void
+    onUpdate?: (deltaTime: number) => void
     onExit?: (next: TurnPhase | null) => void
 }
 
