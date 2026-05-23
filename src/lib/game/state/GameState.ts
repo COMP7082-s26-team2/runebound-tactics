@@ -32,4 +32,13 @@ export class GameState {
         return this._started
     }
 
+    private _enter(name: TurnPhase, prevName: TurnPhase) {
+        if (!this._states.has(name)) {
+            throw new Error(`[GameState] Unknown state "${name}"`)
+        }
+
+        this._name = name
+        this._current = this._states.get(name) || null
+        this._current?.onEnter?.(prevName)
+    }
 }
