@@ -3,8 +3,8 @@ import { TestRoom } from "./TestRoom";
 import { LobbyRoom } from "./LobbyRoom";
 import { GameRoom } from "./GameRoom";
 
-export { ROOM_TEST, ROOM_LOBBY, ROOM_GAME, ROOM_LOBBY_LIST } from "./constants";
-import { ROOM_TEST, ROOM_LOBBY, ROOM_GAME, ROOM_LOBBY_LIST } from "./constants";
+export { ROOM_TEST, ROOM_LOBBY, ROOM_GAME, ROOM_LOBBY_LIST } from "@runebound-tactics/shared";
+import { ROOM_TEST, ROOM_LOBBY, ROOM_GAME, ROOM_LOBBY_LIST } from "@runebound-tactics/shared";
 
 // Register all Colyseus room types here. Adding a new room = one line.
 export function registerRooms(server: Server): void {

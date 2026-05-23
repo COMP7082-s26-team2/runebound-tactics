@@ -1,7 +1,6 @@
 import { Room, Client, matchMaker } from "colyseus";
-import { LobbyPlayerSlot, LobbyState } from "@runebound-tactics/shared";
+import { LobbyPlayerSlot, LobbyState, ROOM_GAME } from "@runebound-tactics/shared";
 import type { Faction, LobbySummary } from "@runebound-tactics/shared";
-import { ROOM_GAME } from "./constants";
 import { pendingGames } from "./pendingGames";
 
 interface JoinOptions {

@@ -1,4 +1,4 @@
-import { Server } from "colyseus";
+import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { createServer } from "http";
 import { registerRooms } from "./rooms";
@@ -32,6 +32,23 @@ export function createGameServer() {
         else if (req.method === "GET" && req.url === "/health") {
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ status: "ok" }));
+        }
+
+        else if (req.method === "GET" && req.url?.startsWith("/rooms/")) {
+            const roomName = decodeURIComponent(req.url.slice("/rooms/".length));
+            matchMaker.query({ name: roomName }).then(rooms => {
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify(rooms.map(r => ({
+                    roomId: r.roomId,
+                    name: r.name,
+                    clients: r.clients,
+                    maxClients: r.maxClients,
+                    metadata: r.metadata,
+                }))));
+            }).catch(err => {
+                res.writeHead(500, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+            });
         }
     });
 
