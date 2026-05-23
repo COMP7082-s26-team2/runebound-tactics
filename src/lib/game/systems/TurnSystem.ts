@@ -1,4 +1,4 @@
-import EventBus from "./EventBus";
+import { EventBus } from "@/lib/engine";
 
 interface Participant {
     id: string;

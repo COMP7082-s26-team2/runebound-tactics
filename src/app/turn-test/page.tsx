@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { EventBus, TurnSystem } from "@/lib/engine";
+import { EventBus, TurnSystem } from "@/lib";
 
 const INITIAL_PARTICIPANTS = [
     { id: "Alice" },

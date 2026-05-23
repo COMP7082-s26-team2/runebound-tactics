@@ -1,7 +1,4 @@
 import EventBus from "./EventBus";
-import TurnSystem from "./TurnSystem";
-
-export { TurnSystem };
 
 export { EventBus };
 export * from "./core/ecs/EntityManager";
