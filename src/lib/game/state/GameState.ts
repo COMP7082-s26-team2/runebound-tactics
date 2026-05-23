@@ -7,6 +7,11 @@ import { EntityId } from "@/lib/engine";
  */
 export type TurnPhase = "idle" | "selected" | "awaiting-move";
 
+export type TurnPhaseState = {
+    onEnter?: (prev: TurnPhase | null) => void
+    onExit?: (next: TurnPhase | null) => void
+}
+
 export class GameState {
     phase: TurnPhase = "idle";
     selectedEntity: EntityId | null = null;
