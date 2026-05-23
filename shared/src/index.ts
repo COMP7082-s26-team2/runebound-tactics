@@ -6,3 +6,6 @@ export { GameUnit, GamePlayerSlot, GameState } from "./schemas/GameState";
 
 // Plain TypeScript types (metadata, enums, value objects)
 export * from "./types";
+
+// Room name constants (shared between client and server)
+export * from "./rooms";
