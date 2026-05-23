@@ -17,4 +17,11 @@ export class GameState {
     selectedEntity: EntityId | null = null;
     reachableTiles = new Set<string>();
     attackableEntities = new Set<EntityId>();
+
+    private _states = new Map();
+    private _current: object | null = null;
+    private _name: string | null = null;
+    private _started = false;
+    // private _context = null;
+
 }
