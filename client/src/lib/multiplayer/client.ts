@@ -1,4 +1,3 @@
-// client/src/lib/multiplayer/client.ts
 import { Client } from "@colyseus/sdk";
 
 const COLYSEUS_URL =

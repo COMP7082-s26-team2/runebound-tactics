@@ -1,44 +1,45 @@
 "use client";
 
-import { BackButton } from "@/components/ui/BackButton";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { BackButton } from "@/components/ui/BackButton";
+import { CreateLobbyModal } from "@/components/lobby/CreateLobbyModal";
+import { getDisplayName, setDisplayName } from "@/lib/multiplayer/identity";
 
 function MultiplayerPage() {
     const router = useRouter();
-    const [createState, setCreateState] = useState(false);
+    const [name, setName] = useState("");
+    const [createOpen, setCreateOpen] = useState(false);
 
-    const handleCreate = () => {
-        console.log(`Create Lobby Modal Show`);
-        setCreateState(!createState);
-    };
+    useEffect(() => {
+        setName(getDisplayName());
+    }, []);
 
-    const handleJoin = () => {
-        console.log(`Join Lobby Modal Show`);
-    };
-
-    const handleModalClose = () => {
-        setCreateState(!createState);
-    };
-
-    const handleModalCreate = () => {
-        router.push("/lobby", {});
-    };
+    function handleNameChange(v: string) {
+        setName(v);
+        setDisplayName(v);
+    }
 
     return (
         <>
-            <div className="min-h-screen bg-gray-900 flex justify-center flex-col gap-4 p-4">
-                <Button onClick={handleCreate}>Create Lobby</Button>
-                <Button onClick={handleJoin}>Join Lobby</Button>
+            <div className="min-h-screen bg-gray-900 flex flex-col gap-4 p-4">
+                <h1 className="text-white text-2xl">Multiplayer</h1>
+                <label className="flex flex-col text-white">
+                    Display Name
+                    <input
+                        type="text"
+                        value={name}
+                        onChange={e => handleNameChange(e.target.value)}
+                        maxLength={32}
+                        className="mt-1 px-2 py-1 bg-gray-800 text-white border border-gray-700 rounded"
+                    />
+                </label>
+                <Button onClick={() => setCreateOpen(true)}>Create Lobby</Button>
+                <Button onClick={() => router.push("/lobbies")}>Browse Lobbies</Button>
                 <BackButton router={router}>Back</BackButton>
             </div>
-            <div>
-                <Modal isOpen={createState} onClose={handleModalClose}>
-                    <Button onClick={handleModalCreate}>Create Lobby</Button>
-                </Modal>
-            </div>
+            <CreateLobbyModal isOpen={createOpen} onClose={() => setCreateOpen(false)} />
         </>
     );
 }
