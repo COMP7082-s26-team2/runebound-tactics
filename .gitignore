@@ -16,6 +16,7 @@ server/.env*
 
 # ─── local design notes ───────────────────────────────────────────────────────
 ai_notes/
+graphify-out
 
 # ─── repo-wide ────────────────────────────────────────────────────────────────
 .DS_Store
@@ -39,3 +40,8 @@ next-env.d.ts
 dist
 
 node_modules
+
+# ai
+.claude
+memory
+.playwright-mcp
