@@ -24,4 +24,12 @@ export class GameState {
     private _started = false;
     // private _context = null;
 
+    get current() {
+        return this._name
+    }
+
+    get started() {
+        return this._started
+    }
+
 }
