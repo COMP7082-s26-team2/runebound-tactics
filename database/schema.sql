@@ -6,6 +6,7 @@ CREATE TABLE "player" (
     "player_id" BIGSERIAL NOT NULL,
     "username" VARCHAR(255),
     "password_hash" VARCHAR(255),
+    "avatar_url" TEXT,
 
     CONSTRAINT "player_pkey" PRIMARY KEY ("player_id")
 );
