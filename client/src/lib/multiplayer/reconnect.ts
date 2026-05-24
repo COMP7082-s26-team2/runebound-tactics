@@ -1,38 +1,45 @@
 import type { Room } from "@colyseus/sdk";
+import { LobbyState, GameState } from "@runebound-tactics/shared";
 import { client } from "./client";
 
 const LOBBY_TOKEN = "lobby_token";
 const GAME_TOKEN  = "game_token";
 
-async function joinOrReconnect<T>(
+async function joinOrReconnect<S>(
     storageKey: string,
     roomId: string,
     options: { displayName: string },
-): Promise<Room<unknown, T>> {
+    rootSchema: new () => S,
+): Promise<Room<unknown, S>> {
     if (typeof window === "undefined") {
         throw new Error("Cannot join from server-side");
     }
     const stored = window.sessionStorage.getItem(storageKey);
     if (stored) {
-        try {
-            const room = await client.reconnect<T>(stored);
-            window.sessionStorage.setItem(storageKey, room.reconnectionToken);
-            return room;
-        } catch {
+        const [tokenRoomId] = stored.split(":");
+        if (tokenRoomId === roomId) {
+            try {
+                const room = await client.reconnect<S>(stored, rootSchema);
+                window.sessionStorage.setItem(storageKey, room.reconnectionToken);
+                return room;
+            } catch {
+                window.sessionStorage.removeItem(storageKey);
+            }
+        } else {
             window.sessionStorage.removeItem(storageKey);
         }
     }
-    const room = await client.joinById<T>(roomId, options);
+    const room = await client.joinById<S>(roomId, options, rootSchema);
     window.sessionStorage.setItem(storageKey, room.reconnectionToken);
     return room;
 }
 
-export function joinOrReconnectLobby<T>(roomId: string, displayName: string) {
-    return joinOrReconnect<T>(LOBBY_TOKEN, roomId, { displayName });
+export function joinOrReconnectLobby(roomId: string, displayName: string) {
+    return joinOrReconnect<LobbyState>(LOBBY_TOKEN, roomId, { displayName }, LobbyState);
 }
 
-export function joinOrReconnectGame<T>(roomId: string, displayName: string) {
-    return joinOrReconnect<T>(GAME_TOKEN, roomId, { displayName });
+export function joinOrReconnectGame(roomId: string, displayName: string) {
+    return joinOrReconnect<GameState>(GAME_TOKEN, roomId, { displayName }, GameState);
 }
 
 export function clearLobbyToken(): void {

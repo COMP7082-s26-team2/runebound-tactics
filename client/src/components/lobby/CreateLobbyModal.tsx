@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { client } from "@/lib/multiplayer/client";
-import { ROOM_LOBBY } from "@runebound-tactics/shared";
+import { ROOM_LOBBY, LobbyState } from "@runebound-tactics/shared";
 import { getDisplayName } from "@/lib/multiplayer/identity";
 import { stashHandoff } from "@/lib/multiplayer/roomHandoff";
 import type { Room } from "@colyseus/sdk";
@@ -27,11 +27,11 @@ export function CreateLobbyModal({ isOpen, onClose }: Props) {
         setErr(null);
         try {
             const displayName = getDisplayName();
-            const room = await client.create(ROOM_LOBBY, {
+            const room = await client.create<LobbyState>(ROOM_LOBBY, {
                 lobbyName: lobbyName.trim() || "My Lobby",
                 maxPlayers,
                 displayName,
-            });
+            }, LobbyState);
             window.sessionStorage.setItem("lobby_token", room.reconnectionToken);
             stashHandoff(room as Room<unknown, unknown>);
             router.push(`/lobby/${room.roomId}`);

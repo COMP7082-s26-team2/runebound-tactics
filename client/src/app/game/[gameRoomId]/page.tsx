@@ -2,7 +2,6 @@
 
 import { use } from "react";
 import { useRouter } from "next/navigation";
-import type { GameState } from "@runebound-tactics/shared";
 import { GameRoomProvider } from "@/context/colyseus";
 import { GameRoomPlaceholder } from "@/components/game/GameRoomPlaceholder";
 import { joinOrReconnectGame, clearGameToken } from "@/lib/multiplayer/reconnect";
@@ -17,16 +16,15 @@ export default function GamePage({ params }: { params: Promise<{ gameRoomId: str
         <ClientOnly fallback={<p className="text-white p-4">Connecting…</p>}>
             <GameRoomProvider
                 connect={() =>
-                    joinOrReconnectGame<GameState>(gameRoomId, getDisplayName()).catch(err => {
+                    joinOrReconnectGame(gameRoomId, getDisplayName()).catch(err => {
                         console.error("[GamePage] join failed:", err);
                         clearGameToken();
-                        router.replace("/multiplayer");
                         throw err;
                     })
                 }
                 deps={[gameRoomId]}
             >
-                <GameRoomPlaceholder />
+                <GameRoomPlaceholder expectedRoomId={gameRoomId} />
             </GameRoomProvider>
         </ClientOnly>
     );

@@ -7,24 +7,29 @@ import { SlotList } from "./SlotList";
 import { Button } from "@/components/ui/Button";
 import { clearLobbyToken } from "@/lib/multiplayer/reconnect";
 
-export function LobbyWaitingRoom() {
-    const { room } = useLobbyRoom();
+export function LobbyWaitingRoom({ expectedRoomId }: { expectedRoomId: string }) {
+    const { room, error } = useLobbyRoom();
     const state = useLobbyRoomState();
     const router = useRouter();
     const [countdown, setCountdown] = useState<number | null>(null);
 
+    const roomMatches = room?.roomId === expectedRoomId;
+
     useLobbyRoomMessage("countdown", (payload: { seconds: number }) => {
+        if (!roomMatches) return;
         setCountdown(payload.seconds);
     });
     useLobbyRoomMessage("countdown_cancelled", () => {
+        if (!roomMatches) return;
         setCountdown(null);
     });
     useLobbyRoomMessage("game_starting", (payload: { roomId: string }) => {
+        if (!roomMatches) return;
         clearLobbyToken();
         router.push(`/game/${payload.roomId}`);
     });
 
-    const gameRoomId = state?.gameRoomId;
+    const gameRoomId = roomMatches ? state?.gameRoomId : undefined;
     useEffect(() => {
         if (gameRoomId) {
             clearLobbyToken();
@@ -32,7 +37,18 @@ export function LobbyWaitingRoom() {
         }
     }, [gameRoomId, router]);
 
-    if (!room || !state) return <p className="text-white p-4">Connecting…</p>;
+    if (error) {
+        return (
+            <div className="min-h-screen bg-gray-900 flex flex-col gap-3 p-4">
+                <p className="text-red-400">Couldn&apos;t join lobby: {error.message}</p>
+                <Button onClick={() => { clearLobbyToken(); router.push("/multiplayer"); }}>
+                    ◀ Back to Multiplayer
+                </Button>
+            </div>
+        );
+    }
+
+    if (!room || !state || !state.players || !roomMatches) return <p className="text-white p-4">Connecting…</p>;
 
     const me = state.players[room.sessionId];
     const isReady = !!me?.isReady;

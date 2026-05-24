@@ -5,12 +5,25 @@ import { useGameRoom, useGameRoomState } from "@/context/colyseus";
 import { Button } from "@/components/ui/Button";
 import { clearGameToken } from "@/lib/multiplayer/reconnect";
 
-export function GameRoomPlaceholder() {
-    const { room } = useGameRoom();
+export function GameRoomPlaceholder({ expectedRoomId }: { expectedRoomId: string }) {
+    const { room, error } = useGameRoom();
     const state = useGameRoomState();
     const router = useRouter();
 
-    if (!room || !state) return <p className="text-white p-4">Connecting…</p>;
+    const roomMatches = room?.roomId === expectedRoomId;
+
+    if (error && (!room || roomMatches)) {
+        return (
+            <div className="min-h-screen bg-gray-900 flex flex-col gap-3 p-4">
+                <p className="text-red-400">Couldn&apos;t join game: {error.message}</p>
+                <Button onClick={() => { clearGameToken(); router.push("/multiplayer"); }}>
+                    ◀ Back to Multiplayer
+                </Button>
+            </div>
+        );
+    }
+
+    if (!room || !state || !state.players || !roomMatches) return <p className="text-white p-4">Connecting…</p>;
 
     const me = state.players[room.sessionId];
     const players = Object.values(state.players);

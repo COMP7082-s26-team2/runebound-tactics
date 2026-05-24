@@ -20,16 +20,15 @@ export default function LobbyPage({ params }: { params: Promise<{ lobbyRoomId: s
                 connect={() => {
                     const handed = peekHandoff<LobbyState>(lobbyRoomId);
                     if (handed) return Promise.resolve(handed);
-                    return joinOrReconnectLobby<LobbyState>(lobbyRoomId, getDisplayName()).catch(err => {
+                    return joinOrReconnectLobby(lobbyRoomId, getDisplayName()).catch(err => {
                         console.error("[LobbyPage] join failed:", err);
                         clearLobbyToken();
-                        router.replace("/multiplayer");
                         throw err;
                     });
                 }}
                 deps={[lobbyRoomId]}
             >
-                <LobbyWaitingRoom />
+                <LobbyWaitingRoom expectedRoomId={lobbyRoomId} />
             </LobbyRoomProvider>
         </ClientOnly>
     );
