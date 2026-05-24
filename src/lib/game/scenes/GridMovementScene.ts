@@ -165,6 +165,15 @@ export class GridMovementScene extends Scene {
         
         this.state.add("moved", {})
 
+        this.eventBus.on("turn:begin", () => {
+            this.turnFlow.transition("action-phase")
+        })
+
+        this.turnSystem = new TurnSystem(
+            [{ id: "player1" }, { id: "player2" }],
+            this.eventBus,
+            true
+        )
         this.components.add(
             new SelectionSystem(
                 this._world,
