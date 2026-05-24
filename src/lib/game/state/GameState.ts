@@ -74,6 +74,7 @@ export class GameState {
             throw new Error(`[GameState] Unknown state "${nextName}"`)
         }
 
+        this.phase = nextName
         const prev = this._name
         this._current?.onExit?.(nextName)
         this._enter(nextName, prev)
@@ -93,6 +94,14 @@ export class GameState {
         this._current = null
         this._name = null
         this._started = false
+
+        this.selectedEntity = null
+        this.reachableTiles.clear()
+        this.reachableAttackableTiles.clear()
+        this.attackableEntities.clear()
+        this.pendingAttacks = []
+        this.pendingDeaths = []
+        this.activePlayerId = null
     }
 
     private _enter(name: TurnPhase, prevName: TurnPhase | null) {
