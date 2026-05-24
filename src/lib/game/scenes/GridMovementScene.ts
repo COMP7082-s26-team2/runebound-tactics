@@ -22,6 +22,9 @@ const GRID_COLS = 10;
 const GRID_ROWS = 10;
 const CELL_SIZE = 80;
 
+const PLAYER1_ID = "player1"
+const PLAYER2_ID = "player2"
+
 export class GridMovementScene extends Scene {
     private _canvas: HTMLCanvasElement;
     private _world: World | null = null;
@@ -56,6 +59,7 @@ export class GridMovementScene extends Scene {
                 attackRange: 1,
             },
             { color: "red" },
+            PLAYER1_ID
         );
 
         this._world.spawnUnit(
@@ -69,6 +73,7 @@ export class GridMovementScene extends Scene {
                 attackRange: 1,
             },
             { color: "purple" },
+            PLAYER2_ID
         );
 
         this._world.spawnUnit(
@@ -82,6 +87,7 @@ export class GridMovementScene extends Scene {
                 attackRange: 1,
             },
             { color: "purple" },
+            PLAYER2_ID
         );
 
         const tweens = new TweenManager();
@@ -170,7 +176,7 @@ export class GridMovementScene extends Scene {
         })
 
         this.turnSystem = new TurnSystem(
-            [{ id: "player1" }, { id: "player2" }],
+            [{ id: PLAYER1_ID }, { id: PLAYER2_ID }],
             this.eventBus,
             true
         )
@@ -178,7 +184,7 @@ export class GridMovementScene extends Scene {
         this.state.start("idle")
         this.turnFlow.start("action-phase")
 
-        this.turnSystem.start("player1")
+        this.turnSystem.start(PLAYER1_ID)
 
         this.components.add(
             new SelectionSystem(
