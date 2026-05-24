@@ -68,7 +68,7 @@ export class SelectionSystem implements GameComponent {
     ): void {
         // attack in place
         if (occupant !== null && this._state.attackableEntities.has(occupant)) {
-            this._attack(this._state.selectedEntity!, occupant);
+            this._declareAttack(this._state.selectedEntity!, occupant);
             this._computeReachable(this._state.selectedEntity!);
             this._state.attackableEntities.clear();
             this._state.transition("awaiting-move");
@@ -99,7 +99,7 @@ export class SelectionSystem implements GameComponent {
 
     private _handleMovedClick(occupant: EntityId | null): void {
         if (occupant !== null && this._state.attackableEntities.has(occupant)) {
-            this._attack(this._state.selectedEntity!, occupant);
+            this._declareAttack(this._state.selectedEntity!, occupant);
         }
         this._deselect();
     }
@@ -230,10 +230,7 @@ export class SelectionSystem implements GameComponent {
         this._state.reachableAttackableTiles = reachableAttackableTiles;
     }
 
-    private _attack(attackerId: EntityId, targetId: EntityId): void {
-        const result = this._combat.resolveAttack(attackerId, targetId)
-        if (result) {
-            this._combat.applyAttackResult(result, attackerId, targetId)
-        }
+    private _declareAttack(attackerId: EntityId, targetId: EntityId): void {
+        this._state.pendingAttacks.push({ attackerId, targetId });
     }
 }
