@@ -73,6 +73,7 @@ export class TurnFlow {
             throw new Error(`[TurnFlow] Unknown state "${name}"`)
         }
 
+        console.log(`[TurnFlow] ${prevName ?? "null"} → ${name}`)
         this._name = name
         this._current = this._states.get(name) || null
         this._current?.onEnter?.(prevName)
