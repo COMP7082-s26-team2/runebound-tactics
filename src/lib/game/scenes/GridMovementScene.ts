@@ -193,7 +193,8 @@ export class GridMovementScene extends Scene {
                 this.state,
                 this.input,
                 tweens,
-                combatSystem
+                combatSystem,
+                this.turnFlow
             ),
         );
         this.components.add(
