@@ -121,16 +121,21 @@ export class GridMovementScene extends Scene {
             onEnter: () => {
                 const world = this._world!
 
+                console.log(`[combat] resolving ${this.state.pendingAttacks.length} attack(s)`)
+
                 for (const { attackerId, targetId } of this.state.pendingAttacks) {
                     const result = combatSystem.resolveAttack(attackerId, targetId)
 
                     if (!result) continue
 
+                    const attackerName = world.unitStats.get(attackerId)?.name ?? attackerId
+                    const defenderName = world.unitStats.get(targetId)?.name ?? targetId
+                    console.log(`[combat] ${attackerName} → ${defenderName}: ${result.damage} dmg | HP ${world.unitStats.get(targetId)?.health} → ${result.newDefenderHp}${result.defenderDied ? " (died)" : ""}`)
+
                     if (result.defenderDied) {
                         this.state.pendingDeaths.push(targetId)
                     } else {
                         const defender = world.unitStats.get(targetId)!
-
                         world.unitStats.set(targetId, { ...defender, health: result.newDefenderHp })
                     }
                 }
