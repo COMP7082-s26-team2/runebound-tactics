@@ -14,12 +14,21 @@ export type TurnPhaseState = {
     onExit?: (next: TurnPhase | null) => void
 }
 
+export type PendingAttack = {
+    attackerId: EntityId;
+    targetId: EntityId;
+}
+
 export class GameState {
     phase: TurnPhase = "idle";
     selectedEntity: EntityId | null = null;
     reachableTiles = new Set<string>();
     reachableAttackableTiles = new Set<string>();
     attackableEntities = new Set<EntityId>();
+
+    pendingAttacks: PendingAttack[] = []
+    pendingDeaths: EntityId[] = []
+    activePlayerId: string | null = null
 
     private _states = new Map<TurnPhase, TurnPhaseState>();
     private _current: TurnPhaseState | null = null;
