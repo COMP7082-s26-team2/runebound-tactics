@@ -1,23 +1,41 @@
 # Gameplay Loop FSM
 
-Documents the full turn-resolution state machine wired into `GameState` alongside the existing per-unit interaction phases.
+Documents the two-FSM architecture that drives the full gameplay loop.
 
 ---
 
-## TurnPhase Union
+## Architecture Overview
 
+The gameplay loop is split across two separate state machines:
+
+| Machine | Type | Phases | Responsibility |
+|---|---|---|---|
+| `GameState` | Inner | `idle`, `selected`, `awaiting-move` | Per-unit interaction; driven by player clicks via `SelectionSystem` |
+| `TurnFlow` | Outer | `action-phase`, `declare-end-turn`, `quick-play`, `combat`, `post-combat` | Turn pipeline; auto-advances through resolution after End Turn is declared |
+
+`SelectionSystem` is only active while `TurnFlow` is in `action-phase`. The outer machine auto-advances through the three resolution placeholder phases and calls `TurnSystem.endTurn()`, which emits `turn:begin` on the shared `EventBus` to start the next player's turn.
+
+---
+
+## Phase Unions
+
+**`TurnPhase`** (inner — `GameState`):
 ```ts
 export type TurnPhase =
-  | "idle"              // waiting for active player input
-  | "selected"          // unit selected; showing movement range + attack targets
-  | "awaiting-move"     // unit attacked; showing movement range before deselect
-  | "declare-end-turn"  // player clicked End Turn; kicks off turn-resolution pipeline
-  | "quick-play"        // placeholder: opponent response window (card system not yet implemented)
-  | "combat"            // placeholder: resolve queued attack declarations into damage
-  | "post-combat";      // placeholder: remove dead units, award gold, advance turn
+  | "idle"           // waiting for active player input
+  | "selected"       // unit selected; showing movement range + attack targets
+  | "awaiting-move"; // unit attacked; showing movement range before deselect
 ```
 
-The first three phases (`idle`, `selected`, `awaiting-move`) are per-unit interaction phases driven by player clicks via `SelectionSystem`. The last four are turn-resolution phases that run automatically in sequence after End Turn is declared.
+**`TurnFlowPhase`** (outer — `TurnFlow`):
+```ts
+export type TurnFlowPhase =
+  | "action-phase"      // inner GameState machine active; player selects/moves/attacks
+  | "declare-end-turn"  // player clicked End Turn; kicks off resolution pipeline
+  | "quick-play"        // placeholder: opponent response window (card system pending)
+  | "combat"            // placeholder: resolve pendingAttacks (combat PR pending)
+  | "post-combat";      // placeholder: unit death removal, gold award (gold system pending)
+```
 
 ---
 
@@ -25,44 +43,50 @@ The first three phases (`idle`, `selected`, `awaiting-move`) are per-unit intera
 
 ```
 GridMovementScene.init()
-  └─ state.start("idle")
-  └─ turnSystem.start("player1") → emits "turn:begin"
-       └─ listener: state.transition("idle")
-            └─ idle.onEnter: activePlayerId = "player1"
+  state.start("idle")              (inner FSM initialized)
+  turnFlow.start("action-phase")   → action-phase.onEnter: state.transition("idle")
+  eventBus.on("turn:begin", ...)   registered
+  turnSystem.start("player1")      → emits "turn:begin"
+    → listener: turnFlow.transition("action-phase")
+         → action-phase.onEnter: state.transition("idle")
+              → idle.onEnter: activePlayerId = "player1"
 
 ── ACTION PHASE (player1) ──────────────────────────────────────
 
-Player clicks a friendly unit
+Player clicks friendly unit
+  └─ SelectionSystem._handleIdleClick() — ownership check passes
   └─ state.transition("selected")
        └─ SelectionSystem computes reachableTiles + attackableEntities
 
-Player clicks an attackable enemy
-  └─ _declareAttack(attacker, target) → pushed to state.pendingAttacks
+Player clicks attackable enemy
+  └─ SelectionSystem._declareAttack(attacker, target)
+       └─ state.pendingAttacks.push({ attackerId, targetId })
   └─ state.transition("awaiting-move")
 
 Player clicks End Turn button
-  └─ scene.endTurn() → state.transition("declare-end-turn")
+  └─ scene.endTurn() → turnFlow.transition("declare-end-turn")
 
-── TURN-RESOLUTION PIPELINE ────────────────────────────────────
+── TURN RESOLUTION PIPELINE ────────────────────────────────────
 
 declare-end-turn.onEnter
-  └─ queueMicrotask → state.transition("quick-play")
+  └─ queueMicrotask → turnFlow.transition("quick-play")
 
 quick-play.onEnter           [placeholder: card response window]
-  └─ queueMicrotask → state.transition("combat")
+  └─ queueMicrotask → turnFlow.transition("combat")
 
 combat.onEnter               [placeholder: full combat system pending PR]
   └─ resolve state.pendingAttacks → damage math → populate state.pendingDeaths
   └─ state.pendingAttacks = []
-  └─ queueMicrotask → state.transition("post-combat")
+  └─ queueMicrotask → turnFlow.transition("post-combat")
 
 post-combat.onEnter          [placeholder: gold resource system not yet implemented]
   └─ world.removeUnit() for each state.pendingDeaths
   └─ state.pendingDeaths = []
   └─ turnSystem.endTurn()
        └─ EventBus emits "turn:begin" (player2)
-            └─ listener: state.transition("idle")
-                 └─ idle.onEnter: activePlayerId = "player2"
+            └─ listener: turnFlow.transition("action-phase")
+                 → action-phase.onEnter: state.transition("idle")
+                      → idle.onEnter: activePlayerId = "player2"
 
 ── ACTION PHASE (player2) ──────────────────────────────────────
 ```
@@ -75,10 +99,10 @@ post-combat.onEnter          [placeholder: gold resource system not yet implemen
 |---|---|---|
 | Declaration | `SelectionSystem._declareAttack()` | `{ attackerId, targetId }` pushed to `state.pendingAttacks` |
 | Held | `state.pendingAttacks` | Survives through `declare-end-turn` and `quick-play` untouched |
-| Resolution | `combat` phase `onEnter` | Damage computed (`max(0, atk.attack - def.defense)`), stats updated, dead units queued to `state.pendingDeaths`, array cleared |
-| Death removal | `post-combat` phase `onEnter` | `world.removeUnit()` for each entry in `state.pendingDeaths`, then array cleared |
+| Resolution | `combat` phase `onEnter` (on `TurnFlow`) | Damage computed (`max(0, atk.attack - def.defense)`), stats updated, dead units queued to `state.pendingDeaths`, array cleared |
+| Death removal | `post-combat` phase `onEnter` (on `TurnFlow`) | `world.removeUnit()` for each entry in `state.pendingDeaths`, then array cleared |
 
-The two-step split (combat computes, post-combat removes) keeps a clean extension point for future death animations or gold distribution between the two phases.
+The two-step split (combat computes, post-combat removes) keeps a clean extension point for future death animations or gold distribution to be inserted between the two phases.
 
 ---
 
@@ -94,26 +118,44 @@ The two-step split (combat computes, post-combat removes) keeps a clean extensio
 
 ## Unit Ownership Model
 
-`World.unitOwnership: ComponentStore<string>` maps each `EntityId` to a player id string that matches the `TurnSystem` participant ids (e.g. `"player1"`, `"player2"`).
+`World.unitOwnership: ComponentStore<string>` maps each `EntityId` to a player id string matching the `TurnSystem` participant ids (e.g. `"player1"`, `"player2"`).
 
 - **Selection guard**: `SelectionSystem._handleIdleClick()` checks `world.unitOwnership.get(occupant) === state.activePlayerId`. Units owned by a different player, or units with no owner (`undefined`), cannot be selected.
-- **`activePlayerId`** on `GameState` is set in `idle.onEnter` from `turnSystem.activeId` each time a new turn begins.
+- **`activePlayerId`** on `GameState` is set in `idle.onEnter` from `turnSystem.activeId` each time a new turn begins (via `action-phase.onEnter` on `TurnFlow`).
 - Neutral units (no entry in `unitOwnership`) are intentionally unselectable by any player.
 
 ---
 
-## onEnter / onExit Hooks Summary
+## EventBus and TurnSystem Wiring
 
-All cleanup is placed in the arriving phase's `onEnter`. `onExit` hooks are empty — cleanup on exit would risk double-cleanup if a transition is redirected.
+`EventBus` is instantiated as a `public eventBus` field on `GridMovementScene` and passed to `TurnSystem` via constructor. This keeps the bus scoped to the scene — no global singleton.
+
+`GridMovementCanvas` (React) accesses `scene.eventBus` to subscribe to `turn:begin` for updating the active player UI label.
+
+`TurnSystem` is constructed with `loop=true` in the scene so turns cycle indefinitely round after round.
+
+---
+
+## `onEnter` Hooks Summary
+
+All cleanup lives in the arriving phase's `onEnter`. `onExit` hooks are empty to avoid double-cleanup if a transition is ever redirected.
+
+**`GameState` (inner):**
 
 | Phase | `onEnter` |
 |---|---|
 | `idle` | `selectedEntity = null`, clear `reachableTiles` + `attackableEntities`, `activePlayerId = turnSystem.activeId` |
 | `selected` | — |
 | `awaiting-move` | `attackableEntities.clear()` |
-| `declare-end-turn` | `queueMicrotask(() => transition("quick-play"))` |
-| `quick-play` | `queueMicrotask(() => transition("combat"))` |
-| `combat` | Resolve `pendingAttacks`, populate `pendingDeaths`, clear `pendingAttacks`; `queueMicrotask(() => transition("post-combat"))` |
+
+**`TurnFlow` (outer):**
+
+| Phase | `onEnter` |
+|---|---|
+| `action-phase` | `state.transition("idle")` |
+| `declare-end-turn` | `queueMicrotask(() => turnFlow.transition("quick-play"))` |
+| `quick-play` | `queueMicrotask(() => turnFlow.transition("combat"))` |
+| `combat` | Resolve `pendingAttacks`, populate `pendingDeaths`, clear `pendingAttacks`; `queueMicrotask(() => turnFlow.transition("post-combat"))` |
 | `post-combat` | Remove dead units, clear `pendingDeaths`, call `turnSystem.endTurn()` |
 
 `queueMicrotask` is used in auto-advancing placeholder phases to prevent synchronous recursive `onEnter` call stacks.
