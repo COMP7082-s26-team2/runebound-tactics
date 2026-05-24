@@ -26,7 +26,7 @@ export async function signUp(formData: FormData) {
 
     // 2. Check if username or email is already taken in the player table
     const existingPlayerByUsername = await prisma.player.findUnique({
-        where: { username } as any,
+        where: { username },
     });
 
     if (existingPlayerByUsername) {
@@ -34,7 +34,7 @@ export async function signUp(formData: FormData) {
     }
 
     const existingPlayerByEmail = await prisma.player.findUnique({
-        where: { email } as any,
+        where: { email },
     });
 
     if (existingPlayerByEmail) {
@@ -84,7 +84,7 @@ export async function verifyOtp(email: string, token: string, username: string) 
     // 2. Finalize registration by creating the player profile
     try {
         const existingPlayer = await prisma.player.findUnique({
-            where: { auth_id: data.user.id } as any,
+            where: { auth_id: data.user.id },
         });
 
         if (!existingPlayer) {
@@ -93,7 +93,7 @@ export async function verifyOtp(email: string, token: string, username: string) 
                     auth_id: data.user.id,
                     username: username,
                     email: email,
-                } as any,
+                },
             });
         }
 
