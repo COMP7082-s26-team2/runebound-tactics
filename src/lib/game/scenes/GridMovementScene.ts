@@ -5,6 +5,7 @@ import {
     MovementRangeSystem,
     SelectionSystem,
     InputSystem,
+    CombatSystem,
 } from "@/lib/game/systems";
 import { GameState } from "@/lib/game/state/GameState";
 
@@ -40,7 +41,7 @@ export class GridMovementScene extends Scene {
         this._world = new World(grid);
 
         this._world.spawnUnit(
-            { q: 2, r: 3 },
+            { q: 2, r: 5 },
             {
                 attack: 10,
                 health: 100,
@@ -65,6 +66,19 @@ export class GridMovementScene extends Scene {
             { color: "purple" },
         );
 
+        this._world.spawnUnit(
+            { q: 5, r: 8 },
+            {
+                attack: 8,
+                health: 80,
+                movement: 2,
+                name: "Skeleton",
+                defense: 2,
+                attackRange: 1,
+            },
+            { color: "purple" },
+        );
+
         const tweens = new TweenManager();
         this.components.add(tweens);
         this.components.add(
@@ -76,6 +90,10 @@ export class GridMovementScene extends Scene {
                 tweens,
             ),
         );
+
+        // CombatSystem not to be added to this.components because it has no lifecycle
+        const combatSystem = new CombatSystem(this._world)
+
         this.components.add(
             new SelectionSystem(
                 this._world,
@@ -83,6 +101,7 @@ export class GridMovementScene extends Scene {
                 this.state,
                 this.input,
                 tweens,
+                combatSystem
             ),
         );
         this.components.add(
