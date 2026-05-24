@@ -71,7 +71,7 @@ export class SelectionSystem implements GameComponent {
             this._attack(this._state.selectedEntity!, occupant);
             this._computeReachable(this._state.selectedEntity!);
             this._state.attackableEntities.clear();
-            this._state.phase = "awaiting-move";
+            this._state.transition("awaiting-move");
             return;
         }
 
@@ -83,7 +83,7 @@ export class SelectionSystem implements GameComponent {
             this._state.reachableAttackableTiles.clear();
             // this._computeAttackable(entityId);
             this._state.attackableEntities = this._combat.computeAttackable(entityId)
-            this._state.phase = "moved";
+            this._state.transition("moved");
             return;
         }
 
@@ -114,7 +114,7 @@ export class SelectionSystem implements GameComponent {
 
     private _select(entityId: EntityId): void {
         this._state.selectedEntity = entityId;
-        this._state.phase = "selected";
+        this._state.transition("selected");
         this._computeReachable(entityId);
         // this._computeAttackable(entityId);
         this._state.attackableEntities = this._combat.computeAttackable(entityId)
@@ -180,7 +180,7 @@ export class SelectionSystem implements GameComponent {
     }
 
     private _deselect(): void {
-        this._state.phase = "idle";
+        this._state.transition("idle");
         this._state.selectedEntity = null;
         this._state.reachableTiles.clear();
         this._state.reachableAttackableTiles.clear();
