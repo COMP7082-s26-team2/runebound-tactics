@@ -174,6 +174,12 @@ export class GridMovementScene extends Scene {
             this.eventBus,
             true
         )
+
+        this.state.start("idle")
+        this.turnFlow.start("action-phase")
+
+        this.turnSystem.start("player1")
+
         this.components.add(
             new SelectionSystem(
                 this._world,
