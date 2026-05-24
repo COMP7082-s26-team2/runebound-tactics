@@ -24,6 +24,7 @@ export class World {
     public gridPositions = new ComponentStore<GridPositionData>();
     public unitStats = new ComponentStore<UnitStatsData>();
     public unitAppearance = new ComponentStore<AppearanceData>();
+    public unitOwnership = new ComponentStore<string>();
 
     constructor(grid: Grid) {
         this.grid = grid;
@@ -33,12 +34,16 @@ export class World {
         coord: GridCoord,
         stats: UnitStatsData,
         appearance: AppearanceData,
+        owner?: string,
     ): EntityId {
         const entityId = this.entityManager.createEntity();
         this.gridPositions.set(entityId, coord);
         this.unitStats.set(entityId, stats);
         this.unitAppearance.set(entityId, appearance);
         this.occupancyMap.set(cellKey(coord), entityId);
+
+        if (owner !== undefined) this.unitOwnership.set(entityId, owner);
+
         return entityId;
     }
 
@@ -58,6 +63,7 @@ export class World {
         this.gridPositions.remove(entityId);
         this.unitStats.remove(entityId);
         this.unitAppearance.remove(entityId);
+        this.unitOwnership.remove(entityId);
         this.entityManager.removeEntity(entityId);
     }
 }
