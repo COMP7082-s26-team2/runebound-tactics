@@ -48,14 +48,15 @@ class CombatSystem {
         // TESTING
         console.log(`[CombatSystem.applyAttackResult] ${defender.name} HP: ${defender.health} -> ${result.newDefenderHp}`);
         
-        if (result.defenderDied) {
-            this._world.removeUnit(targetId)
-        } else {
+        // NOTE: commented out unit removal logic because it should be left to the post-combat phase
+        // if (result.defenderDied) {
+        //     this._world.removeUnit(targetId)
+        // } else {
             this._world.unitStats.set(targetId, {
                 ...defender,
                 health: result.newDefenderHp
             })
-        }
+        // }
     }
 
     computeAttackable(entityId: EntityId): Set<EntityId> {
