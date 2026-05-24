@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { GameEngine } from "@/lib/";
 import { GridMovementScene } from "@/lib/game/";
+import type { TurnFlowPhase } from "@/lib/game/state";
 
 export interface GridMovementCanvasProps {
     debug?: boolean;
@@ -18,6 +19,8 @@ export default function GridMovementCanvas({
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const sceneRef = useRef<GridMovementScene | null>(null);
     const [activePlayer, setActivePlayer] = useState("player1");
+    const [turnPhase, setTurnPhase] = useState<TurnFlowPhase | null>(null);
+    const [gamePhase, setGamePhase] = useState<string | null>(null);
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -49,9 +52,18 @@ export default function GridMovementCanvas({
         };
         scene.eventBus.on("turn:begin", onTurnBegin);
 
+        let rafId: number;
+        const poll = () => {
+            setTurnPhase(scene.turnFlow.current);
+            setGamePhase(scene.state.current);
+            rafId = requestAnimationFrame(poll);
+        };
+        rafId = requestAnimationFrame(poll);
+
         return () => {
             engine.stop();
             scene.eventBus.off("turn:begin", onTurnBegin);
+            cancelAnimationFrame(rafId);
         };
     }, []);
 
@@ -69,9 +81,14 @@ export default function GridMovementCanvas({
                     color: "white",
                     background: "rgba(0,0,0,0.5)",
                     padding: "4px 8px",
+                    fontFamily: "monospace",
+                    fontSize: "13px",
+                    lineHeight: "1.6",
                 }}
             >
-                Turn: {activePlayer}
+                <div>Turn: {activePlayer}</div>
+                <div>Turn phase: {turnPhase ?? "—"}</div>
+                <div>Game phase: {gamePhase ?? "—"}</div>
             </div>
             <button
                 style={{ position: "absolute", bottom: 8, right: 8 }}
