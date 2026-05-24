@@ -7,7 +7,7 @@ import {
     World,
     cellKey,
 } from "@/lib/engine";
-import { GameState } from "@/lib/game/state";
+import { GameState, TurnFlow } from "@/lib/game/state";
 import { CombatSystem, InputSystem } from "@/lib/game/systems";
 
 const STEP_DURATION = 0.15; // seconds per grid cell
@@ -19,10 +19,12 @@ export class SelectionSystem implements GameComponent {
         private _state: GameState,
         private _input: InputSystem,
         private _tweens: TweenManager,
-        private _combat: CombatSystem
+        private _combat: CombatSystem,
+        private _turnFlow: TurnFlow
     ) {}
 
     update(_dt: number): void {
+        if (this._turnFlow.current !== "action-phase") return;
         if (!this._input.isMouseButtonJustPressed(0)) return;
 
         const coord: GridCoord = {
@@ -53,6 +55,9 @@ export class SelectionSystem implements GameComponent {
         console.log("[_handleIdleClick]");
         
         if (occupant === null) return;
+        
+        if (this._world.unitOwnership.get(occupant) !== this._state.activePlayerId) return;
+
         this._select(occupant);
     }
 
