@@ -33,6 +33,26 @@ export class GameState {
         return this._started
     }
 
+    add(name: TurnPhase, state: TurnPhaseState) {
+        this._states.set(name, state)
+    }
+
+    remove(name: TurnPhase) {
+        if (this._name === name) {
+            throw new Error(`[GameState] Cannot remove active state "${name}"`)
+        }
+
+        this._states.delete(name)
+    }
+
+    start(initialState: TurnPhase) {
+        if (this._started) {
+            throw new Error(`[GameState] Already started - call reset() before re-starting`)
+        }
+
+        this._started = true
+        this._enter(initialState, null)
+    }
 
     transition(nextName: TurnPhase) {
         if (!this._started) {
