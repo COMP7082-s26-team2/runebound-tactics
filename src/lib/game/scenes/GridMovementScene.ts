@@ -1,4 +1,4 @@
-import { Scene, TweenManager, World, SquareGrid } from "@/lib/engine";
+import { Scene, TweenManager, World, SquareGrid, EventBus } from "@/lib/engine";
 import {
     GridRenderSystem,
     UnitRenderSystem,
@@ -6,8 +6,10 @@ import {
     SelectionSystem,
     InputSystem,
     CombatSystem,
+    TurnSystem,
 } from "@/lib/game/systems";
 import { GameState } from "@/lib/game/state/GameState";
+import { TurnFlow } from "../state";
 
 /**
  * A simple scene demonstrating grid-based movement and combat.
@@ -25,6 +27,9 @@ export class GridMovementScene extends Scene {
     private _world: World | null = null;
     public input: InputSystem;
     public state = new GameState();
+    public eventBus = new EventBus();
+    public turnFlow = new TurnFlow();
+    public turnSystem!: TurnSystem;
 
     constructor(canvas: HTMLCanvasElement) {
         super();
@@ -93,6 +98,54 @@ export class GridMovementScene extends Scene {
 
         // CombatSystem not to be added to this.components because it has no lifecycle
         const combatSystem = new CombatSystem(this._world)
+
+        this.turnFlow.add("action-phase", {
+            onEnter: () => { this.state.transition("idle") }
+        })
+
+        this.turnFlow.add("declare-end-turn", {
+            onEnter: () => { queueMicrotask(() => this.turnFlow.transition("quick-play")) }
+        })
+
+        this.turnFlow.add("quick-play", {
+            onEnter: () => { queueMicrotask(() => this.turnFlow.transition("combat")) }
+        })
+
+        this.turnFlow.add("combat", {
+            onEnter: () => {
+                const world = this._world!
+
+                for (const { attackerId, targetId } of this.state.pendingAttacks) {
+                    const result = combatSystem.resolveAttack(attackerId, targetId)
+
+                    if (!result) continue
+
+                    if (result.defenderDied) {
+                        this.state.pendingDeaths.push(targetId)
+                    } else {
+                        const defender = world.unitStats.get(targetId)!
+
+                        world.unitStats.set(targetId, { ...defender, health: result.newDefenderHp })
+                    }
+                }
+
+                this.state.pendingAttacks = []
+                queueMicrotask(() => this.turnFlow.transition("post-combat"))
+            }
+        })
+
+        this.turnFlow.add("post-combat", {
+            onEnter: () => {
+                const world = this._world!
+
+                for (const id of this.state.pendingDeaths) {
+                    world.removeUnit(id)
+                }
+
+                this.state.pendingDeaths = []
+                this.turnSystem.endTurn()
+            }
+        })
 
         this.components.add(
             new SelectionSystem(
