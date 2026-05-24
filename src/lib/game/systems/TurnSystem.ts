@@ -17,7 +17,7 @@ class TurnSystem {
     constructor(
         participants: Participant[] = [],
         eventBus: EventBus | null = null,
-        loop = true,
+        loop = false,
     ) {
         this._eventBus = eventBus;
         this._loop = loop;
@@ -190,7 +190,7 @@ class TurnSystem {
             // TODO: add string union type
             this._emit("turn:round-end", { round: this._round - 1 });
 
-            if (this._loop) {
+            if (!this._loop) {
                 this._started = false;
                 this._emit("turn:sequence-end", {
                     round: this._round - 1,
