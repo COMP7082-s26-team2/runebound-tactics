@@ -147,6 +147,24 @@ export class GridMovementScene extends Scene {
             }
         })
 
+        this.state.add("idle", {
+            onEnter: () => {
+                this.state.selectedEntity = null
+                this.state.reachableTiles.clear()
+                this.state.reachableAttackableTiles.clear()
+                this.state.attackableEntities.clear()
+                this.state.activePlayerId = this.turnSystem.activeId
+            }
+        })
+
+        this.state.add("selected", {})
+        
+        this.state.add("awaiting-move", {
+            onEnter: () => { this.state.attackableEntities.clear() }
+        })
+        
+        this.state.add("moved", {})
+
         this.components.add(
             new SelectionSystem(
                 this._world,
