@@ -74,7 +74,12 @@ export async function assertTokenNotExpired(): Promise<boolean> {
                     .filter((c) => c.name.startsWith('sb-'))
                     .forEach((c) => {
                         // Options must match standard Supabase cookie settings to trigger removal
-                        cookieStore.set(c.name, '', { maxAge: -1, path: '/' });
+                        try {
+                            cookieStore.set(c.name, '', { maxAge: -1, path: '/' });
+                        } catch (err) {
+                            // Next.js throws an error when attempting to modify cookies from a Server Component.
+                            // We catch and ignore it since the redirect will enforce authentication anyway.
+                        }
                     });
 
                 return true; // Token has strictly expired
