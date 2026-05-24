@@ -33,31 +33,34 @@ class CombatSystem {
         }
     }
     
-    applyAttackResult(
-        result: AttackResult,
-        // NOTE: _attackerId is unused but kept for future counter-attack feature implementation
-        _attackerId: EntityId,
-        targetId: EntityId,
-    ): void {
-        const defender = this._world.unitStats.get(targetId)
+    // NOTE: dead code; originally used to directly apply damage on attack,
+    // but now shifted to declare attack and add to pending queue for later damage resolution
+    // can be re-purposed as a counter-attack feature later
+    // applyAttackResult(
+    //     result: AttackResult,
+    //     // NOTE: _attackerId is unused but kept for future counter-attack feature implementation
+    //     _attackerId: EntityId,
+    //     targetId: EntityId,
+    // ): void {
+    //     const defender = this._world.unitStats.get(targetId)
         
-        if (!defender) {
-            throw new Error(`[CombatSystem.applyAttackResult] Target unit ${targetId} does not exist in world`)
-        }
+    //     if (!defender) {
+    //         throw new Error(`[CombatSystem.applyAttackResult] Target unit ${targetId} does not exist in world`)
+    //     }
 
-        // TESTING
-        console.log(`[CombatSystem.applyAttackResult] ${defender.name} HP: ${defender.health} -> ${result.newDefenderHp}`);
+    //     // TESTING
+    //     console.log(`[CombatSystem.applyAttackResult] ${defender.name} HP: ${defender.health} -> ${result.newDefenderHp}`);
         
-        // NOTE: commented out unit removal logic because it should be left to the post-combat phase
-        // if (result.defenderDied) {
-        //     this._world.removeUnit(targetId)
-        // } else {
-            this._world.unitStats.set(targetId, {
-                ...defender,
-                health: result.newDefenderHp
-            })
-        // }
-    }
+    //     // NOTE: commented out unit removal logic because it should be left to the post-combat phase
+    //     // if (result.defenderDied) {
+    //     //     this._world.removeUnit(targetId)
+    //     // } else {
+    //         this._world.unitStats.set(targetId, {
+    //             ...defender,
+    //             health: result.newDefenderHp
+    //         })
+    //     // }
+    // }
 
     computeAttackable(entityId: EntityId): Set<EntityId> {
         const stats = this._world.unitStats.get(entityId)
