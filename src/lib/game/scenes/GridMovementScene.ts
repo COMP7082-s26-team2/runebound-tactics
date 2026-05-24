@@ -205,6 +205,12 @@ export class GridMovementScene extends Scene {
         this.components.add(this.input);
     }
 
+    endTurn(): void {
+        if (this.turnFlow.current === "action-phase") {
+            this.turnFlow.transition("declare-end-turn")
+        }
+    }
+
     destroy(): void {
         this._world = null;
     }
