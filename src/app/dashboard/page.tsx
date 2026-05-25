@@ -7,14 +7,16 @@ export default async function DashboardPage() {
     // Enforce strict absolute session expiration boundaries
     const isExpired = await assertTokenNotExpired();
     if (isExpired) {
-        redirect('/auth/login');
+        redirect("/auth/login");
     }
 
     const supabase = await createServerSideClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+        data: { session },
+    } = await supabase.auth.getSession();
 
     if (!session) {
-        redirect('/auth/login');
+        redirect("/auth/login");
     }
 
     const username = session.user.user_metadata?.username || session.user.email;
@@ -24,13 +26,30 @@ export default async function DashboardPage() {
             <div className="w-full max-w-md bg-[#111111] border border-[#222222] p-8 shadow-2xl text-center space-y-6">
                 <div className="space-y-2">
                     <div className="w-12 h-12 rounded-full border-2 border-[#66ff66] flex items-center justify-center mx-auto mb-4 animate-pulse">
-                        <svg className="w-6 h-6 text-[#66ff66]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        <svg
+                            className="w-6 h-6 text-[#66ff66]"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 13l4 4L19 7"
+                            />
                         </svg>
                     </div>
-                    <span className="text-[10px] text-[#66ff66] uppercase tracking-[0.2em] font-bold">Vector Established</span>
-                    <h1 className="text-2xl font-bold tracking-tighter uppercase">Sign-In Success</h1>
-                    <p className="text-[#666666] text-xs">Welcome back to Runebound Tactics, <strong className="text-white">{username}</strong>.</p>
+                    <span className="text-[10px] text-[#66ff66] uppercase tracking-[0.2em] font-bold">
+                        Vector Established
+                    </span>
+                    <h1 className="text-2xl font-bold tracking-tighter uppercase">
+                        Sign-In Success
+                    </h1>
+                    <p className="text-[#666666] text-xs">
+                        Welcome back to Runebound Tactics,{" "}
+                        <strong className="text-white">{username}</strong>.
+                    </p>
                 </div>
 
                 <div className="py-6 border-y border-[#222222] space-y-4">
