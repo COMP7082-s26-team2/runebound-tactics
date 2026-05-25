@@ -1,4 +1,4 @@
-import { Scene, TweenManager, World, SquareGrid } from "@/lib/engine";
+import { Scene, TweenManager, World, SquareGrid, EventBus } from "@/lib/engine";
 import {
     GridRenderSystem,
     UnitRenderSystem,
@@ -6,8 +6,10 @@ import {
     SelectionSystem,
     InputSystem,
     CombatSystem,
+    TurnSystem,
 } from "@/lib/game/systems";
 import { GameState } from "@/lib/game/state/GameState";
+import { TurnFlow } from "../state";
 
 /**
  * A simple scene demonstrating grid-based movement and combat.
@@ -20,11 +22,17 @@ const GRID_COLS = 10;
 const GRID_ROWS = 10;
 const CELL_SIZE = 80;
 
+const PLAYER1_ID = "player1"
+const PLAYER2_ID = "player2"
+
 export class GridMovementScene extends Scene {
     private _canvas: HTMLCanvasElement;
     private _world: World | null = null;
     public input: InputSystem;
     public state = new GameState();
+    public eventBus = new EventBus();
+    public turnFlow = new TurnFlow();
+    public turnSystem!: TurnSystem;
 
     constructor(canvas: HTMLCanvasElement) {
         super();
@@ -51,6 +59,7 @@ export class GridMovementScene extends Scene {
                 attackRange: 1,
             },
             { color: "red" },
+            PLAYER1_ID
         );
 
         this._world.spawnUnit(
@@ -64,6 +73,7 @@ export class GridMovementScene extends Scene {
                 attackRange: 1,
             },
             { color: "purple" },
+            PLAYER2_ID
         );
 
         this._world.spawnUnit(
@@ -77,6 +87,7 @@ export class GridMovementScene extends Scene {
                 attackRange: 1,
             },
             { color: "purple" },
+            PLAYER2_ID
         );
 
         const tweens = new TweenManager();
@@ -94,6 +105,92 @@ export class GridMovementScene extends Scene {
         // CombatSystem not to be added to this.components because it has no lifecycle
         const combatSystem = new CombatSystem(this._world)
 
+        this.turnFlow.add("action-phase", {
+            onEnter: () => { this.state.transition("idle") }
+        })
+
+        this.turnFlow.add("declare-end-turn", {
+            onEnter: () => { queueMicrotask(() => this.turnFlow.transition("quick-play")) }
+        })
+
+        this.turnFlow.add("quick-play", {
+            onEnter: () => { queueMicrotask(() => this.turnFlow.transition("combat")) }
+        })
+
+        this.turnFlow.add("combat", {
+            onEnter: () => {
+                const world = this._world!
+
+                console.log(`[combat] resolving ${this.state.pendingAttacks.length} attack(s)`)
+
+                for (const { attackerId, targetId } of this.state.pendingAttacks) {
+                    const result = combatSystem.resolveAttack(attackerId, targetId)
+
+                    if (!result) continue
+
+                    const attackerName = world.unitStats.get(attackerId)?.name ?? attackerId
+                    const defenderName = world.unitStats.get(targetId)?.name ?? targetId
+                    console.log(`[combat] ${attackerName} → ${defenderName}: ${result.damage} dmg | HP ${world.unitStats.get(targetId)?.health} → ${result.newDefenderHp}${result.defenderDied ? " (died)" : ""}`)
+
+                    if (result.defenderDied) {
+                        this.state.pendingDeaths.push(targetId)
+                    } else {
+                        const defender = world.unitStats.get(targetId)!
+                        world.unitStats.set(targetId, { ...defender, health: result.newDefenderHp })
+                    }
+                }
+
+                this.state.pendingAttacks = []
+                queueMicrotask(() => this.turnFlow.transition("post-combat"))
+            }
+        })
+
+        this.turnFlow.add("post-combat", {
+            onEnter: () => {
+                const world = this._world!
+
+                for (const id of this.state.pendingDeaths) {
+                    world.removeUnit(id)
+                }
+
+                this.state.pendingDeaths = []
+                this.turnSystem.endTurn()
+            }
+        })
+
+        this.state.add("idle", {
+            onEnter: () => {
+                this.state.selectedEntity = null
+                this.state.reachableTiles.clear()
+                this.state.reachableAttackableTiles.clear()
+                this.state.attackableEntities.clear()
+                this.state.activePlayerId = this.turnSystem.activeId
+            }
+        })
+
+        this.state.add("selected", {})
+        
+        this.state.add("awaiting-move", {
+            onEnter: () => { this.state.attackableEntities.clear() }
+        })
+        
+        this.state.add("moved", {})
+
+        this.eventBus.on("turn:begin", () => {
+            this.turnFlow.transition("action-phase")
+        })
+
+        this.turnSystem = new TurnSystem(
+            [{ id: PLAYER1_ID }, { id: PLAYER2_ID }],
+            this.eventBus,
+            true
+        )
+
+        this.state.start("idle")
+        this.turnFlow.start("action-phase")
+
+        this.turnSystem.start(PLAYER1_ID)
+
         this.components.add(
             new SelectionSystem(
                 this._world,
@@ -101,7 +198,8 @@ export class GridMovementScene extends Scene {
                 this.state,
                 this.input,
                 tweens,
-                combatSystem
+                combatSystem,
+                this.turnFlow
             ),
         );
         this.components.add(
@@ -111,6 +209,12 @@ export class GridMovementScene extends Scene {
             new MovementRangeSystem(this._world, CELL_SIZE, this.state),
         );
         this.components.add(this.input);
+    }
+
+    endTurn(): void {
+        if (this.turnFlow.current === "action-phase") {
+            this.turnFlow.transition("declare-end-turn")
+        }
     }
 
     destroy(): void {

@@ -7,7 +7,7 @@ import {
     World,
     cellKey,
 } from "@/lib/engine";
-import { GameState } from "@/lib/game/state";
+import { GameState, TurnFlow } from "@/lib/game/state";
 import { CombatSystem, InputSystem } from "@/lib/game/systems";
 
 const STEP_DURATION = 0.15; // seconds per grid cell
@@ -19,10 +19,12 @@ export class SelectionSystem implements GameComponent {
         private _state: GameState,
         private _input: InputSystem,
         private _tweens: TweenManager,
-        private _combat: CombatSystem
+        private _combat: CombatSystem,
+        private _turnFlow: TurnFlow
     ) {}
 
     update(_dt: number): void {
+        if (this._turnFlow.current !== "action-phase") return;
         if (!this._input.isMouseButtonJustPressed(0)) return;
 
         const coord: GridCoord = {
@@ -53,6 +55,9 @@ export class SelectionSystem implements GameComponent {
         console.log("[_handleIdleClick]");
         
         if (occupant === null) return;
+        
+        if (this._world.unitOwnership.get(occupant) !== this._state.activePlayerId) return;
+
         this._select(occupant);
     }
 
@@ -63,10 +68,10 @@ export class SelectionSystem implements GameComponent {
     ): void {
         // attack in place
         if (occupant !== null && this._state.attackableEntities.has(occupant)) {
-            this._attack(this._state.selectedEntity!, occupant);
+            this._declareAttack(this._state.selectedEntity!, occupant);
             this._computeReachable(this._state.selectedEntity!);
             this._state.attackableEntities.clear();
-            this._state.phase = "awaiting-move";
+            this._state.transition("awaiting-move");
             return;
         }
 
@@ -78,7 +83,7 @@ export class SelectionSystem implements GameComponent {
             this._state.reachableAttackableTiles.clear();
             // this._computeAttackable(entityId);
             this._state.attackableEntities = this._combat.computeAttackable(entityId)
-            this._state.phase = "moved";
+            this._state.transition("moved");
             return;
         }
 
@@ -94,7 +99,7 @@ export class SelectionSystem implements GameComponent {
 
     private _handleMovedClick(occupant: EntityId | null): void {
         if (occupant !== null && this._state.attackableEntities.has(occupant)) {
-            this._attack(this._state.selectedEntity!, occupant);
+            this._declareAttack(this._state.selectedEntity!, occupant);
         }
         this._deselect();
     }
@@ -109,7 +114,7 @@ export class SelectionSystem implements GameComponent {
 
     private _select(entityId: EntityId): void {
         this._state.selectedEntity = entityId;
-        this._state.phase = "selected";
+        this._state.transition("selected");
         this._computeReachable(entityId);
         // this._computeAttackable(entityId);
         this._state.attackableEntities = this._combat.computeAttackable(entityId)
@@ -175,7 +180,7 @@ export class SelectionSystem implements GameComponent {
     }
 
     private _deselect(): void {
-        this._state.phase = "idle";
+        this._state.transition("idle");
         this._state.selectedEntity = null;
         this._state.reachableTiles.clear();
         this._state.reachableAttackableTiles.clear();
@@ -225,10 +230,7 @@ export class SelectionSystem implements GameComponent {
         this._state.reachableAttackableTiles = reachableAttackableTiles;
     }
 
-    private _attack(attackerId: EntityId, targetId: EntityId): void {
-        const result = this._combat.resolveAttack(attackerId, targetId)
-        if (result) {
-            this._combat.applyAttackResult(result, attackerId, targetId)
-        }
+    private _declareAttack(attackerId: EntityId, targetId: EntityId): void {
+        this._state.pendingAttacks.push({ attackerId, targetId });
     }
 }
