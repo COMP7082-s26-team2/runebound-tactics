@@ -1,0 +1,19 @@
+{
+    "name": "@runebound-tactics/shared",
+    "version": "1.0.0",
+    "private": true,
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc --build",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint src"
+    },
+    "peerDependencies": {
+        "@colyseus/schema": "^4.x"
+    },
+    "devDependencies": {
+        "@colyseus/schema": "^4.0.0",
+        "typescript": "^5.8.3"
+    }
+}

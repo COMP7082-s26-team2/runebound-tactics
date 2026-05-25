@@ -1,0 +1,22 @@
+{
+    "name": "@runebound-tactics/server",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "tsx watch --tsconfig ../tsconfig.base.json src/index.ts",
+        "build": "tsc --build",
+        "start": "node dist/index.js",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint src"
+    },
+    "dependencies": {
+        "@colyseus/schema": "^4.0.0",
+        "@colyseus/ws-transport": "^0.17.0",
+        "@runebound-tactics/shared": "*",
+        "colyseus": "^0.17.0"
+    },
+    "devDependencies": {
+        "tsx": "^4.19.2",
+        "typescript": "^5.8.3"
+    }
+}
