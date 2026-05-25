@@ -2,6 +2,8 @@ import { Room, Client } from "colyseus";
 import { GamePlayerSlot, GameState } from "@runebound-tactics/shared";
 import type { Faction } from "@runebound-tactics/shared";
 import { pendingGames } from "./pendingGames";
+import prisma from "../lib/prisma";
+import { supabaseAdmin } from "../lib/supabase";
 
 interface PendingPlayer {
     displayName: string;
@@ -14,6 +16,8 @@ interface GameRoomOptions {
 
 interface JoinOptions {
     displayName?: string;
+    token?: string;
+    reconnectionToken?: string;
 }
 
 interface MoveUnitPayload {
@@ -32,6 +36,32 @@ export class GameRoom extends Room<{ state: GameState }> {
     private _pendingPlayers = new Map<string, PendingPlayer>();
     /** Ordered turn list — session IDs in the order players joined. */
     private _turnOrder: string[] = [];
+
+    async onAuth(_client: Client, options: JoinOptions) {
+        if (options.reconnectionToken) {
+            return true;
+        }
+
+        if (!options.token) {
+            throw new Error("No auth token provided");
+        }
+
+        const { data: { user }, error } = await supabaseAdmin.auth.getUser(options.token);
+        if (error || !user) {
+            throw new Error("Invalid or expired auth token");
+        }
+
+        const player = await prisma.player.findUnique({
+            where: { auth_id: user.id },
+            select: { player_id: true, username: true },
+        });
+
+        if (!player) {
+            throw new Error("Player profile not found");
+        }
+
+        return player;
+    }
 
     onCreate(options: GameRoomOptions): void {
         const pending = pendingGames.get(options.lobbyRoomId);
@@ -87,7 +117,10 @@ export class GameRoom extends Room<{ state: GameState }> {
     }
 
     onJoin(client: Client, options?: JoinOptions): void {
-        const displayName = String(options?.displayName ?? "Player").slice(0, 32);
+        const authUsername = typeof client.auth === "object" && client.auth !== null
+            ? (client.auth as { username?: string | null }).username ?? undefined
+            : undefined;
+        const displayName = String(options?.displayName ?? authUsername ?? "Player").slice(0, 32);
         const pending = this._pendingPlayers.get(displayName);
 
         const slot = new GamePlayerSlot();

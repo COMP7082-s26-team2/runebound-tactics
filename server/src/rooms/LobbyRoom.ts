@@ -2,9 +2,13 @@ import { Room, Client, matchMaker } from "colyseus";
 import { LobbyPlayerSlot, LobbyState, ROOM_GAME } from "@runebound-tactics/shared";
 import type { Faction, LobbySummary } from "@runebound-tactics/shared";
 import { pendingGames } from "./pendingGames";
+import prisma from "../lib/prisma";
+import { supabaseAdmin } from "../lib/supabase";
 
 interface JoinOptions {
     displayName?: string;
+    token?: string;
+    reconnectionToken?: string;
 }
 
 interface SetReadyPayload {
@@ -26,6 +30,32 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
     private _countdownTimer: ReturnType<typeof setInterval> | null = null;
     private _countdownRemaining = 0;
     private _hostSessionId = "";
+
+    async onAuth(_client: Client, options: JoinOptions) {
+        if (options.reconnectionToken) {
+            return true;
+        }
+
+        if (!options.token) {
+            throw new Error("No auth token provided");
+        }
+
+        const { data: { user }, error } = await supabaseAdmin.auth.getUser(options.token);
+        if (error || !user) {
+            throw new Error("Invalid or expired auth token");
+        }
+
+        const player = await prisma.player.findUnique({
+            where: { auth_id: user.id },
+            select: { player_id: true, username: true },
+        });
+
+        if (!player) {
+            throw new Error("Player profile not found");
+        }
+
+        return player;
+    }
 
     onCreate(options?: { lobbyName?: string; maxPlayers?: number }): void {
         const state = new LobbyState();
@@ -62,7 +92,10 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
             throw new Error("Game is already starting");
         }
 
-        const displayName = String(options?.displayName ?? "Player").slice(0, 32);
+        const authUsername = typeof client.auth === "object" && client.auth !== null
+            ? (client.auth as { username?: string | null }).username ?? undefined
+            : undefined;
+        const displayName = String(options?.displayName ?? authUsername ?? "Player").slice(0, 32);
 
         const usedSlots = new Set([...this.state.players.values()].map(p => p.slot));
         const nextSlot = Array.from(

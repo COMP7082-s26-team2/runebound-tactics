@@ -8,6 +8,7 @@ import { client } from "@/lib/multiplayer/client";
 import { ROOM_LOBBY, LobbyState } from "@runebound-tactics/shared";
 import { getDisplayName } from "@/lib/multiplayer/identity";
 import { stashHandoff } from "@/lib/multiplayer/roomHandoff";
+import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { Room } from "@colyseus/sdk";
 
 interface Props {
@@ -27,10 +28,14 @@ export function CreateLobbyModal({ isOpen, onClose }: Props) {
         setErr(null);
         try {
             const displayName = getDisplayName();
+            const supabase = createBrowserSupabaseClient();
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token ?? "";
             const room = await client.create<LobbyState>(ROOM_LOBBY, {
                 lobbyName: lobbyName.trim() || "My Lobby",
                 maxPlayers,
                 displayName,
+                token,
             }, LobbyState);
             window.sessionStorage.setItem("lobby_token", room.reconnectionToken);
             stashHandoff(room as Room<unknown, unknown>);

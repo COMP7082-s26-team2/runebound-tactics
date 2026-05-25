@@ -1,9 +1,16 @@
 import type { Room } from "@colyseus/sdk";
 import { LobbyState, GameState } from "@runebound-tactics/shared";
 import { client } from "./client";
+import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 
 const LOBBY_TOKEN = "lobby_token";
 const GAME_TOKEN  = "game_token";
+
+async function getSupabaseToken(): Promise<string> {
+    const supabase = createBrowserSupabaseClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token ?? "";
+}
 
 async function joinOrReconnect<S>(
     storageKey: string,
@@ -29,7 +36,8 @@ async function joinOrReconnect<S>(
             window.sessionStorage.removeItem(storageKey);
         }
     }
-    const room = await client.joinById<S>(roomId, options, rootSchema);
+    const token = await getSupabaseToken();
+    const room = await client.joinById<S>(roomId, { ...options, token }, rootSchema);
     window.sessionStorage.setItem(storageKey, room.reconnectionToken);
     return room;
 }
