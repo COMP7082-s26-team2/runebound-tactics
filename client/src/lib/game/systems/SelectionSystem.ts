@@ -7,7 +7,7 @@ import {
     World,
     cellKey,
 } from "@/lib/engine";
-import { GameState, TurnFlow } from "@/lib/game/state";
+import { ClientGameState, TurnFlow } from "@/lib/game/state";
 import { CombatSystem, InputSystem } from "@/lib/game/systems";
 
 const DEFAULT_STEP_DURATION = 0.15;
@@ -16,7 +16,7 @@ export class SelectionSystem implements GameComponent {
     constructor(
         private _world: World,
         private _cellSize: number,
-        private _state: GameState,
+        private _state: ClientGameState,
         private _input: InputSystem,
         private _tweens: TweenManager,
         private _combat: CombatSystem,

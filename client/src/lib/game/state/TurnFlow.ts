@@ -1,3 +1,5 @@
+// Client-only macro phase mirror. NOT authoritative — reflects server GameRoom phase.
+// Phases: action-phase → declare-end-turn → quick-play → combat → post-combat
 export type TurnFlowPhase =
     | "action-phase"
     | "declare-end-turn"

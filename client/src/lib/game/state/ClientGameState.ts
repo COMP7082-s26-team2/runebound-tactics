@@ -1,3 +1,6 @@
+// Client-only input validation FSM. NOT authoritative — server GameRoom owns turn state.
+// Phases: idle → selected → awaiting-move → moved
+// Gates player input within the active turn; reset when server advances turn.
 import { EntityId } from "@/lib/engine";
 
 /**
@@ -19,7 +22,7 @@ export type PendingAttack = {
     targetId: EntityId;
 };
 
-export class GameState {
+export class ClientGameState {
     phase: TurnPhase = "idle";
     selectedEntity: EntityId | null = null;
     reachableTiles = new Set<string>();
@@ -50,7 +53,7 @@ export class GameState {
 
     remove(name: TurnPhase) {
         if (this._name === name) {
-            throw new Error(`[GameState] Cannot remove active state "${name}"`);
+            throw new Error(`[ClientGameState] Cannot remove active state "${name}"`);
         }
 
         this._states.delete(name);
@@ -59,7 +62,7 @@ export class GameState {
     start(initialState: TurnPhase) {
         if (this._started) {
             throw new Error(
-                `[GameState] Already started - call reset() before re-starting`,
+                `[ClientGameState] Already started - call reset() before re-starting`,
             );
         }
 
@@ -69,11 +72,11 @@ export class GameState {
 
     transition(nextName: TurnPhase) {
         if (!this._started) {
-            throw new Error(`[GameState] Call start() before transition()`);
+            throw new Error(`[ClientGameState] Call start() before transition()`);
         }
 
         if (!this._states.has(nextName)) {
-            throw new Error(`[GameState] Unknown state "${nextName}"`);
+            throw new Error(`[ClientGameState] Unknown state "${nextName}"`);
         }
 
         this.phase = nextName;
@@ -108,7 +111,7 @@ export class GameState {
 
     private _enter(name: TurnPhase, prevName: TurnPhase | null) {
         if (!this._states.has(name)) {
-            throw new Error(`[GameState] Unknown state "${name}"`);
+            throw new Error(`[ClientGameState] Unknown state "${name}"`);
         }
 
         this._name = name;

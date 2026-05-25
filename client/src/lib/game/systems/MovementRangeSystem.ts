@@ -1,5 +1,5 @@
 import { GameComponent, World } from "@/lib/engine";
-import { GameState } from "@/lib/game/state";
+import { ClientGameState } from "@/lib/game/state";
 
 export class MovementRangeSystem implements GameComponent {
     readonly zIndex = 2; // above grid tiles, below unit sprites
@@ -7,7 +7,7 @@ export class MovementRangeSystem implements GameComponent {
     constructor(
         private _world: World,
         private _cellSize: number,
-        private _state: GameState,
+        private _state: ClientGameState,
     ) {}
 
     draw(ctx: CanvasRenderingContext2D): void {

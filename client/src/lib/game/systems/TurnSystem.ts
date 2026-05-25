@@ -1,3 +1,5 @@
+// ECS GameComponent — tracks active participant for UI display.
+// NOT authoritative — mirrors server's current active player via Colyseus state.
 import { EventBus } from "@/lib/engine";
 
 interface Participant {

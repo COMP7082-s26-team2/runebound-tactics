@@ -8,7 +8,7 @@ import {
     CombatSystem,
     TurnSystem,
 } from "@/lib/game/systems";
-import { GameState } from "@/lib/game/state/GameState";
+import { ClientGameState } from "@/lib/game/state/ClientGameState";
 import { TurnFlow } from "../state";
 import {
     ASSET_MANIFEST,
@@ -35,7 +35,7 @@ export class GridMovementScene extends Scene {
     private _canvas: HTMLCanvasElement;
     private _world: World | null = null;
     public input: InputSystem;
-    public state = new GameState();
+    public state = new ClientGameState();
     public eventBus = new EventBus();
     public turnFlow = new TurnFlow();
     public turnSystem!: TurnSystem;

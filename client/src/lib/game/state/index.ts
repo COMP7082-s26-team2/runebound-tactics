@@ -1,2 +1,2 @@
-export * from "./GameState";
+export * from "./ClientGameState";
 export * from "./TurnFlow";
