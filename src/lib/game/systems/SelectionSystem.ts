@@ -10,7 +10,7 @@ import {
 import { GameState, TurnFlow } from "@/lib/game/state";
 import { CombatSystem, InputSystem } from "@/lib/game/systems";
 
-const STEP_DURATION = 0.15; // seconds per grid cell
+const DEFAULT_STEP_DURATION = 0.15;
 
 export class SelectionSystem implements GameComponent {
     constructor(
@@ -20,8 +20,9 @@ export class SelectionSystem implements GameComponent {
         private _input: InputSystem,
         private _tweens: TweenManager,
         private _combat: CombatSystem,
-        private _turnFlow: TurnFlow
-    ) {}
+        private _turnFlow: TurnFlow,
+        private _stepDuration: number = DEFAULT_STEP_DURATION,
+    ) { }
 
     update(_dt: number): void {
         if (this._turnFlow.current !== "action-phase") return;
@@ -138,7 +139,7 @@ export class SelectionSystem implements GameComponent {
             ...path.slice(1).map((c) => this._world.grid.gridToWorld(c)),
         ];
 
-        this._tweens.startPath(entityId, waypoints, STEP_DURATION);
+        this._tweens.startPath(entityId, waypoints, this._stepDuration);
     }
 
     // BFS to find the grid path to target

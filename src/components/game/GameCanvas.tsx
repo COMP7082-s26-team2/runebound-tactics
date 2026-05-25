@@ -46,7 +46,11 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
                     defense: 5,
                     attackRange: 1,
                 },
-                { color: "red" },
+                {
+                    assetKey: "tilemap:entity:castle:swordsman",
+                    animationState: "idle",
+                    color: "red",
+                },
             );
             world.spawnUnit(
                 { q: 5, r: 6 },
@@ -58,7 +62,11 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
                     defense: 5,
                     attackRange: 1,
                 },
-                { color: "green" },
+                {
+                    assetKey: "tilemap:entity:castle:archer",
+                    animationState: "idle",
+                    color: "green",
+                },
             );
 
             engine.addComponent(new GridRenderSystem(world, 10, 10, 80));
@@ -74,7 +82,7 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
             engine.components.draw(ctx, 1);
         };
 
-        engine.postDraw = (ctx) => {};
+        engine.postDraw = (ctx) => { };
 
         // start engine
         engine.start();

@@ -7,3 +7,4 @@ export * from "./grid/Grid";
 export * from "./grid/SquareGrid";
 export * from "./world/World";
 export * from "./core";
+export * from "./assets";

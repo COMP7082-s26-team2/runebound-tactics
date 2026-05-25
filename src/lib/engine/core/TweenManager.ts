@@ -55,6 +55,14 @@ export class TweenManager implements GameComponent {
         return tween.waypoints[0].lerp(tween.waypoints[1], t);
     }
 
+    /** Returns the current segment direction, or null if no tween is active. */
+    getDirection(entityId: EntityId): Vector2D | null {
+        const tween = this._tweens.get(entityId);
+        if (!tween || tween.waypoints.length < 2) return null;
+
+        return tween.waypoints[1].sub(tween.waypoints[0]);
+    }
+
     isMoving(entityId: EntityId): boolean {
         return this._tweens.has(entityId);
     }
