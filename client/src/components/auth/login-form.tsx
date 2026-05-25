@@ -34,8 +34,8 @@ export default function LoginForm() {
         if (result?.error) {
             setError(result.error);
         } else if (result?.success) {
-            setSuccess("Authentication successful! Entering the realm...");
-            window.location.href = "/dashboard";
+            setSuccess('Authentication successful! Entering the realm...');
+            window.location.href = '/';
         }
     }
 
