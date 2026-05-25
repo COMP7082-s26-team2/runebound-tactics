@@ -2,6 +2,7 @@
 
 import { createServerSideClient } from '@/lib/supabase';
 import prisma from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 
 const BUCKET_NAME = 'profile-pictures';
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
@@ -35,7 +36,7 @@ export async function getProfile() {
     }
 
     const player = await prisma.player.findUnique({
-        where: { auth_id: user.id } as any,
+        where: { auth_id: user.id } satisfies Prisma.playerWhereUniqueInput,
         select: {
             player_id: true,
             username: true,
@@ -78,7 +79,7 @@ export async function updateUsername(newUsername: string) {
 
     // Check uniqueness
     const existing = await prisma.player.findUnique({
-        where: { username: trimmed } as any,
+        where: { username: trimmed } satisfies Prisma.playerWhereUniqueInput,
     });
 
     if (existing && String(existing.auth_id) !== user.id) {
@@ -87,8 +88,8 @@ export async function updateUsername(newUsername: string) {
 
     // Update player table
     await prisma.player.update({
-        where: { auth_id: user.id } as any,
-        data: { username: trimmed } as any,
+        where: { auth_id: user.id } satisfies Prisma.playerWhereUniqueInput,
+        data: { username: trimmed } satisfies Prisma.playerUpdateInput,
     });
 
     // Update Supabase Auth metadata
@@ -150,8 +151,8 @@ export async function uploadAvatar(formData: FormData) {
 
     // Save URL to player record
     await prisma.player.update({
-        where: { auth_id: user.id } as any,
-        data: { avatar_url: publicUrl } as any,
+        where: { auth_id: user.id } satisfies Prisma.playerWhereUniqueInput,
+        data: { avatar_url: publicUrl } satisfies Prisma.playerUpdateInput,
     });
 
     return { success: true, avatar_url: publicUrl };
