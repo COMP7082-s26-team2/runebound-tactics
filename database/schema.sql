@@ -1,221 +1,226 @@
--- ==========================================
--- Runebound Tactic: PostgreSQL Schema & Seed Data
--- ==========================================
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
 
--- 1. CLEANUP (Optional: Drops tables in reverse order of dependencies)
-DROP TABLE IF EXISTS game_action CASCADE;
-DROP TABLE IF EXISTS player_deck CASCADE;
-DROP TABLE IF EXISTS card CASCADE;
-DROP TABLE IF EXISTS resource CASCADE;
-DROP TABLE IF EXISTS turn CASCADE;
-DROP TABLE IF EXISTS unit CASCADE;
-DROP TABLE IF EXISTS unit_type CASCADE;
-DROP TABLE IF EXISTS match_player CASCADE;
-DROP TABLE IF EXISTS game_match CASCADE;
-DROP TABLE IF EXISTS guild_invite CASCADE;
-DROP TABLE IF EXISTS guild_member CASCADE;
-DROP TABLE IF EXISTS guild CASCADE;
-DROP TABLE IF EXISTS player CASCADE;
+-- CreateTable
+CREATE TABLE "player" (
+    "player_id" BIGSERIAL NOT NULL,
+    "username" VARCHAR(255),
+    "password_hash" VARCHAR(255),
 
--- ==========================================
--- TABLE DEFINITIONS
--- ==========================================
-
--- Stores each player's account.
-CREATE TABLE player (
-    player_id BIGSERIAL PRIMARY KEY,
-    username VARCHAR(255) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL
+    CONSTRAINT "player_pkey" PRIMARY KEY ("player_id")
 );
 
--- Stores guild/clan information.
-CREATE TABLE guild (
-    guild_id BIGSERIAL PRIMARY KEY,
-    guild_name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT,
-    total_wins INT DEFAULT 0,
-    total_losses INT DEFAULT 0,
-    leaderboard_rank INT
+-- CreateTable
+CREATE TABLE "guild" (
+    "guild_id" BIGSERIAL NOT NULL,
+    "guild_name" VARCHAR(255),
+    "description" TEXT,
+    "total_wins" INTEGER DEFAULT 0,
+    "total_losses" INTEGER DEFAULT 0,
+    "leaderboard_rank" INTEGER,
+
+    CONSTRAINT "guild_pkey" PRIMARY KEY ("guild_id")
 );
 
--- Connects players to guilds.
-CREATE TABLE guild_member (
-    guild_member_id BIGSERIAL PRIMARY KEY,
-    guild_id BIGINT REFERENCES guild(guild_id) ON DELETE CASCADE,
-    player_id BIGINT REFERENCES player(player_id) ON DELETE CASCADE,
-    role VARCHAR(50) NOT NULL -- leader, officer, member
+-- CreateTable
+CREATE TABLE "guild_member" (
+    "guild_member_id" BIGSERIAL NOT NULL,
+    "guild_id" BIGINT,
+    "player_id" BIGINT,
+    "role" VARCHAR(50),
+
+    CONSTRAINT "guild_member_pkey" PRIMARY KEY ("guild_member_id")
 );
 
--- Stores pending guild invitations or join requests.
-CREATE TABLE guild_invite (
-    guild_invite_id BIGSERIAL PRIMARY KEY,
-    guild_id BIGINT REFERENCES guild(guild_id) ON DELETE CASCADE,
-    player_id BIGINT REFERENCES player(player_id) ON DELETE CASCADE,
-    initiated_by BIGINT REFERENCES player(player_id),
-    status VARCHAR(50) DEFAULT 'pending' -- pending, accepted, rejected
+-- CreateTable
+CREATE TABLE "guild_invite" (
+    "guild_invite_id" BIGSERIAL NOT NULL,
+    "guild_id" BIGINT,
+    "player_id" BIGINT,
+    "initiated_by" BIGINT,
+    "status" VARCHAR(50) DEFAULT 'pending',
+
+    CONSTRAINT "guild_invite_pkey" PRIMARY KEY ("guild_invite_id")
 );
 
--- Stores one game session.
-CREATE TABLE game_match (
-    match_id BIGSERIAL PRIMARY KEY,
-    status VARCHAR(50) DEFAULT 'waiting', -- waiting, active, finished
-    current_turn_player_id BIGINT REFERENCES player(player_id),
-    winner_player_id BIGINT REFERENCES player(player_id),
-    turn_number INT DEFAULT 1
+-- CreateTable
+CREATE TABLE "game_match" (
+    "match_id" BIGSERIAL NOT NULL,
+    "status" VARCHAR(50) DEFAULT 'waiting',
+    "current_turn_player_id" BIGINT,
+    "winner_player_id" BIGINT,
+    "turn_number" INTEGER DEFAULT 1,
+
+    CONSTRAINT "game_match_pkey" PRIMARY KEY ("match_id")
 );
 
--- Links players to a match.
-CREATE TABLE match_player (
-    match_player_id BIGSERIAL PRIMARY KEY,
-    match_id BIGINT REFERENCES game_match(match_id) ON DELETE CASCADE,
-    player_id BIGINT REFERENCES player(player_id) ON DELETE CASCADE,
-    team_side INT,
-    is_ready BOOLEAN DEFAULT FALSE
+-- CreateTable
+CREATE TABLE "match_player" (
+    "match_player_id" BIGSERIAL NOT NULL,
+    "match_id" BIGINT,
+    "player_id" BIGINT,
+    "team_side" INTEGER,
+    "is_ready" BOOLEAN DEFAULT false,
+
+    CONSTRAINT "match_player_pkey" PRIMARY KEY ("match_player_id")
 );
 
--- Stores predefined unit definitions.
-CREATE TABLE unit_type (
-    unit_type_id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    class_type VARCHAR(100),
-    role_type VARCHAR(100),
-    base_hp INT NOT NULL,
-    base_attack INT NOT NULL,
-    move_range INT NOT NULL,
-    attack_range INT NOT NULL
+-- CreateTable
+CREATE TABLE "unit_type" (
+    "unit_type_id" BIGSERIAL NOT NULL,
+    "name" VARCHAR(255),
+    "class_type" VARCHAR(100),
+    "role_type" VARCHAR(100),
+    "base_hp" INTEGER,
+    "base_attack" INTEGER,
+    "move_range" INTEGER,
+    "attack_range" INTEGER,
+
+    CONSTRAINT "unit_type_pkey" PRIMARY KEY ("unit_type_id")
 );
 
--- Stores live units in battle.
-CREATE TABLE unit (
-    unit_id BIGSERIAL PRIMARY KEY,
-    match_id BIGINT REFERENCES game_match(match_id) ON DELETE CASCADE,
-    owner_player_id BIGINT REFERENCES player(player_id),
-    unit_type_id BIGINT REFERENCES unit_type(unit_type_id),
-    current_hp INT NOT NULL,
-    pos_x INT NOT NULL,
-    pos_y INT NOT NULL,
-    is_alive BOOLEAN DEFAULT TRUE
+-- CreateTable
+CREATE TABLE "unit" (
+    "unit_id" BIGSERIAL NOT NULL,
+    "match_id" BIGINT,
+    "owner_player_id" BIGINT,
+    "unit_type_id" BIGINT,
+    "current_hp" INTEGER,
+    "pos_x" INTEGER,
+    "pos_y" INTEGER,
+    "is_alive" BOOLEAN DEFAULT true,
+
+    CONSTRAINT "unit_pkey" PRIMARY KEY ("unit_id")
 );
 
--- Tracks turn ownership and remaining actions.
-CREATE TABLE turn (
-    turn_id BIGSERIAL PRIMARY KEY,
-    match_id BIGINT REFERENCES game_match(match_id) ON DELETE CASCADE,
-    player_id BIGINT REFERENCES player(player_id),
-    turn_number INT NOT NULL,
-    actions_remaining INT DEFAULT 2
+-- CreateTable
+CREATE TABLE "turn" (
+    "turn_id" BIGSERIAL NOT NULL,
+    "match_id" BIGINT,
+    "player_id" BIGINT,
+    "turn_number" INTEGER,
+    "actions_remaining" INTEGER DEFAULT 2,
+
+    CONSTRAINT "turn_pkey" PRIMARY KEY ("turn_id")
 );
 
--- Stores player gold during a match.
-CREATE TABLE resource (
-    resource_id BIGSERIAL PRIMARY KEY,
-    match_id BIGINT REFERENCES game_match(match_id) ON DELETE CASCADE,
-    player_id BIGINT REFERENCES player(player_id),
-    current_gold INT DEFAULT 0,
-    passive_income INT DEFAULT 10
+-- CreateTable
+CREATE TABLE "resource" (
+    "resource_id" BIGSERIAL NOT NULL,
+    "match_id" BIGINT,
+    "player_id" BIGINT,
+    "current_gold" INTEGER DEFAULT 0,
+    "passive_income" INTEGER DEFAULT 10,
+
+    CONSTRAINT "resource_pkey" PRIMARY KEY ("resource_id")
 );
 
--- Stores card definitions.
-CREATE TABLE card (
-    card_id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    effect_type VARCHAR(100),
-    cost INT NOT NULL,
-    description TEXT
+-- CreateTable
+CREATE TABLE "card" (
+    "card_id" BIGSERIAL NOT NULL,
+    "name" VARCHAR(255),
+    "effect_type" VARCHAR(100),
+    "cost" INTEGER,
+    "description" TEXT,
+
+    CONSTRAINT "card_pkey" PRIMARY KEY ("card_id")
 );
 
--- Stores which cards a player selected.
-CREATE TABLE player_deck (
-    player_deck_id BIGSERIAL PRIMARY KEY,
-    player_id BIGINT REFERENCES player(player_id) ON DELETE CASCADE,
-    card_id BIGINT REFERENCES card(card_id) ON DELETE CASCADE
+-- CreateTable
+CREATE TABLE "player_deck" (
+    "player_deck_id" BIGSERIAL NOT NULL,
+    "player_id" BIGINT,
+    "card_id" BIGINT,
+
+    CONSTRAINT "player_deck_pkey" PRIMARY KEY ("player_deck_id")
 );
 
--- Stores gameplay history.
-CREATE TABLE game_action (
-    action_id BIGSERIAL PRIMARY KEY,
-    match_id BIGINT REFERENCES game_match(match_id) ON DELETE CASCADE,
-    player_id BIGINT REFERENCES player(player_id),
-    unit_id BIGINT REFERENCES unit(unit_id),
-    target_unit_id BIGINT REFERENCES unit(unit_id),
-    action_type VARCHAR(50) NOT NULL, -- move, attack, card, end_turn
-    from_x INT,
-    from_y INT,
-    to_x INT,
-    to_y INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- CreateTable
+CREATE TABLE "game_action" (
+    "action_id" BIGSERIAL NOT NULL,
+    "match_id" BIGINT,
+    "player_id" BIGINT,
+    "unit_id" BIGINT,
+    "target_unit_id" BIGINT,
+    "action_type" VARCHAR(50),
+    "from_x" INTEGER,
+    "from_y" INTEGER,
+    "to_x" INTEGER,
+    "to_y" INTEGER,
+    "created_at" TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "game_action_pkey" PRIMARY KEY ("action_id")
 );
 
--- ==========================================
--- SEED DATA
--- ==========================================
+-- CreateIndex
+CREATE UNIQUE INDEX "player_username_key" ON "player"("username");
 
--- Players
-INSERT INTO player (player_id, username, password_hash) VALUES
-(1, 'Alex', 'hashed_pw_alex'),
-(2, 'Ryan', 'hashed_pw_ryan');
+-- CreateIndex
+CREATE UNIQUE INDEX "guild_guild_name_key" ON "guild"("guild_name");
 
--- Guilds
-INSERT INTO guild (guild_id, guild_name, description, total_wins, total_losses, leaderboard_rank) VALUES
-(1, 'DragonKnights', 'Competitive guild for high-level tactics.', 50, 10, 1);
+-- AddForeignKey
+ALTER TABLE "guild_member" ADD CONSTRAINT "guild_member_guild_id_fkey" FOREIGN KEY ("guild_id") REFERENCES "guild"("guild_id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
--- Guild Members
-INSERT INTO guild_member (guild_member_id, guild_id, player_id, role) VALUES
-(1, 1, 1, 'leader');
+-- AddForeignKey
+ALTER TABLE "guild_member" ADD CONSTRAINT "guild_member_player_id_fkey" FOREIGN KEY ("player_id") REFERENCES "player"("player_id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
--- Guild Invites
-INSERT INTO guild_invite (guild_invite_id, guild_id, player_id, initiated_by, status) VALUES
-(1, 1, 2, 1, 'pending');
+-- AddForeignKey
+ALTER TABLE "guild_invite" ADD CONSTRAINT "guild_invite_guild_id_fkey" FOREIGN KEY ("guild_id") REFERENCES "guild"("guild_id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
--- Matches
-INSERT INTO game_match (match_id, status, current_turn_player_id, turn_number) VALUES
-(101, 'active', 1, 4);
+-- AddForeignKey
+ALTER TABLE "guild_invite" ADD CONSTRAINT "guild_invite_initiated_by_fkey" FOREIGN KEY ("initiated_by") REFERENCES "player"("player_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
 
--- Match Players
-INSERT INTO match_player (match_player_id, match_id, player_id, team_side, is_ready) VALUES
-(1, 101, 1, 1, TRUE),
-(2, 101, 2, 2, TRUE);
+-- AddForeignKey
+ALTER TABLE "guild_invite" ADD CONSTRAINT "guild_invite_player_id_fkey" FOREIGN KEY ("player_id") REFERENCES "player"("player_id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
--- Unit Types
-INSERT INTO unit_type (unit_type_id, name, class_type, role_type, base_hp, base_attack, move_range, attack_range) VALUES
-(1, 'Archer', 'range', 'pawn', 70, 20, 2, 3);
+-- AddForeignKey
+ALTER TABLE "game_match" ADD CONSTRAINT "game_match_current_turn_player_id_fkey" FOREIGN KEY ("current_turn_player_id") REFERENCES "player"("player_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
 
--- Units
-INSERT INTO unit (unit_id, match_id, owner_player_id, unit_type_id, current_hp, pos_x, pos_y, is_alive) VALUES
-(1001, 101, 1, 1, 70, 2, 5, TRUE);
+-- AddForeignKey
+ALTER TABLE "game_match" ADD CONSTRAINT "game_match_winner_player_id_fkey" FOREIGN KEY ("winner_player_id") REFERENCES "player"("player_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
 
--- Turns
-INSERT INTO turn (turn_id, match_id, player_id, turn_number, actions_remaining) VALUES
-(1, 101, 1, 4, 2);
+-- AddForeignKey
+ALTER TABLE "match_player" ADD CONSTRAINT "match_player_match_id_fkey" FOREIGN KEY ("match_id") REFERENCES "game_match"("match_id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
--- Resources
-INSERT INTO resource (resource_id, match_id, player_id, current_gold, passive_income) VALUES
-(1, 101, 1, 30, 5);
+-- AddForeignKey
+ALTER TABLE "match_player" ADD CONSTRAINT "match_player_player_id_fkey" FOREIGN KEY ("player_id") REFERENCES "player"("player_id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
--- Cards
-INSERT INTO card (card_id, name, effect_type, cost, description) VALUES
-(1, 'Reflect', 'defense', 10, 'Reflects incoming damage back to the attacker.');
+-- AddForeignKey
+ALTER TABLE "unit" ADD CONSTRAINT "unit_match_id_fkey" FOREIGN KEY ("match_id") REFERENCES "game_match"("match_id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
--- Player Decks
-INSERT INTO player_deck (player_deck_id, player_id, card_id) VALUES
-(1, 1, 1);
+-- AddForeignKey
+ALTER TABLE "unit" ADD CONSTRAINT "unit_owner_player_id_fkey" FOREIGN KEY ("owner_player_id") REFERENCES "player"("player_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
 
--- Game Actions
-INSERT INTO game_action (action_id, match_id, player_id, unit_id, target_unit_id, action_type, from_x, from_y, to_x, to_y) VALUES
-(1, 101, 1, 1001, NULL, 'move', 2, 5, 3, 5),
-(2, 101, 1, 1001, NULL, 'attack', 3, 5, 3, 5); -- Target NULL as per user example 2, but could be a target_unit_id if attacking 2001
+-- AddForeignKey
+ALTER TABLE "unit" ADD CONSTRAINT "unit_unit_type_id_fkey" FOREIGN KEY ("unit_type_id") REFERENCES "unit_type"("unit_type_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
 
--- Reset sequences (PostgreSQL ONLY)
-SELECT setval(pg_get_serial_sequence('player', 'player_id'), (SELECT MAX(player_id) FROM player));
-SELECT setval(pg_get_serial_sequence('guild', 'guild_id'), (SELECT MAX(guild_id) FROM guild));
-SELECT setval(pg_get_serial_sequence('guild_member', 'guild_member_id'), (SELECT MAX(guild_member_id) FROM guild_member));
-SELECT setval(pg_get_serial_sequence('guild_invite', 'guild_invite_id'), (SELECT MAX(guild_invite_id) FROM guild_invite));
-SELECT setval(pg_get_serial_sequence('game_match', 'match_id'), (SELECT MAX(match_id) FROM game_match));
-SELECT setval(pg_get_serial_sequence('match_player', 'match_player_id'), (SELECT MAX(match_player_id) FROM match_player));
-SELECT setval(pg_get_serial_sequence('unit_type', 'unit_type_id'), (SELECT MAX(unit_type_id) FROM unit_type));
-SELECT setval(pg_get_serial_sequence('unit', 'unit_id'), (SELECT MAX(unit_id) FROM unit));
-SELECT setval(pg_get_serial_sequence('turn', 'turn_id'), (SELECT MAX(turn_id) FROM turn));
-SELECT setval(pg_get_serial_sequence('resource', 'resource_id'), (SELECT MAX(resource_id) FROM resource));
-SELECT setval(pg_get_serial_sequence('card', 'card_id'), (SELECT MAX(card_id) FROM card));
-SELECT setval(pg_get_serial_sequence('player_deck', 'player_deck_id'), (SELECT MAX(player_deck_id) FROM player_deck));
-SELECT setval(pg_get_serial_sequence('game_action', 'action_id'), (SELECT MAX(action_id) FROM game_action));
+-- AddForeignKey
+ALTER TABLE "turn" ADD CONSTRAINT "turn_match_id_fkey" FOREIGN KEY ("match_id") REFERENCES "game_match"("match_id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "turn" ADD CONSTRAINT "turn_player_id_fkey" FOREIGN KEY ("player_id") REFERENCES "player"("player_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "resource" ADD CONSTRAINT "resource_match_id_fkey" FOREIGN KEY ("match_id") REFERENCES "game_match"("match_id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "resource" ADD CONSTRAINT "resource_player_id_fkey" FOREIGN KEY ("player_id") REFERENCES "player"("player_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "player_deck" ADD CONSTRAINT "player_deck_card_id_fkey" FOREIGN KEY ("card_id") REFERENCES "card"("card_id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "player_deck" ADD CONSTRAINT "player_deck_player_id_fkey" FOREIGN KEY ("player_id") REFERENCES "player"("player_id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "game_action" ADD CONSTRAINT "game_action_match_id_fkey" FOREIGN KEY ("match_id") REFERENCES "game_match"("match_id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "game_action" ADD CONSTRAINT "game_action_player_id_fkey" FOREIGN KEY ("player_id") REFERENCES "player"("player_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "game_action" ADD CONSTRAINT "game_action_target_unit_id_fkey" FOREIGN KEY ("target_unit_id") REFERENCES "unit"("unit_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "game_action" ADD CONSTRAINT "game_action_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "unit"("unit_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+

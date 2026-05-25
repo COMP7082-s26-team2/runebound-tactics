@@ -40,6 +40,8 @@ next-env.d.ts
 dist
 
 node_modules
+.env
+.env*
 
 # ai
 .claude
