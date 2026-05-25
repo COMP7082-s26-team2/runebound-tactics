@@ -85,8 +85,8 @@ export async function assertTokenNotExpired(): Promise<boolean> {
                 return true; // Token has strictly expired
             }
         }
-    } catch (e: any) {
-        console.error('[AUTH GUARD] Error parsing session expiration:', e.message);
+    } catch (e: unknown) {
+        console.error('[AUTH GUARD] Error parsing session expiration:', e instanceof Error ? e.message : String(e));
     }
 
     return false;
