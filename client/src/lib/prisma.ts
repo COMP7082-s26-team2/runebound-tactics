@@ -31,6 +31,12 @@ if (process.env.NODE_ENV !== "production") globalThis.prismaGlobal = prisma;
  * JSON.stringify() fails by default on BigInt.
  * This adds a global toJSON method to BigInt to convert them to strings automatically.
  */
-(BigInt.prototype as any).toJSON = function () {
+declare global {
+    interface BigInt {
+        toJSON(): string;
+    }
+}
+
+BigInt.prototype.toJSON = function () {
     return this.toString();
 };
