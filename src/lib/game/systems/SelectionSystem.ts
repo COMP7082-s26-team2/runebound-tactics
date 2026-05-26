@@ -7,8 +7,8 @@ import {
     World,
     cellKey,
 } from "@/lib/engine";
-import { GameState } from "@/lib/game/state";
-import { InputSystem } from "@/lib/game/systems";
+import { GameState, TurnFlow } from "@/lib/game/state";
+import { CombatSystem, InputSystem } from "@/lib/game/systems";
 
 const DEFAULT_STEP_DURATION = 0.15;
 
@@ -19,10 +19,13 @@ export class SelectionSystem implements GameComponent {
         private _state: GameState,
         private _input: InputSystem,
         private _tweens: TweenManager,
+        private _combat: CombatSystem,
+        private _turnFlow: TurnFlow,
         private _stepDuration: number = DEFAULT_STEP_DURATION,
     ) { }
 
     update(_dt: number): void {
+        if (this._turnFlow.current !== "action-phase") return;
         if (!this._input.isMouseButtonJustPressed(0)) return;
 
         const coord: GridCoord = {
@@ -42,11 +45,20 @@ export class SelectionSystem implements GameComponent {
             case "awaiting-move":
                 this._handleAwaitingMoveClick(coord, key);
                 break;
+            case "moved":
+                this._handleMovedClick(occupant);
+                break;
         }
     }
 
     private _handleIdleClick(occupant: EntityId | null): void {
+        // TESTING
+        console.log("[_handleIdleClick]");
+        
         if (occupant === null) return;
+        
+        if (this._world.unitOwnership.get(occupant) !== this._state.activePlayerId) return;
+
         this._select(occupant);
     }
 
@@ -55,22 +67,41 @@ export class SelectionSystem implements GameComponent {
         key: string,
         occupant: EntityId | null,
     ): void {
-        // attack
+        // attack in place
         if (occupant !== null && this._state.attackableEntities.has(occupant)) {
-            this._attack(this._state.selectedEntity!, occupant);
+            this._declareAttack(this._state.selectedEntity!, occupant);
             this._computeReachable(this._state.selectedEntity!);
             this._state.attackableEntities.clear();
-            this._state.phase = "awaiting-move";
+            this._state.transition("awaiting-move");
             return;
         }
 
-        // move
+        // move to attack-position tile, then await attack
+        if (this._state.reachableAttackableTiles.has(key)) {
+            const entityId = this._state.selectedEntity!;
+            this._moveUnit(entityId, coord);
+            this._state.reachableTiles.clear();
+            this._state.reachableAttackableTiles.clear();
+            // this._computeAttackable(entityId);
+            this._state.attackableEntities = this._combat.computeAttackable(entityId)
+            this._state.transition("moved");
+            return;
+        }
+
+        // move and end turn
         if (this._state.reachableTiles.has(key)) {
             this._moveUnit(this._state.selectedEntity!, coord);
             this._deselect();
             return;
         }
 
+        this._deselect();
+    }
+
+    private _handleMovedClick(occupant: EntityId | null): void {
+        if (occupant !== null && this._state.attackableEntities.has(occupant)) {
+            this._declareAttack(this._state.selectedEntity!, occupant);
+        }
         this._deselect();
     }
 
@@ -84,9 +115,10 @@ export class SelectionSystem implements GameComponent {
 
     private _select(entityId: EntityId): void {
         this._state.selectedEntity = entityId;
-        this._state.phase = "selected";
+        this._state.transition("selected");
         this._computeReachable(entityId);
-        this._computeAttackable(entityId);
+        // this._computeAttackable(entityId);
+        this._state.attackableEntities = this._combat.computeAttackable(entityId)
     }
 
     private _moveUnit(entityId: EntityId, targetCoord: GridCoord): void {
@@ -149,9 +181,10 @@ export class SelectionSystem implements GameComponent {
     }
 
     private _deselect(): void {
-        this._state.phase = "idle";
+        this._state.transition("idle");
         this._state.selectedEntity = null;
         this._state.reachableTiles.clear();
+        this._state.reachableAttackableTiles.clear();
         this._state.attackableEntities.clear();
     }
 
@@ -160,6 +193,7 @@ export class SelectionSystem implements GameComponent {
         const start = this._world.gridPositions.get(entityId);
         if (!stats || !start) return;
 
+        // BFS over unoccupied tiles within movement range
         const visited = new Map<string, number>();
         const queue: Array<{ coord: GridCoord; steps: number }> = [
             { coord: start, steps: 0 },
@@ -181,40 +215,23 @@ export class SelectionSystem implements GameComponent {
 
         visited.delete(cellKey(start));
         this._state.reachableTiles = new Set(visited.keys());
-    }
 
-    private _computeAttackable(entityId: EntityId): void {
-        const stats = this._world.unitStats.get(entityId);
-        const pos = this._world.gridPositions.get(entityId);
-        if (!stats || !pos) return;
-
-        this._state.attackableEntities.clear();
-
-        for (const [candidateId] of this._world.unitStats.entries()) {
-            if (candidateId === entityId) continue;
-            const candidatePos = this._world.gridPositions.get(candidateId);
-            if (!candidatePos) continue;
-            if (
-                this._world.grid.distance(pos, candidatePos) <=
-                stats.attackRange
-            ) {
-                this._state.attackableEntities.add(candidateId);
+        // Green tiles: reachable empty tiles that are adjacent to an enemy
+        const reachableAttackableTiles = new Set<string>();
+        for (const key of this._state.reachableTiles) {
+            const [q, r] = key.split(",").map(Number);
+            for (const neighbor of this._world.grid.getNeighbors({ q, r })) {
+                const occupant = this._world.occupancyMap.get(cellKey(neighbor));
+                if (occupant !== undefined && occupant !== entityId) {
+                    reachableAttackableTiles.add(key);
+                    break;
+                }
             }
         }
+        this._state.reachableAttackableTiles = reachableAttackableTiles;
     }
 
-    private _attack(attackerId: EntityId, targetId: EntityId): void {
-        const atkStats = this._world.unitStats.get(attackerId);
-        const defStats = this._world.unitStats.get(targetId);
-        if (!atkStats || !defStats) return;
-
-        const damage = Math.max(0, atkStats.attack - defStats.defense);
-        const newHp = defStats.health - damage;
-
-        if (newHp <= 0) {
-            this._world.removeUnit(targetId);
-        } else {
-            this._world.unitStats.set(targetId, { ...defStats, health: newHp });
-        }
+    private _declareAttack(attackerId: EntityId, targetId: EntityId): void {
+        this._state.pendingAttacks.push({ attackerId, targetId });
     }
 }
