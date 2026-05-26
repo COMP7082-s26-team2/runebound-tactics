@@ -5,6 +5,7 @@
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
+        "clean" : "tsc --build --clean",
         "build": "tsc --build",
         "typecheck": "tsc --noEmit",
         "lint": "eslint src"
