@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { GameEngine } from "@/lib/engine";
+import { useEffect, useRef, useState } from "react";
+import { GameEngine, AssetHandler } from "@/lib/engine";
 import { MultiplayerGameScene } from "@/lib/game/scenes/MultiplayerGameScene";
+import { ASSET_MANIFEST } from "@/lib/game/assets";
 import {
     CELL_SIZE,
     GRID_COLS,
@@ -19,44 +20,73 @@ interface MultiplayerGameCanvasProps {
 const CANVAS_WIDTH = CELL_SIZE * GRID_COLS;
 const CANVAS_HEIGHT = CELL_SIZE * GRID_ROWS;
 
+type LoadPhase = "loading" | "ready" | "error";
+
 /**
- * Canvas wrapper: spins up GameEngine + MultiplayerGameScene once, then
- * reconciles state on every Colyseus snapshot.
+ * Canvas wrapper: preloads sprite assets, then spins up GameEngine +
+ * MultiplayerGameScene, then reconciles state on every Colyseus snapshot.
  *
- * Two effects, both required:
- *   1. Init (once, on mount): create engine, register scene, switch to it,
- *      start the render loop. Cleanup stops the engine on unmount.
- *   2. Reconcile (on each `state` change): scene.reconcile(state) syncs
- *      `state.units` → local World so the new positions render.
+ * Three lifecycle phases:
+ *   1. `loading`  — AssetHandler.preload in flight; canvas hidden behind
+ *                   overlay. Engine has not started.
+ *   2. `ready`    — preload resolved; engine running; reconciles flow into
+ *                   the scene on each state patch.
+ *   3. `error`    — preload rejected (network / 404). Engine never starts.
+ *
+ * The asset handler is canvas-owned (created inside this effect, discarded on
+ * unmount). Scene init is sync, so preload happens above the scene rather
+ * than inside it.
  */
 export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const sceneRef = useRef<MultiplayerGameScene | null>(null);
+    const [phase, setPhase] = useState<LoadPhase>("loading");
 
     useEffect(() => {
         if (!canvasRef.current) return;
         const canvas = canvasRef.current;
 
-        const engine = new GameEngine({
-            canvas,
-            width: CANVAS_WIDTH,
-            height: CANVAS_HEIGHT,
-            fixedDelta: 1 / 60,
-        });
+        const handler = new AssetHandler(ASSET_MANIFEST);
+        const keys = Object.keys(ASSET_MANIFEST);
 
-        const scene = new MultiplayerGameScene(canvas, room);
-        sceneRef.current = scene;
-        engine.scenes.register("main", scene);
-        engine.scenes.switch("main");
+        let engine: GameEngine | null = null;
+        let cancelled = false;
 
-        engine.preDraw = (ctx) => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        };
+        setPhase("loading");
 
-        engine.start();
+        handler
+            .preload(keys)
+            .then(() => {
+                if (cancelled) return;
+
+                engine = new GameEngine({
+                    canvas,
+                    width: CANVAS_WIDTH,
+                    height: CANVAS_HEIGHT,
+                    fixedDelta: 1 / 60,
+                });
+
+                const scene = new MultiplayerGameScene(canvas, room, handler);
+                sceneRef.current = scene;
+                engine.scenes.register("main", scene);
+                engine.scenes.switch("main");
+
+                engine.preDraw = (ctx) => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                };
+
+                engine.start();
+                setPhase("ready");
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error("[MultiplayerGameCanvas] Asset preload failed:", err);
+                setPhase("error");
+            });
 
         return () => {
-            engine.stop();
+            cancelled = true;
+            engine?.stop();
             sceneRef.current = null;
         };
     }, [room]);
@@ -66,9 +96,24 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
     }, [state]);
 
     return (
-        <canvas
-            ref={canvasRef}
-            style={{ display: "block", width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
-        />
+        <div
+            className="relative"
+            style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+        >
+            <canvas
+                ref={canvasRef}
+                style={{ display: "block", width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+            />
+            {phase === "loading" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 text-white">
+                    Loading assets…
+                </div>
+            )}
+            {phase === "error" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 text-red-400">
+                    Failed to load assets. Refresh to retry.
+                </div>
+            )}
+        </div>
     );
 }

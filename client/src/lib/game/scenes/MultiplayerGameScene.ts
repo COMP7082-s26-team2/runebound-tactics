@@ -1,4 +1,11 @@
-import { Scene, World, SquareGrid } from "@/lib/engine";
+import {
+    Scene,
+    World,
+    SquareGrid,
+    TweenManager,
+    AnimationController,
+    AssetHandler,
+} from "@/lib/engine";
 import EventBus from "@/lib/engine/EventBus";
 import {
     GridRenderSystem,
@@ -13,6 +20,11 @@ import {
     unitTypeToAppearance,
 } from "@/lib/game/assets/multiplayerUnitMap";
 import {
+    ANIMATION_FRAME_DURATIONS,
+    DEFAULT_FRAME_DURATION,
+    UnitAnimationSystem,
+} from "@/lib/game/assets";
+import {
     CELL_SIZE,
     GRID_COLS,
     GRID_ROWS,
@@ -20,6 +32,14 @@ import {
     type GameState as ServerGameState,
 } from "@runebound-tactics/shared";
 import type { Room } from "@colyseus/sdk";
+
+/**
+ * Seconds spent tweening a unit across one cell on a position update.
+ * Straight-line interpolation from current visual position to destination
+ * cell center; multi-cell server moves still tween straight to the endpoint
+ * (server doesn't broadcast the path).
+ */
+const MOVE_STEP_DURATION = 0.25;
 
 /**
  * Multiplayer game scene.
@@ -37,6 +57,9 @@ import type { Room } from "@colyseus/sdk";
 export class MultiplayerGameScene extends Scene {
     private _world: World;
     private _selection: MultiplayerSelectionSystem;
+    private _tweens: TweenManager;
+    private _animationController: AnimationController;
+    private _unitAnimationSystem: UnitAnimationSystem;
     private _eventBus = new EventBus();
     private _lastSeenHp = new Map<string, number>();
     public input: InputSystem;
@@ -44,11 +67,21 @@ export class MultiplayerGameScene extends Scene {
     constructor(
         private _canvas: HTMLCanvasElement,
         private _room: Room<ServerGameState>,
+        private _assetHandler: AssetHandler,
     ) {
         super();
         const grid = new SquareGrid(CELL_SIZE);
         this._world = new World(grid);
         this.input = new InputSystem(this._canvas);
+        this._tweens = new TweenManager();
+        this._animationController = new AnimationController(
+            (state) => ANIMATION_FRAME_DURATIONS[state] ?? DEFAULT_FRAME_DURATION,
+        );
+        this._unitAnimationSystem = new UnitAnimationSystem(
+            this._world,
+            this._tweens,
+            this._animationController,
+        );
         this._selection = new MultiplayerSelectionSystem(
             this._world,
             CELL_SIZE,
@@ -65,9 +98,17 @@ export class MultiplayerGameScene extends Scene {
         // Order matters for update():
         //   - Consumers of input (`MultiplayerSelectionSystem`) must run BEFORE
         //     `InputSystem.update()` clears `_mouseJustPressed` for the frame.
-        //   - Therefore `this.input` is added LAST so it ticks last.
-        // Same convention as the singleplayer `GridMovementScene`.
+        //   - `_tweens` advances positions; `_unitAnimationSystem` then reads
+        //     `tweens.isMoving(...)` and sets walk/idle state on the
+        //     `_animationController`, which finally advances frame indices.
+        //   - Renderers consume freshly-updated tween position + anim frame
+        //     within the same tick.
+        //   - `this.input` is added LAST so its clear-just-pressed runs after
+        //     `_selection` reads input.
         this.components.add(this._selection);
+        this.components.add(this._tweens);
+        this.components.add(this._unitAnimationSystem);
+        this.components.add(this._animationController);
         this.components.add(
             new GridRenderSystem(
                 this._world,
@@ -89,6 +130,9 @@ export class MultiplayerGameScene extends Scene {
                 GRID_COLS,
                 GRID_ROWS,
                 CELL_SIZE,
+                this._tweens,
+                this._assetHandler,
+                this._animationController,
             ),
         );
         this.components.add(
@@ -169,15 +213,27 @@ export class MultiplayerGameScene extends Scene {
 
             const existing = this._world.getEntityByServerId(unitId);
             if (existing === undefined) {
-                this._world.spawnUnit(
+                const appearance = {
+                    ...unitTypeToAppearance(unit.unitType, unit.ownerId),
+                    exhausted,
+                };
+                const entityId = this._world.spawnUnit(
                     { q: unit.x, r: unit.y },
                     unitTypeToStats(unit.unitType),
-                    {
-                        ...unitTypeToAppearance(unit.unitType, unit.ownerId),
-                        exhausted,
-                    },
+                    appearance,
                     unit.ownerId,
                     unitId,
+                );
+
+                // Register with the animation controller. Frame count comes
+                // from the sprite sheet definition; fallback to 1 when the
+                // asset isn't in the manifest (UnitRenderSystem will draw a
+                // color square in that case — no frames to cycle).
+                const sheet = this._assetHandler.getSpriteSheet(appearance.assetKey);
+                this._animationController.register(
+                    entityId,
+                    "idle",
+                    sheet?.frameCount ?? 1,
                 );
                 continue;
             }
@@ -191,7 +247,21 @@ export class MultiplayerGameScene extends Scene {
                 current.q !== unit.x ||
                 current.r !== unit.y
             ) {
-                this._world.moveUnit(existing, { q: unit.x, r: unit.y });
+                // Smooth visual move from the current rendered position
+                // (handles mid-tween reconciles by reading the live tween
+                // position) to the new cell center. Logical position is
+                // updated immediately so subsequent reconciles see the new
+                // occupancy map.
+                const targetCoord = { q: unit.x, r: unit.y };
+                const fromWorld = this._world.grid.gridToWorld(current ?? targetCoord);
+                const toWorld = this._world.grid.gridToWorld(targetCoord);
+                const visualStart = this._tweens.getPosition(existing, fromWorld);
+                this._tweens.startPath(
+                    existing,
+                    [visualStart, toWorld],
+                    MOVE_STEP_DURATION,
+                );
+                this._world.moveUnit(existing, targetCoord);
             }
         }
 
@@ -201,6 +271,7 @@ export class MultiplayerGameScene extends Scene {
             if (seenUnitIds.has(serverId)) continue;
             const entityId = this._world.getEntityByServerId(serverId);
             if (entityId !== undefined) {
+                this._animationController.deregister(entityId);
                 this._world.removeUnit(entityId);
             }
             this._lastSeenHp.delete(serverId);

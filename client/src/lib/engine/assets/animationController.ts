@@ -26,6 +26,13 @@ export class AnimationController implements GameComponent {
         this._frameTimers.set(entityId, 0);
     }
 
+    deregister(entityId: EntityId): void {
+        this._states.delete(entityId);
+        this._frameIndices.delete(entityId);
+        this._frameTimers.delete(entityId);
+        this._frameCounts.delete(entityId);
+    }
+
     getFrameIndex(entityId: EntityId): number {
         return this._frameIndices.get(entityId) ?? 0;
     }
