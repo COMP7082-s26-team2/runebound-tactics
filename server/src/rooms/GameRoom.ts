@@ -5,8 +5,10 @@ import {
     GameUnit,
     cellKey,
     computeReachableTiles,
+    computeAttackDamage,
     getUnitMovement,
     squareGridNeighbors,
+    unitIsExhausted,
     GRID_ROWS,
 } from "@runebound-tactics/shared";
 import type { Faction, GridCoord } from "@runebound-tactics/shared";
@@ -34,6 +36,12 @@ interface MoveUnitPayload {
 interface AttackUnitPayload {
     attackerId: string;
     targetId: string;
+    /**
+     * Optional pre-attack movement to an attack-from tile.
+     * - Undefined OR equal to attacker's current position = zero-move attack.
+     * - Different from current position = combined move+attack (atomic).
+     */
+    moveTo?: { q: number; r: number };
 }
 
 export class GameRoom extends Room<{ state: GameState }> {
@@ -87,21 +95,7 @@ export class GameRoom extends Room<{ state: GameState }> {
         });
 
         this.onMessage<AttackUnitPayload>("attack_unit", (client, payload) => {
-            if (!this._isCurrentTurn(client)) return;
-
-            const attacker = this.state.units.get(payload?.attackerId);
-            const target = this.state.units.get(payload?.targetId);
-            if (!attacker || !target) return;
-            if (attacker.ownerId !== client.sessionId) return;
-            if (attacker.hasActed) return;
-
-            // TODO: apply damage formula from combat design
-            attacker.hasActed = true;
-
-            if (target.hp <= 0) {
-                this.state.units.delete(target.unitId);
-                this._checkWinCondition();
-            }
+            this._handleAttack(client.sessionId, payload);
         });
 
         this.onMessage("end_turn", (client) => {
@@ -213,6 +207,99 @@ export class GameRoom extends Room<{ state: GameState }> {
 
     private _isCurrentTurn(client: Client): boolean {
         return this.state.phase === "active" && this.state.currentTurnId === client.sessionId;
+    }
+
+    /**
+     * Atomic combined move+attack transaction.
+     *
+     * Validates and applies both halves as a single state mutation, so the
+     * Colyseus patch broadcast carries either both updates or neither —
+     * clients never see a half-applied state.
+     *
+     * 1-AP model: any successful attack flips `hasMoved = true` (and the
+     * legacy `hasActed = true` for back-compat). `unitIsExhausted` gates
+     * any further action this turn.
+     *
+     * If `moveTo` is undefined OR equal to the attacker's current position,
+     * the move-half is skipped (zero-move attack). Adjacency is validated
+     * against the attacker's pre-mutation position.
+     *
+     * If `moveTo` is a different reachable tile, the move-half applies,
+     * adjacency is pre-validated against the post-move position, and the
+     * move is rolled back if the attack-half resolves to no-op.
+     *
+     * Returns silently on any validation failure — no broadcast, no
+     * mutation. Caller (the message handler) does not need to act on the
+     * outcome.
+     */
+    private _handleAttack(sessionId: string, payload: AttackUnitPayload | undefined): void {
+        if (this.state.phase !== "active") return;
+        if (this.state.currentTurnId !== sessionId) return;
+
+        const attacker = this.state.units.get(payload?.attackerId ?? "");
+        const target = this.state.units.get(payload?.targetId ?? "");
+        if (!attacker || !target) return;
+        if (attacker.ownerId !== sessionId) return;
+        if (attacker.ownerId === target.ownerId) return;     // friendly-fire blocked
+        if (unitIsExhausted(attacker)) return;               // 1-AP exhaustion
+
+        const posBefore: GridCoord = { q: attacker.x, r: attacker.y };
+        const targetPos: GridCoord = { q: target.x, r: target.y };
+        const moveTo = payload?.moveTo;
+        const moveToIsCurrentPos =
+            moveTo !== undefined &&
+            moveTo.q === posBefore.q &&
+            moveTo.r === posBefore.r;
+
+        // ── Half 1: optional move ─────────────────────────────────────
+        if (moveTo && !moveToIsCurrentPos) {
+            if (attacker.hasMoved) return;                   // already moved this turn
+            const reachable = this._reachabilityCache.get(attacker.unitId);
+            if (!reachable) return;
+            const moveKey = cellKey({ q: moveTo.q, r: moveTo.r });
+            if (!reachable.has(moveKey)) return;
+
+            // Pre-validate half-2 adjacency BEFORE mutating
+            if (manhattan({ q: moveTo.q, r: moveTo.r }, targetPos) !== 1) return;
+
+            attacker.x = moveTo.q;
+            attacker.y = moveTo.r;
+            // hasMoved is set unconditionally below after half-2 success.
+        } else {
+            // Zero-move attack — validate adjacency from current position.
+            if (manhattan(posBefore, targetPos) !== 1) return;
+        }
+
+        // ── Half 2: resolve attack ────────────────────────────────────
+        const damage = computeAttackDamage(attacker.unitType, target.unitType);
+        if (damage <= 0) {
+            // Defensive: rollback move-half if applied, then bail.
+            if (moveTo && !moveToIsCurrentPos) {
+                attacker.x = posBefore.q;
+                attacker.y = posBefore.r;
+            }
+            return;
+        }
+
+        target.hp = Math.max(0, target.hp - damage);
+        const defenderDied = target.hp <= 0;
+
+        // 1-AP exhaustion: flip on any successful attack.
+        attacker.hasMoved = true;
+        attacker.hasActed = true;
+
+        if (defenderDied) {
+            this.state.units.delete(target.unitId);
+            this._checkWinCondition();
+        }
+
+        // Update reachability cache only when an actual move applied.
+        if (moveTo && !moveToIsCurrentPos) {
+            this._updateReachabilityAfterMove(attacker.unitId, posBefore, {
+                q: moveTo.q,
+                r: moveTo.r,
+            });
+        }
     }
 
     private _advanceTurn(): void {
@@ -339,4 +426,8 @@ export class GameRoom extends Room<{ state: GameState }> {
             console.log(`[GameRoom] Game over. Winner: ${winner.displayName}`);
         }
     }
+}
+
+function manhattan(a: GridCoord, b: GridCoord): number {
+    return Math.abs(a.q - b.q) + Math.abs(a.r - b.r);
 }

@@ -20,6 +20,10 @@ export class IdleState extends StateBase<SelectionContext, SelectionEvent> {
                 action: () => ({
                     selectedUnitId: p.unitId,
                     reachableTiles: p.reachable,
+                    attackableEnemies: p.attackable,
+                    attackFromPositions: p.attackFromPositions,
+                    pendingAttackFrom: null,
+                    pendingTargetCandidates: new Set<string>(),
                 }),
             };
         }
