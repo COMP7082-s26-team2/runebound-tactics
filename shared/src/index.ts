@@ -11,3 +11,9 @@ export * from "./rooms";
 
 // State machine primitive + canonical machine factories
 export * from "./fsm";
+
+// Grid / movement constants
+export * from "./constants/grid";
+
+// Game logic helpers (grid utils, movement BFS, unit stats)
+export * from "./game";

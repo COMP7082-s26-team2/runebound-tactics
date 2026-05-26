@@ -1,6 +1,15 @@
 /**
- * Generic synchronous state machine primitive.
+ * @deprecated Legacy config-object FSM primitive. Use the class-per-state
+ * primitive from this folder instead:
  *
+ *     import { Machine, StateBase } from "@runebound-tactics/shared";
+ *
+ * Retained only as a back-compat re-export. Removed in a follow-up sprint
+ * after the migration is verified.
+ *
+ * See state_machine_shared_design_v3.0 for the new primitive and rationale.
+ *
+ * --- Original shape doc (preserved for reference) ---
  * Shape:
  *   - StateKey / EventKey are string-literal unions for compile-time validation.
  *   - Context is a typed object; effects (onEntry, onExit, transition action) may
@@ -50,6 +59,9 @@ export type StateMachineListener<Ctx, StateKey extends string> = (
     context: Readonly<Ctx>,
 ) => void;
 
+/**
+ * @deprecated Use {@link Machine} + {@link StateBase} from this module instead.
+ */
 export class StateMachine<
     Ctx extends object,
     StateKey extends string,

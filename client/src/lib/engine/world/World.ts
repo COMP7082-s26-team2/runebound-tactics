@@ -26,6 +26,13 @@ export class World {
     public unitAppearance = new ComponentStore<AppearanceData>();
     public unitOwnership = new ComponentStore<string>();
 
+    // Bidirectional bindings between server-authoritative unit IDs (strings)
+    // and local entity IDs (numbers). Optional — only populated for units
+    // created via the multiplayer reconciler. Singleplayer-spawned units
+    // ignore these maps entirely.
+    private _serverIdToEntity = new Map<string, EntityId>();
+    private _entityToServerId = new Map<EntityId, string>();
+
     constructor(grid: Grid) {
         this.grid = grid;
     }
@@ -35,6 +42,7 @@ export class World {
         stats: UnitStatsData,
         appearance: AppearanceData,
         owner?: string,
+        serverId?: string,
     ): EntityId {
         const entityId = this.entityManager.createEntity();
         this.gridPositions.set(entityId, coord);
@@ -43,6 +51,11 @@ export class World {
         this.occupancyMap.set(cellKey(coord), entityId);
 
         if (owner !== undefined) this.unitOwnership.set(entityId, owner);
+
+        if (serverId !== undefined) {
+            this._serverIdToEntity.set(serverId, entityId);
+            this._entityToServerId.set(entityId, serverId);
+        }
 
         return entityId;
     }
@@ -64,6 +77,25 @@ export class World {
         this.unitStats.remove(entityId);
         this.unitAppearance.remove(entityId);
         this.unitOwnership.remove(entityId);
+
+        const serverId = this._entityToServerId.get(entityId);
+        if (serverId !== undefined) {
+            this._serverIdToEntity.delete(serverId);
+            this._entityToServerId.delete(entityId);
+        }
+
         this.entityManager.removeEntity(entityId);
+    }
+
+    getEntityByServerId(serverId: string): EntityId | undefined {
+        return this._serverIdToEntity.get(serverId);
+    }
+
+    getServerIdByEntity(entityId: EntityId): string | undefined {
+        return this._entityToServerId.get(entityId);
+    }
+
+    getAllServerIds(): string[] {
+        return [...this._serverIdToEntity.keys()];
     }
 }

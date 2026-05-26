@@ -1,6 +1,15 @@
 import { Room, Client } from "colyseus";
-import { GamePlayerSlot, GameState } from "@runebound-tactics/shared";
-import type { Faction } from "@runebound-tactics/shared";
+import {
+    GamePlayerSlot,
+    GameState,
+    GameUnit,
+    cellKey,
+    computeReachableTiles,
+    getUnitMovement,
+    squareGridNeighbors,
+    GRID_ROWS,
+} from "@runebound-tactics/shared";
+import type { Faction, GridCoord } from "@runebound-tactics/shared";
 import { pendingGames } from "./pendingGames";
 
 interface PendingPlayer {
@@ -32,6 +41,12 @@ export class GameRoom extends Room<{ state: GameState }> {
     private _pendingPlayers = new Map<string, PendingPlayer>();
     /** Ordered turn list — session IDs in the order players joined. */
     private _turnOrder: string[] = [];
+    /**
+     * Reachability cache for the CURRENT active player's units.
+     * Map<unitId, Set<cellKey>>. Rebuilt on turn start and on every move.
+     * O(1) lookup for move_unit validation.
+     */
+    private _reachabilityCache = new Map<string, Set<string>>();
 
     onCreate(options: GameRoomOptions): void {
         const pending = pendingGames.get(options.lobbyRoomId);
@@ -56,10 +71,19 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (!unit || unit.ownerId !== client.sessionId) return;
             if (unit.hasMoved) return;
 
-            // TODO: validate movement range against game rules design
+            const destKey = cellKey({ q: payload.x, r: payload.y });
+            const reachable = this._reachabilityCache.get(unit.unitId);
+            if (!reachable || !reachable.has(destKey)) return;
+
+            const prevPos: GridCoord = { q: unit.x, r: unit.y };
             unit.x = payload.x;
             unit.y = payload.y;
             unit.hasMoved = true;
+
+            this._updateReachabilityAfterMove(unit.unitId, prevPos, {
+                q: payload.x,
+                r: payload.y,
+            });
         });
 
         this.onMessage<AttackUnitPayload>("attack_unit", (client, payload) => {
@@ -139,9 +163,52 @@ export class GameRoom extends Room<{ state: GameState }> {
     private _startGame(): void {
         this.state.phase = "active";
         this.state.currentTurnId = this._turnOrder[0] ?? "";
+
+        this._spawnInitialUnits();
+        this._rebuildReachabilityCache(this.state.currentTurnId);
+
         console.log(
-            `[GameRoom] Game started. First turn: ${this.state.currentTurnId}`,
+            `[GameRoom] Game started. First turn: ${this.state.currentTurnId}. Units: ${this.state.units.size}`,
         );
+    }
+
+    /**
+     * Minimal unit spawn — 2 units per player at fixed positions.
+     * First player (index 0) spawns at row 1; second at row GRID_ROWS-2.
+     *
+     * Replace with the full faction-based spawn config when the combat
+     * sprint lands (see engine_multiplayer_rework_design_v1.0 §2.1).
+     */
+    private _spawnInitialUnits(): void {
+        for (let i = 0; i < this._turnOrder.length; i++) {
+            const sessionId = this._turnOrder[i];
+            const slot = this.state.players.get(sessionId);
+            if (!slot) continue;
+
+            const isFirst = i === 0;
+            const row = isFirst ? 1 : GRID_ROWS - 2;
+            const faction: Faction =
+                slot.faction === "necropolis" ? "necropolis" : "castle";
+
+            const unitTypes =
+                faction === "necropolis"
+                    ? ["necropolis:skeleton", "necropolis:death_knight"]
+                    : ["castle:swordsman", "castle:archer"];
+
+            for (let j = 0; j < unitTypes.length; j++) {
+                const unit = new GameUnit();
+                unit.unitId = `${sessionId}:u${j + 1}`;
+                unit.ownerId = sessionId;
+                unit.unitType = unitTypes[j]!;
+                unit.x = 2 + j * 2;
+                unit.y = row;
+                unit.hp = 30;
+                unit.maxHp = 30;
+                unit.hasMoved = false;
+                unit.hasActed = false;
+                this.state.units.set(unit.unitId, unit);
+            }
+        }
     }
 
     private _isCurrentTurn(client: Client): boolean {
@@ -174,7 +241,89 @@ export class GameRoom extends Room<{ state: GameState }> {
             this.state.turnNumber++;
         }
 
+        this._rebuildReachabilityCache(this.state.currentTurnId);
+
         console.log(`[GameRoom] Turn advanced to ${this.state.currentTurnId}`);
+    }
+
+    /**
+     * Rebuild the entire reachability cache for `playerId`'s units.
+     * Called on turn start and on player advance.
+     */
+    private _rebuildReachabilityCache(playerId: string): void {
+        this._reachabilityCache.clear();
+        const occupied = this._buildOccupiedSet();
+        for (const unit of this.state.units.values()) {
+            if (unit.ownerId !== playerId) continue;
+            if (unit.hasMoved) continue;
+            this._reachabilityCache.set(
+                unit.unitId,
+                computeReachableTiles({
+                    getNeighbors: squareGridNeighbors,
+                    isOccupied: (k) => occupied.has(k),
+                    movement: getUnitMovement(unit.unitType),
+                    start: { q: unit.x, r: unit.y },
+                }),
+            );
+        }
+    }
+
+    /**
+     * Surgical cache update after a single move. The moved unit and any
+     * other current-player unit whose old reachable set touched the moved
+     * unit's prev or new tile need recomputation. Everything else stays.
+     */
+    private _updateReachabilityAfterMove(
+        movedUnitId: string,
+        prevPos: GridCoord,
+        newPos: GridCoord,
+    ): void {
+        const movedUnit = this.state.units.get(movedUnitId);
+        if (!movedUnit) return;
+        const playerId = movedUnit.ownerId;
+        const prevKey = cellKey(prevPos);
+        const newKey = cellKey(newPos);
+        const occupied = this._buildOccupiedSet();
+
+        const recompute = (unitId: string) => {
+            const u = this.state.units.get(unitId);
+            if (!u) return;
+            this._reachabilityCache.set(
+                unitId,
+                computeReachableTiles({
+                    getNeighbors: squareGridNeighbors,
+                    isOccupied: (k) => occupied.has(k),
+                    movement: getUnitMovement(u.unitType),
+                    start: { q: u.x, r: u.y },
+                }),
+            );
+        };
+
+        for (const [unitId, oldReachable] of [
+            ...this._reachabilityCache.entries(),
+        ]) {
+            const unit = this.state.units.get(unitId);
+            if (!unit || unit.ownerId !== playerId) continue;
+            if (unitId === movedUnitId) {
+                if (unit.hasMoved) {
+                    this._reachabilityCache.delete(unitId);
+                } else {
+                    recompute(unitId);
+                }
+                continue;
+            }
+            if (oldReachable.has(prevKey) || oldReachable.has(newKey)) {
+                recompute(unitId);
+            }
+        }
+    }
+
+    private _buildOccupiedSet(): Set<string> {
+        const occupied = new Set<string>();
+        for (const unit of this.state.units.values()) {
+            occupied.add(cellKey({ q: unit.x, r: unit.y }));
+        }
+        return occupied;
     }
 
     private _checkWinCondition(): void {
