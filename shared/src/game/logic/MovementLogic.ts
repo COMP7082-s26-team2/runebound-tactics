@@ -48,3 +48,66 @@ export function computeReachableTiles(ctx: MovementContext): Set<string> {
     visited.delete(startKey);
     return new Set(visited.keys());
 }
+
+/**
+ * Pathfinding context for shortest-path BFS. Like MovementContext but
+ * without a `movement` budget — caller is responsible for ensuring the
+ * goal is actually reachable (typically because the server validated the
+ * move). The `isOccupied` predicate should return false for `start` (the
+ * mover's own cell, treated as free for path purposes).
+ */
+export interface PathfindingContext {
+    getNeighbors(coord: GridCoord): GridCoord[];
+    isOccupied(cellKey: string): boolean;
+    start: GridCoord;
+    goal: GridCoord;
+}
+
+/**
+ * Returns a shortest grid path from `start` to `goal` as `[start, ..., goal]`.
+ * Path passes through unoccupied cells only (`isOccupied` predicate gates
+ * intermediate cells). The goal itself is treated as reachable even if
+ * `isOccupied` reports true (the mover may have already been placed there).
+ *
+ * If no path exists, returns `[start, goal]` as a straight-line fallback
+ * so the renderer still tweens to the destination instead of stalling.
+ * Used by client tween-sequencing for path-following walk animations.
+ */
+export function computeShortestPath(ctx: PathfindingContext): GridCoord[] {
+    const startKey = cellKey(ctx.start);
+    const goalKey = cellKey(ctx.goal);
+
+    if (startKey === goalKey) return [ctx.start];
+
+    const parent = new Map<string, GridCoord | null>();
+    parent.set(startKey, null);
+
+    const queue: GridCoord[] = [ctx.start];
+    let found = false;
+
+    outer: while (queue.length > 0) {
+        const coord = queue.shift()!;
+        for (const neighbor of ctx.getNeighbors(coord)) {
+            const key = cellKey(neighbor);
+            if (parent.has(key)) continue;
+            // Allow goal even if "occupied" (mover's destination).
+            if (ctx.isOccupied(key) && key !== goalKey) continue;
+            parent.set(key, coord);
+            if (key === goalKey) {
+                found = true;
+                break outer;
+            }
+            queue.push(neighbor);
+        }
+    }
+
+    if (!found) return [ctx.start, ctx.goal];
+
+    const path: GridCoord[] = [];
+    let cur: GridCoord | null | undefined = ctx.goal;
+    while (cur != null) {
+        path.unshift(cur);
+        cur = parent.get(cellKey(cur));
+    }
+    return path;
+}
