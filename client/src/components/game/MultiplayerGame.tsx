@@ -69,7 +69,7 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const gameState = state as unknown as GameState;
 
     return (
-        <div className="min-h-screen bg-gray-900 p-4">
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
             <div className="relative inline-block">
                 <MultiplayerGameCanvas room={room} state={gameState} />
                 <GameHUD
