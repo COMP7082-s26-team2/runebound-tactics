@@ -11,8 +11,12 @@ export const STEP_DURATION_S = 0.35;
 /** Total seconds for a lunge attack (going + returning). */
 export const LUNGE_DURATION_S = 0.7;
 
-/** Seconds for a target's recoil reaction (push back + return). Matches lunge so both halves align. */
-export const RECOIL_DURATION_S = 0.7;
+/**
+ * Seconds for a target's recoil reaction (push back + return). Triggered
+ * at the midpoint of the attacker's lunge (impact moment), so this
+ * duration equals the lunge's RETURN half (LUNGE_DURATION_S / 2).
+ */
+export const RECOIL_DURATION_S = 0.35;
 
 /** Fraction of a cell the target is pushed back during recoil. */
 export const RECOIL_FRACTION = 0.25;

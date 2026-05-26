@@ -46,6 +46,8 @@ export class WalkStep implements AnimationStep {
 
         this._tween.startPath(this._entityId, waypoints, this._stepDuration);
         this._anim.setState(this._entityId, "walk");
+        const appearance = this._world.unitAppearance.get(this._entityId);
+        if (appearance) appearance.animationState = "walk";
     }
 
     update(): StepStatus {
@@ -55,5 +57,7 @@ export class WalkStep implements AnimationStep {
 
     cleanup(): void {
         this._anim.setState(this._entityId, "idle");
+        const appearance = this._world.unitAppearance.get(this._entityId);
+        if (appearance) appearance.animationState = "idle";
     }
 }

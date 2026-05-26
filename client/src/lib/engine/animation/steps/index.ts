@@ -1,5 +1,6 @@
 export * from "./WaitStep";
 export * from "./ParallelStep";
+export * from "./SerialStep";
 export * from "./WalkStep";
 export * from "./LungeStep";
 export * from "./RecoilStep";

@@ -23,7 +23,6 @@ import {
 import {
     ANIMATION_FRAME_DURATIONS,
     DEFAULT_FRAME_DURATION,
-    UnitAnimationSystem,
 } from "@/lib/game/assets";
 import {
     diffSnapshots,
@@ -65,7 +64,6 @@ export class MultiplayerGameScene extends Scene {
     private _selection: MultiplayerSelectionSystem;
     private _tweens: TweenManager;
     private _animationController: AnimationController;
-    private _unitAnimationSystem: UnitAnimationSystem;
     private _sequencer: AnimationSequencer;
     private _seqDeps: SequenceDeps;
     private _eventBus = new EventBus();
@@ -85,11 +83,6 @@ export class MultiplayerGameScene extends Scene {
         this._tweens = new TweenManager();
         this._animationController = new AnimationController(
             (state) => ANIMATION_FRAME_DURATIONS[state] ?? DEFAULT_FRAME_DURATION,
-        );
-        this._unitAnimationSystem = new UnitAnimationSystem(
-            this._world,
-            this._tweens,
-            this._animationController,
         );
         this._sequencer = new AnimationSequencer();
         this._seqDeps = {
@@ -119,9 +112,13 @@ export class MultiplayerGameScene extends Scene {
         //     internally call `_tweens.startPath(...)` (WalkStep, LungeStep),
         //     so the sequencer ticks BEFORE `_tweens` advances positions for
         //     this frame.
-        //   - `_unitAnimationSystem` then reads `tweens.isMoving(...)` and
-        //     sets walk/idle state on `_animationController`, which finally
-        //     advances frame indices.
+        //   - Animation state (idle/walk/attack/damage/death) is now owned
+        //     by sequencer steps (WalkStep, SetAnimationStateStep, etc).
+        //     UnitAnimationSystem is intentionally NOT registered — it would
+        //     override sequence-set states like "attack" with "walk" every
+        //     frame while a tween is active. See [[tween_sequencing_design_v1.0]].
+        //   - `_animationController` runs after the sequencer so frame
+        //     indices advance with the freshly-set animation state.
         //   - Renderers consume freshly-updated tween position + anim frame
         //     within the same tick.
         //   - `this.input` is added LAST so its clear-just-pressed runs after
@@ -129,7 +126,6 @@ export class MultiplayerGameScene extends Scene {
         this.components.add(this._selection);
         this.components.add(this._sequencer);
         this.components.add(this._tweens);
-        this.components.add(this._unitAnimationSystem);
         this.components.add(this._animationController);
         this.components.add(
             new GridRenderSystem(

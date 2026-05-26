@@ -6,6 +6,8 @@ import {
     RecoilStep,
     SetAnimationStateStep,
     ParallelStep,
+    SerialStep,
+    WaitStep,
 } from "@/lib/engine/animation";
 import { cellKey } from "@/lib/engine/world/World";
 import { computeShortestPath } from "@runebound-tactics/shared";
@@ -60,12 +62,19 @@ export function buildAttackSequence(
         );
     }
 
-    // Attacker lunge + attack frames in parallel with target recoil +
-    // damage frames. The target's normal idle/walk anim is interrupted by
-    // the "damage" state for the full lunge duration; the target tweens
-    // back ~25% of a cell along the away-from-attacker vector, then
-    // returns to its origin. By the time the lunge completes, the target
-    // is back in position and ready for the death sequence (if any).
+    // Attacker timing over LUNGE_DURATION_S = T:
+    //   t=0    → T/2 (windup → impact):  attack frames play
+    //   t=T/2                          :  IMPACT — attack loop ends at the
+    //                                     tip; SetAnimationStateStep cleanup
+    //                                     restores priorState (idle)
+    //   t=T/2  → T   (recovery):        idle frames play while attacker
+    //                                     tweens back to origin
+    //
+    // Target reaction also fires at impact (mid-lunge) and runs through the
+    // attacker's recovery half. Both attacker and target are back in their
+    // resting state at t=T.
+    const impactDelay = LUNGE_DURATION_S / 2;
+
     steps.push(
         new ParallelStep([
             new LungeStep(
@@ -79,24 +88,31 @@ export function buildAttackSequence(
             new SetAnimationStateStep(
                 ev.attackerId,
                 "attack",
-                LUNGE_DURATION_S,
+                impactDelay + 0.7,
                 deps.anim,
-            ),
-            new RecoilStep(
-                ev.targetId,
-                ev.targetPos,
-                ev.attackerFinalPos,
-                RECOIL_DURATION_S,
-                RECOIL_FRACTION,
-                deps.tween,
                 deps.world,
             ),
-            new SetAnimationStateStep(
-                ev.targetId,
-                "damage",
-                RECOIL_DURATION_S,
-                deps.anim,
-            ),
+            new SerialStep([
+                new WaitStep(impactDelay),
+                new ParallelStep([
+                    new RecoilStep(
+                        ev.targetId,
+                        ev.targetPos,
+                        ev.attackerFinalPos,
+                        RECOIL_DURATION_S,
+                        RECOIL_FRACTION,
+                        deps.tween,
+                        deps.world,
+                    ),
+                    new SetAnimationStateStep(
+                        ev.targetId,
+                        "damage",
+                        RECOIL_DURATION_S,
+                        deps.anim,
+                        deps.world,
+                    ),
+                ]),
+            ]),
         ]),
     );
 

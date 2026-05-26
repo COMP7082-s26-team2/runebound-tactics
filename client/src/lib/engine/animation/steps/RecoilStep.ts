@@ -56,21 +56,27 @@ export class RecoilStep implements AnimationStep {
             visualStart,
             pushTarget,
             this._halfDuration,
-            () => {
-                if (this._cancelled) {
-                    this._phase = "done";
-                    return;
-                }
-                this._tween.start(
-                    this._entityId,
-                    pushTarget,
-                    selfWorld,
-                    this._halfDuration,
-                    () => {
+            {
+                preserveFacing: true,
+                onComplete: () => {
+                    if (this._cancelled) {
                         this._phase = "done";
-                    },
-                );
-                this._phase = "returning";
+                        return;
+                    }
+                    this._tween.start(
+                        this._entityId,
+                        pushTarget,
+                        selfWorld,
+                        this._halfDuration,
+                        {
+                            preserveFacing: true,
+                            onComplete: () => {
+                                this._phase = "done";
+                            },
+                        },
+                    );
+                    this._phase = "returning";
+                },
             },
         );
     }

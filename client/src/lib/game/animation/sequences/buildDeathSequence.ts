@@ -42,6 +42,7 @@ export function buildDeathSequence(
                 "death",
                 DEATH_ANIM_DURATION_S,
                 deps.anim,
+                deps.world,
             ),
         );
     } else {

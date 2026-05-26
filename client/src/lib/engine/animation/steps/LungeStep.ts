@@ -47,9 +47,21 @@ export class LungeStep implements AnimationStep {
         const targetWorld = this._world.grid.gridToWorld(this._targetCoord);
         const visualStart = this._tween.getPosition(this._entityId, fromWorld);
 
+        // Snap the attacker's facing to point at the target ONCE up front,
+        // then run the lunge tween with `preserveFacing: true` so neither
+        // the forward half nor the return half can flip the facing back to
+        // the opposite direction. Without this, the return tween's
+        // direction.x is the opposite sign of the forward tween, and the
+        // render system ends up freezing facing AWAY from the target.
+        const attackVector = targetWorld.sub(visualStart);
+        const appearance = this._world.unitAppearance.get(this._entityId);
+        if (appearance && Math.abs(attackVector.x) > 0.001) {
+            appearance.facingLeft = attackVector.x < 0;
+        }
+
         // Lunge midpoint = visualStart + LUNGE_FRACTION * (targetWorld - visualStart)
         const midpoint = visualStart.add(
-            targetWorld.sub(visualStart).scale(LUNGE_FRACTION),
+            attackVector.scale(LUNGE_FRACTION),
         );
 
         this._tween.start(
@@ -57,21 +69,27 @@ export class LungeStep implements AnimationStep {
             visualStart,
             midpoint,
             this._halfDuration,
-            () => {
-                if (this._cancelled) {
-                    this._phase = "done";
-                    return;
-                }
-                this._tween.start(
-                    this._entityId,
-                    midpoint,
-                    fromWorld,
-                    this._halfDuration,
-                    () => {
+            {
+                preserveFacing: true,
+                onComplete: () => {
+                    if (this._cancelled) {
                         this._phase = "done";
-                    },
-                );
-                this._phase = "returning";
+                        return;
+                    }
+                    this._tween.start(
+                        this._entityId,
+                        midpoint,
+                        fromWorld,
+                        this._halfDuration,
+                        {
+                            preserveFacing: true,
+                            onComplete: () => {
+                                this._phase = "done";
+                            },
+                        },
+                    );
+                    this._phase = "returning";
+                },
             },
         );
     }
