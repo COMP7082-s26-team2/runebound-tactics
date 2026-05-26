@@ -7,6 +7,7 @@ client/tsconfig.tsbuildinfo
 client/next-env.d.ts
 client/.env*
 !client/.env.example
+client/.next
 
 # ─── server (Colyseus) ────────────────────────────────────────────────────────
 server/dist/

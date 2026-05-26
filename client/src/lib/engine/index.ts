@@ -1,3 +1,6 @@
+import EventBus from "./EventBus";
+
+export { EventBus };
 export * from "./core/ecs/EntityManager";
 export * from "./core/ecs/ComponentStore";
 export * from "./grid/Grid";
