@@ -36,6 +36,18 @@ export class AwaitingAttackTargetState extends StateBase<
             };
         }
 
+        // Pure-move bailout from awaiting-attack-target — when the player
+        // re-clicks the pending attack-from tile, the SelectionSystem sends
+        // MOVE_REQUESTED to commit a move there without attacking. The FSM
+        // must transition back to idle and clear context, same as a move
+        // from the "selected" state.
+        if (event === "MOVE_REQUESTED") {
+            return {
+                target: "idle",
+                action: () => clearSelectionContext(),
+            };
+        }
+
         // Self-loop: player picked a different attack-from tile. Swap the
         // pending fields; keep reachable / attackable / selectedUnitId.
         if (event === "ATTACK_POSITION_CHOSEN") {

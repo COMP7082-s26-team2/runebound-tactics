@@ -151,6 +151,22 @@ describe("selectionMachine", () => {
             expect(m.context.pendingTargetCandidates.size).toBe(0);
         });
 
+        it("MOVE_REQUESTED from awaiting-attack-target transitions to idle (re-click same tile bug fix)", () => {
+            const m = createSelectionMachine();
+            m.send("SELECT_FRIENDLY", SELECT_PAYLOAD);
+            m.send("ATTACK_POSITION_CHOSEN", {
+                attackerId: "u1",
+                from: "1,1",
+                adjacentEnemies: new Set(["e1"]),
+            });
+            expect(m.state).toBe("awaiting-attack-target");
+            m.send("MOVE_REQUESTED", { unitId: "u1", to: { q: 1, r: 1 } });
+            expect(m.state).toBe("idle");
+            expect(m.context.selectedUnitId).toBeNull();
+            expect(m.context.pendingAttackFrom).toBeNull();
+            expect(m.context.attackFromPositions.size).toBe(0);
+        });
+
         it("DESELECT from awaiting-attack-target clears all context", () => {
             const m = createSelectionMachine();
             m.send("SELECT_FRIENDLY", SELECT_PAYLOAD);

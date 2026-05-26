@@ -218,6 +218,30 @@ export class MultiplayerSelectionSystem implements GameComponent {
             }
         }
 
+        // Click on the SAME attack-from tile (already pending) → commit a
+        // pure move there, skipping the attack. Lets the player use a green
+        // tile as a movement destination after entering the picker.
+        //   - If the tile is in reachableTiles → server-side movable → send move.
+        //   - If the tile is the attacker's current position (NOT in
+        //     reachableTiles since BFS excludes the start cell) → cancel
+        //     (cannot "move" to current pos).
+        if (key === pendingFrom) {
+            if (ctx.reachableTiles.has(key)) {
+                this._room.send("move_unit", {
+                    unitId: attackerServerId,
+                    x: coord.q,
+                    y: coord.r,
+                });
+                this._selection.send("MOVE_REQUESTED", {
+                    unitId: attackerServerId,
+                    to: coord,
+                });
+            } else {
+                this._selection.send("CANCEL_ATTACK");
+            }
+            return;
+        }
+
         // Click on a different attack-from tile → self-loop swap.
         if (ctx.attackFromPositions.has(key) && key !== pendingFrom) {
             const adjacentEnemies = this._adjacentEnemyServerIdsAt(

@@ -100,10 +100,26 @@ describe("AwaitingAttackTargetState", () => {
         }
     });
 
-    it("returns null for out-of-state events (SELECT_FRIENDLY, MOVE_REQUESTED)", () => {
+    it("transitions to idle on MOVE_REQUESTED with full context clear (re-click pending tile)", () => {
+        const state = new AwaitingAttackTargetState();
+        const result = state.handle("MOVE_REQUESTED", makeCtx());
+        expect(result).not.toBeNull();
+        if (result && typeof result === "object" && "target" in result) {
+            expect(result.target).toBe("idle");
+            const patch = result.action?.(makeCtx());
+            expect(patch).toMatchObject({
+                selectedUnitId: null,
+                attackableEnemies: new Set(),
+                attackFromPositions: new Set(),
+                pendingAttackFrom: null,
+                pendingTargetCandidates: new Set(),
+            });
+        }
+    });
+
+    it("returns null for out-of-state SELECT_FRIENDLY", () => {
         const state = new AwaitingAttackTargetState();
         expect(state.handle("SELECT_FRIENDLY", makeCtx())).toBeNull();
-        expect(state.handle("MOVE_REQUESTED", makeCtx())).toBeNull();
     });
 
     describe("exhaustiveness", () => {

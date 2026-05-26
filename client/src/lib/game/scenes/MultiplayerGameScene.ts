@@ -7,6 +7,7 @@ import {
 } from "@/lib/game/systems";
 import { MultiplayerSelectionSystem } from "@/lib/game/systems/MultiplayerSelectionSystem";
 import { MovementRangeRenderSystem } from "@/lib/game/systems/MovementRangeRenderSystem";
+import { EnemyTargetOutlineSystem } from "@/lib/game/systems/EnemyTargetOutlineSystem";
 import {
     unitTypeToStats,
     unitTypeToAppearance,
@@ -88,6 +89,13 @@ export class MultiplayerGameScene extends Scene {
                 GRID_COLS,
                 GRID_ROWS,
                 CELL_SIZE,
+            ),
+        );
+        this.components.add(
+            new EnemyTargetOutlineSystem(
+                this._world,
+                CELL_SIZE,
+                this._selection,
             ),
         );
         this.components.add(this.input);

@@ -66,11 +66,11 @@ export class MovementRangeRenderSystem implements GameComponent {
         }
 
         // Red fill on attackable enemies — only in "selected" (before commit)
+        // Outline drawn separately by EnemyTargetOutlineSystem (zIndex=3) so it
+        // renders on top of unit sprites.
         if (state === "selected") {
             ctx.save();
             ctx.fillStyle = "rgba(220, 50, 50, 0.4)";
-            ctx.strokeStyle = "rgba(255, 140, 0, 0.95)";
-            ctx.lineWidth = 3;
             for (const enemyServerId of this._selection.attackableEnemies) {
                 const entityId =
                     this._world.getEntityByServerId(enemyServerId);
@@ -82,12 +82,6 @@ export class MovementRangeRenderSystem implements GameComponent {
                     coord.r * this._cellSize,
                     this._cellSize,
                     this._cellSize,
-                );
-                ctx.strokeRect(
-                    coord.q * this._cellSize + 1.5,
-                    coord.r * this._cellSize + 1.5,
-                    this._cellSize - 3,
-                    this._cellSize - 3,
                 );
             }
             ctx.restore();
@@ -110,11 +104,10 @@ export class MovementRangeRenderSystem implements GameComponent {
                 ctx.restore();
             }
 
-            // Target candidates — brighter red fill
+            // Target candidates — brighter red fill (outline rendered later
+            // by EnemyTargetOutlineSystem above the unit sprites).
             ctx.save();
             ctx.fillStyle = "rgba(255, 60, 60, 0.55)";
-            ctx.strokeStyle = "rgba(255, 200, 50, 0.95)";
-            ctx.lineWidth = 3;
             for (const enemyServerId of this._selection
                 .pendingTargetCandidates) {
                 const entityId =
@@ -127,12 +120,6 @@ export class MovementRangeRenderSystem implements GameComponent {
                     coord.r * this._cellSize,
                     this._cellSize,
                     this._cellSize,
-                );
-                ctx.strokeRect(
-                    coord.q * this._cellSize + 1.5,
-                    coord.r * this._cellSize + 1.5,
-                    this._cellSize - 3,
-                    this._cellSize - 3,
                 );
             }
             ctx.restore();
