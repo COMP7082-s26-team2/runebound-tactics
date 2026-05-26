@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useGameRoom, useGameRoomState } from "@/context/colyseus";
 import { Button } from "@/components/ui/Button";
 import { clearGameToken } from "@/lib/multiplayer/reconnect";
+import { MultiplayerGameCanvas } from "@/components/game/MultiplayerGameCanvas";
 
 export function GameRoomPlaceholder({ expectedRoomId }: { expectedRoomId: string }) {
     const { room, error } = useGameRoom();
@@ -24,6 +25,10 @@ export function GameRoomPlaceholder({ expectedRoomId }: { expectedRoomId: string
     }
 
     if (!room || !state || !state.players || !roomMatches) return <p className="text-white p-4">Connecting…</p>;
+
+    if (state.phase === "active") {
+        return <MultiplayerGameCanvas />;
+    }
 
     const me = state.players[room.sessionId];
     const players = Object.values(state.players);

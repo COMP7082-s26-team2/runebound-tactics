@@ -1,6 +1,7 @@
 import { Room, Client } from "colyseus";
-import { GamePlayerSlot, GameState } from "@runebound-tactics/shared";
+import { GamePlayerSlot, GameState, GameUnit } from "@runebound-tactics/shared";
 import type { Faction } from "@runebound-tactics/shared";
+import { UNIT_STATS, SIDE_POSITIONS, FACTION_ROSTERS } from "./unitStats";
 import { pendingGames } from "./pendingGames";
 
 interface PendingPlayer {
@@ -56,7 +57,16 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (!unit || unit.ownerId !== client.sessionId) return;
             if (unit.hasMoved) return;
 
-            // TODO: validate movement range against game rules design
+            const stats = UNIT_STATS[unit.unitType];
+            if (!stats) return;
+            const dx = Math.abs(payload.x - unit.x);
+            const dy = Math.abs(payload.y - unit.y);
+            if (dx + dy > stats.movement) return;
+            if (payload.x < 0 || payload.x > 9 || payload.y < 0 || payload.y > 9) return;
+            const occupied = [...this.state.units.values()].some(
+                u => u.unitId !== unit.unitId && u.x === payload.x && u.y === payload.y
+            );
+            if (occupied) return;
             unit.x = payload.x;
             unit.y = payload.y;
             unit.hasMoved = true;
@@ -71,7 +81,14 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (attacker.ownerId !== client.sessionId) return;
             if (attacker.hasActed) return;
 
-            // TODO: apply damage formula from combat design
+            const attackerStats = UNIT_STATS[attacker.unitType];
+            const targetStats = UNIT_STATS[target.unitType];
+            if (!attackerStats || !targetStats) return;
+            const adx = Math.abs(attacker.x - target.x);
+            const ady = Math.abs(attacker.y - target.y);
+            if (adx + ady > attackerStats.attackRange) return;
+            const damage = Math.max(1, attackerStats.attack - targetStats.defense);
+            target.hp = Math.max(0, target.hp - damage);
             attacker.hasActed = true;
 
             if (target.hp <= 0) {
@@ -137,11 +154,35 @@ export class GameRoom extends Room<{ state: GameState }> {
     }
 
     private _startGame(): void {
+        for (let i = this._turnOrder.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this._turnOrder[i], this._turnOrder[j]] = [this._turnOrder[j]!, this._turnOrder[i]!];
+        }
+        this._spawnUnits();
         this.state.phase = "active";
         this.state.currentTurnId = this._turnOrder[0] ?? "";
-        console.log(
-            `[GameRoom] Game started. First turn: ${this.state.currentTurnId}`,
-        );
+        console.log(`[GameRoom] Game started. First turn: ${this.state.currentTurnId}`);
+    }
+
+    private _spawnUnits(): void {
+        const playerList = [...this.state.players.values()];
+        playerList.forEach((player, playerIdx) => {
+            const roster = FACTION_ROSTERS[player.faction] ?? FACTION_ROSTERS["castle"]!;
+            const positions = SIDE_POSITIONS[playerIdx % 4]!;
+            roster.forEach((unitType, i) => {
+                const stats = UNIT_STATS[unitType]!;
+                const pos = positions[i]!;
+                const unit = new GameUnit();
+                unit.unitId = `${player.sessionId}:${i}`;
+                unit.ownerId = player.sessionId;
+                unit.unitType = unitType;
+                unit.x = pos.x;
+                unit.y = pos.y;
+                unit.hp = stats.hp;
+                unit.maxHp = stats.hp;
+                this.state.units.set(unit.unitId, unit);
+            });
+        });
     }
 
     private _isCurrentTurn(client: Client): boolean {

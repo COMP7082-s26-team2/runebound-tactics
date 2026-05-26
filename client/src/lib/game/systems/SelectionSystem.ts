@@ -9,19 +9,20 @@ import {
 } from "@/lib/engine";
 import { ClientGameState, TurnFlow } from "@/lib/game/state";
 import { CombatSystem, InputSystem } from "@/lib/game/systems";
+import { computePath } from "@/lib/game/utils";
 
 const DEFAULT_STEP_DURATION = 0.15;
 
 export class SelectionSystem implements GameComponent {
     constructor(
-        private _world: World,
-        private _cellSize: number,
-        private _state: ClientGameState,
-        private _input: InputSystem,
-        private _tweens: TweenManager,
+        protected _world: World,
+        protected _cellSize: number,
+        protected _state: ClientGameState,
+        protected _input: InputSystem,
+        protected _tweens: TweenManager,
         private _combat: CombatSystem,
         private _turnFlow: TurnFlow,
-        private _stepDuration: number = DEFAULT_STEP_DURATION,
+        protected _stepDuration: number = DEFAULT_STEP_DURATION,
     ) { }
 
     update(_dt: number): void {
@@ -121,7 +122,7 @@ export class SelectionSystem implements GameComponent {
         this._state.attackableEntities = this._combat.computeAttackable(entityId)
     }
 
-    private _moveUnit(entityId: EntityId, targetCoord: GridCoord): void {
+    protected _moveUnit(entityId: EntityId, targetCoord: GridCoord): void {
         const path = this._computePath(entityId, targetCoord);
 
         // sample visual pos so an interrupted tween starts from there
@@ -142,42 +143,10 @@ export class SelectionSystem implements GameComponent {
         this._tweens.startPath(entityId, waypoints, this._stepDuration);
     }
 
-    // BFS to find the grid path to target
     private _computePath(entityId: EntityId, target: GridCoord): GridCoord[] {
-        const start = this._world.gridPositions.get(entityId);
         const stats = this._world.unitStats.get(entityId);
-        if (!start || !stats) return [];
-
-        const targetKey = cellKey(target);
-        const parentMap = new Map<string, GridCoord | null>();
-        const queue: Array<{ coord: GridCoord; steps: number }> = [
-            { coord: start, steps: 0 },
-        ];
-        parentMap.set(cellKey(start), null);
-
-        outer: while (queue.length > 0) {
-            const { coord, steps } = queue.shift()!;
-            if (steps >= stats.movement) continue;
-
-            for (const neighbor of this._world.grid.getNeighbors(coord)) {
-                const key = cellKey(neighbor);
-                if (parentMap.has(key)) continue;
-                if (this._world.occupancyMap.has(key)) continue;
-                parentMap.set(key, coord);
-                if (key === targetKey) break outer;
-                queue.push({ coord: neighbor, steps: steps + 1 });
-            }
-        }
-
-        // reconstruct path from parent pointers
-        const path: GridCoord[] = [];
-        let current: GridCoord | null | undefined = target;
-        while (current != null) {
-            path.unshift(current);
-            current = parentMap.get(cellKey(current));
-        }
-
-        return path.length > 0 ? path : [start, target];
+        if (!stats) return [];
+        return computePath(this._world, entityId, target, stats.movement);
     }
 
     private _deselect(): void {
@@ -231,7 +200,7 @@ export class SelectionSystem implements GameComponent {
         this._state.reachableAttackableTiles = reachableAttackableTiles;
     }
 
-    private _declareAttack(attackerId: EntityId, targetId: EntityId): void {
+    protected _declareAttack(attackerId: EntityId, targetId: EntityId): void {
         this._state.pendingAttacks.push({ attackerId, targetId });
     }
 }
