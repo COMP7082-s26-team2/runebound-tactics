@@ -22,7 +22,7 @@ export class SelectionSystem implements GameComponent {
         private _combat: CombatSystem,
         private _turnFlow: TurnFlow,
         private _stepDuration: number = DEFAULT_STEP_DURATION,
-    ) { }
+    ) {}
 
     update(_dt: number): void {
         if (this._turnFlow.current !== "action-phase") return;
@@ -52,12 +52,15 @@ export class SelectionSystem implements GameComponent {
     }
 
     private _handleIdleClick(occupant: EntityId | null): void {
-        // TESTING
-        console.log("[_handleIdleClick]");
-        
+        // click on own unit to select
+
         if (occupant === null) return;
-        
-        if (this._world.unitOwnership.get(occupant) !== this._state.activePlayerId) return;
+
+        if (
+            this._world.unitOwnership.get(occupant) !==
+            this._state.activePlayerId
+        )
+            return;
 
         this._select(occupant);
     }
@@ -83,7 +86,8 @@ export class SelectionSystem implements GameComponent {
             this._state.reachableTiles.clear();
             this._state.reachableAttackableTiles.clear();
             // this._computeAttackable(entityId);
-            this._state.attackableEntities = this._combat.computeAttackable(entityId)
+            this._state.attackableEntities =
+                this._combat.computeAttackable(entityId);
             this._state.transition("moved");
             return;
         }
@@ -118,7 +122,8 @@ export class SelectionSystem implements GameComponent {
         this._state.transition("selected");
         this._computeReachable(entityId);
         // this._computeAttackable(entityId);
-        this._state.attackableEntities = this._combat.computeAttackable(entityId)
+        this._state.attackableEntities =
+            this._combat.computeAttackable(entityId);
     }
 
     private _moveUnit(entityId: EntityId, targetCoord: GridCoord): void {
@@ -221,7 +226,9 @@ export class SelectionSystem implements GameComponent {
         for (const key of this._state.reachableTiles) {
             const [q, r] = key.split(",").map(Number);
             for (const neighbor of this._world.grid.getNeighbors({ q, r })) {
-                const occupant = this._world.occupancyMap.get(cellKey(neighbor));
+                const occupant = this._world.occupancyMap.get(
+                    cellKey(neighbor),
+                );
                 if (occupant !== undefined && occupant !== entityId) {
                     reachableAttackableTiles.add(key);
                     break;
