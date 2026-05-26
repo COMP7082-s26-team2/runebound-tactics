@@ -4,6 +4,7 @@ import {
     computeReachableTiles,
     createSelectionMachine,
     squareGridNeighbors,
+    unitIsExhausted,
     type SelectionMachine,
     type GridCoord,
     type GameState,
@@ -60,6 +61,7 @@ export class MultiplayerSelectionSystem implements GameComponent {
 
             const serverId = this._world.getServerIdByEntity(occupant);
             if (!serverId || !this._isFriendly(serverId)) return;
+            if (this._isExhausted(serverId)) return;
 
             const stats = this._world.unitStats.get(occupant);
             const start = this._world.gridPositions.get(occupant);
@@ -112,5 +114,11 @@ export class MultiplayerSelectionSystem implements GameComponent {
     private _isFriendly(serverId: string): boolean {
         const unit = this._room.state?.units?.get(serverId);
         return unit?.ownerId === this._room.sessionId;
+    }
+
+    private _isExhausted(serverId: string): boolean {
+        const unit = this._room.state?.units?.get(serverId);
+        if (!unit) return false;
+        return unitIsExhausted(unit);
     }
 }

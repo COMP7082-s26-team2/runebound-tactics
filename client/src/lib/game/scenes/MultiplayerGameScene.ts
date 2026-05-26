@@ -14,6 +14,7 @@ import {
     CELL_SIZE,
     GRID_COLS,
     GRID_ROWS,
+    unitIsExhausted,
     type GameState as ServerGameState,
 } from "@runebound-tactics/shared";
 import type { Room } from "@colyseus/sdk";
@@ -109,6 +110,7 @@ export class MultiplayerGameScene extends Scene {
             unitType: string;
             x: number;
             y: number;
+            hasMoved: boolean;
         };
 
         const entries: Array<[string, LiteUnit]> = [];
@@ -125,18 +127,30 @@ export class MultiplayerGameScene extends Scene {
             }
         }
 
+        const mySessionId = this._room.sessionId;
+
         for (const [unitId, unit] of entries) {
+            const isMine = unit.ownerId === mySessionId;
+            const exhausted = isMine && unitIsExhausted(unit);
+
             const existing = this._world.getEntityByServerId(unitId);
             if (existing === undefined) {
                 this._world.spawnUnit(
                     { q: unit.x, r: unit.y },
                     unitTypeToStats(unit.unitType),
-                    unitTypeToAppearance(unit.unitType, unit.ownerId),
+                    {
+                        ...unitTypeToAppearance(unit.unitType, unit.ownerId),
+                        exhausted,
+                    },
                     unit.ownerId,
                     unitId,
                 );
                 continue;
             }
+
+            const appearance = this._world.unitAppearance.get(existing);
+            if (appearance) appearance.exhausted = exhausted;
+
             const current = this._world.gridPositions.get(existing);
             if (
                 !current ||

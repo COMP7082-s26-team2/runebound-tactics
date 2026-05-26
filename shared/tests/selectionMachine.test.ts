@@ -1,4 +1,4 @@
-import { createSelectionMachine } from "../src/fsm/machines/selectionMachine";
+import { createSelectionMachine } from "../src/fsm/selection/SelectionMachine";
 
 describe("selectionMachine", () => {
     it("starts in idle with an empty context", () => {
