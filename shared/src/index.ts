@@ -8,3 +8,6 @@ export * from "./types";
 
 // Room name constants (shared between client and server)
 export * from "./rooms";
+
+// State machine primitive + canonical machine factories
+export * from "./fsm";
