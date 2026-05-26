@@ -26,12 +26,16 @@ export class AssetHandler {
         const total = keys.length;
         let loaded = 0;
 
-        const promises = keys.map((key) => {
-            return this._loadAsset(key).then(() => {
-                loaded++;
-                onProgress?.(loaded, total);
-            });
-        });
+        const promises = keys.map((key) =>
+            this._loadAsset(key)
+                .then(() => {
+                    loaded++;
+                    onProgress?.(loaded, total);
+                })
+                .catch((err: unknown) => {
+                    console.warn(`[AssetHandler] Failed to load "${key}":`, err);
+                })
+        );
 
         await Promise.all(promises);
     }
@@ -89,23 +93,15 @@ export class AssetHandler {
      * Internal: loads a single asset and caches it.
      */
     private _loadAsset(key: string): Promise<void> {
-        // Return immediately if already cached
-        if (this._cache.has(key)) {
-            return Promise.resolve();
-        }
-
-        // Return existing promise if already loading
-        if (this._loading.has(key)) {
-            return this._waitForLoad(key);
-        }
-
-        this._loading.add(key);
+        if (this._cache.has(key)) return Promise.resolve();
+        if (this._loading.has(key)) return this._waitForLoad(key);
 
         const descriptor = this._manifest[key];
         if (!descriptor) {
-            this._loading.delete(key);
-            throw new Error(`Asset key "${key}" not found in manifest`);
+            return Promise.reject(new Error(`Asset key "${key}" not found in manifest`));
         }
+
+        this._loading.add(key);
 
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -116,8 +112,9 @@ export class AssetHandler {
                 resolve();
             };
 
-            img.onerror = () => {
+            img.onerror = (e) => {
                 this._loading.delete(key);
+                console.warn(`[AssetHandler] onerror for "${key}" src="${descriptor.src}"`, e);
                 reject(new Error(`Failed to load image: ${descriptor.src}`));
             };
 
@@ -125,15 +122,16 @@ export class AssetHandler {
         });
     }
 
-    /**
-     * Internal: waits for an asset that is currently being loaded.
-     */
     private _waitForLoad(key: string): Promise<void> {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const checkInterval = setInterval(() => {
-                if (this._cache.has(key) && !this._loading.has(key)) {
+                if (this._cache.has(key)) {
                     clearInterval(checkInterval);
                     resolve();
+                } else if (!this._loading.has(key)) {
+                    // loading finished but not cached — failed
+                    clearInterval(checkInterval);
+                    reject(new Error(`Asset "${key}" failed to load`));
                 }
             }, 10);
         });

@@ -110,7 +110,8 @@ export class GameRoom extends Room<{ state: GameState }> {
         const slot = new GamePlayerSlot();
         slot.sessionId = client.sessionId;
         slot.displayName = displayName;
-        slot.faction = (pending?.faction ?? "") as Faction;
+        const rawFaction = pending?.faction ?? "";
+        slot.faction = (rawFaction === "castle" || rawFaction === "necropolis" ? rawFaction : "castle") as Faction;
         this.state.players.set(client.sessionId, slot);
 
         this._pendingPlayers.delete(displayName);

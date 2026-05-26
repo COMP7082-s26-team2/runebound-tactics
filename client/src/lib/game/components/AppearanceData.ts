@@ -5,4 +5,5 @@ export type AppearanceData = {
     animationState: AnimationState;
     facingLeft?: boolean;       // if true, sprite is rendered horizontally flipped
     color?: string;             // fallback for debug renders when asset not loaded
+    outlineColor?: string;      // per-player team color indicator
 };

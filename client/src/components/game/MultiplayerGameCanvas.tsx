@@ -12,7 +12,11 @@ type TurnOverlayProps = {
     turnNumber: number;
 };
 
-function TurnOverlay({ currentTurnPlayerName, isMyTurn, turnNumber }: TurnOverlayProps) {
+function TurnOverlay({
+    currentTurnPlayerName,
+    isMyTurn,
+    turnNumber,
+}: TurnOverlayProps) {
     return (
         <div
             style={{
@@ -27,7 +31,9 @@ function TurnOverlay({ currentTurnPlayerName, isMyTurn, turnNumber }: TurnOverla
             }}
         >
             <div>Turn: {currentTurnPlayerName ?? "…"}</div>
-            <div>{isMyTurn ? "YOUR TURN — press E to end turn" : "Waiting…"}</div>
+            <div>
+                {isMyTurn ? "YOUR TURN — press E to end turn" : "Waiting…"}
+            </div>
             <div>Round: {turnNumber}</div>
         </div>
     );
@@ -44,18 +50,35 @@ export function MultiplayerGameCanvas() {
         const canvas = canvasRef.current;
 
         const assetHandler = new AssetHandler(ASSET_MANIFEST);
-        const scene = new MultiplayerGameScene(canvas, room, room.sessionId, assetHandler);
-        const engine = new GameEngine({ canvas, width: 800, height: 800, fixedDelta: 1 / 60 });
+        const manifestKeys = Object.keys(ASSET_MANIFEST);
+
+        const scene = new MultiplayerGameScene(
+            canvas,
+            room,
+            room.sessionId,
+            assetHandler,
+        );
+        const engine = new GameEngine({
+            canvas,
+            width: 800,
+            height: 800,
+            fixedDelta: 1 / 60,
+        });
         engineRef.current = engine;
 
         engine.init = () => scene.init();
         engine.update = (dt) => scene.update(dt);
         engine.preDraw = (ctx) => ctx.clearRect(0, 0, 800, 800);
         engine.draw = (ctx, alpha) => scene.draw(ctx, alpha);
-        engine.start();
+
         assetHandler
-            .preload(Object.keys(ASSET_MANIFEST))
-            .catch((err) => console.warn("[MultiplayerGameCanvas] Asset preload failed:", err));
+            .preload(manifestKeys)
+            .catch((err) =>
+                console.warn("[MultiplayerGameCanvas] preload error:", err),
+            )
+            .finally(() => {
+                engine.start();
+            });
 
         return () => {
             engine.stop();
@@ -64,7 +87,8 @@ export function MultiplayerGameCanvas() {
     }, [room?.roomId]);
 
     const isMyTurn = state?.currentTurnId === room?.sessionId;
-    const currentTurnPlayerName = state?.players?.[state?.currentTurnId ?? ""]?.displayName;
+    const currentTurnPlayerName =
+        state?.players?.[state?.currentTurnId ?? ""]?.displayName;
 
     return (
         <div style={{ position: "relative", display: "inline-block" }}>

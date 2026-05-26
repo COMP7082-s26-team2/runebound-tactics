@@ -35,6 +35,7 @@ const GRID_COLS = 10;
 const GRID_ROWS = 10;
 const CELL_SIZE = 80;
 const STEP_DURATION = 0.37;
+const PLAYER_COLORS = ["#e04040", "#4080ff", "#40c060", "#e0c040"];
 
 export class MultiplayerGameScene extends Scene {
     private _world: World | null = null;
@@ -218,7 +219,7 @@ export class MultiplayerGameScene extends Scene {
         if (!this._world) return;
 
         const clientStats = CLIENT_UNIT_STATS[unit.unitType];
-        const faction = this.room.state.players.get(unit.ownerId)?.faction ?? "castle";
+        const faction = this.room.state.players.get(unit.ownerId)?.faction || "castle";
 
         const stats: UnitStatsData = {
             name: clientStats?.name ?? unit.unitType,
@@ -229,11 +230,17 @@ export class MultiplayerGameScene extends Scene {
             attackRange: clientStats?.attackRange ?? 1,
         };
 
+        const isMine = unit.ownerId === this.mySessionId;
+        const outlineColor = isMine
+            ? PLAYER_COLORS[0]!
+            : PLAYER_COLORS[1]!;
+
         const appearance: AppearanceData = {
             assetKey: `tilemap:entity:${faction}:${unit.unitType}`,
             animationState: "idle",
             color: faction === "castle" ? "red" : "purple",
             facingLeft: faction === "necropolis",
+            outlineColor,
         };
 
         const entityId = this._world.spawnUnit(

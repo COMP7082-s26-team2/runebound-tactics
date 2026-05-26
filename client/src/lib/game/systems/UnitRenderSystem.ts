@@ -20,6 +20,9 @@ function resolveRow(
 
 export class UnitRenderSystem implements GameComponent {
     readonly zIndex = 2; // above grid (0) and movement highlights (1)
+    private static readonly OUTLINE = 2;
+    private _offCanvas: HTMLCanvasElement | null = null;
+    private _offCtx: CanvasRenderingContext2D | null = null;
 
     constructor(
         private _world: World,
@@ -30,6 +33,14 @@ export class UnitRenderSystem implements GameComponent {
         private _assetHandler?: AssetHandler,
         private _animationController?: AnimationController,
     ) { }
+
+    init(): void {
+        const pad = UnitRenderSystem.OUTLINE;
+        this._offCanvas = document.createElement("canvas");
+        this._offCanvas.width = this._cellSize + pad * 2;
+        this._offCanvas.height = this._cellSize + pad * 2;
+        this._offCtx = this._offCanvas.getContext("2d") ?? null;
+    }
 
     update() {
         if (!this._tweens) return;
@@ -58,7 +69,7 @@ export class UnitRenderSystem implements GameComponent {
             const appearance = this._world.unitAppearance.get(entityId);
             if (!appearance) continue;
 
-            const { assetKey, animationState, facingLeft, color } = appearance;
+            const { assetKey, animationState, facingLeft, color, outlineColor } = appearance;
             const tweenDirection = this._tweens?.getDirection(entityId);
             const effectiveFacingLeft = tweenDirection && tweenDirection.x !== 0
                 ? tweenDirection.x < 0
@@ -86,9 +97,15 @@ export class UnitRenderSystem implements GameComponent {
                     if (effectiveFacingLeft) {
                         ctx.save();
                         ctx.scale(-1, 1);
+                        if (outlineColor) {
+                            this._drawOutline(ctx, img, sx, sy, sw, sh, -(x + this._cellSize), y, outlineColor);
+                        }
                         ctx.drawImage(img, sx, sy, sw, sh, -(x + this._cellSize), y, this._cellSize, this._cellSize);
                         ctx.restore();
                     } else {
+                        if (outlineColor) {
+                            this._drawOutline(ctx, img, sx, sy, sw, sh, x, y, outlineColor);
+                        }
                         ctx.drawImage(img, sx, sy, sw, sh, x, y, this._cellSize, this._cellSize);
                     }
 
@@ -104,6 +121,36 @@ export class UnitRenderSystem implements GameComponent {
                 ctx.fillStyle = color ?? "gray";
                 ctx.fillRect(x, y, this._cellSize, this._cellSize);
             }
+        }
+    }
+
+    private _drawOutline(
+        ctx: CanvasRenderingContext2D,
+        img: HTMLImageElement,
+        sx: number, sy: number, sw: number, sh: number,
+        x: number, y: number,
+        color: string,
+    ): void {
+        if (!this._offCanvas || !this._offCtx) return;
+        const pad = UnitRenderSystem.OUTLINE;
+        const off = this._offCtx;
+
+        off.clearRect(0, 0, this._offCanvas.width, this._offCanvas.height);
+        off.imageSmoothingEnabled = false;
+        off.drawImage(img, sx, sy, sw, sh, pad, pad, this._cellSize, this._cellSize);
+
+        off.globalCompositeOperation = "source-in";
+        off.fillStyle = color;
+        off.fillRect(0, 0, this._offCanvas.width, this._offCanvas.height);
+        off.globalCompositeOperation = "source-over";
+
+        const offsets: [number, number][] = [
+            [-1, -1], [0, -1], [1, -1],
+            [-1,  0],          [1,  0],
+            [-1,  1], [0,  1], [1,  1],
+        ];
+        for (const [dx, dy] of offsets) {
+            ctx.drawImage(this._offCanvas, x - pad + dx, y - pad + dy);
         }
     }
 }

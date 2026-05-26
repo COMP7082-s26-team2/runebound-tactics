@@ -62,7 +62,13 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
             throw new Error("Game is already starting");
         }
 
-        const displayName = String(options?.displayName ?? "Player").slice(0, 32);
+        let displayName = String(options?.displayName ?? "Player").slice(0, 32);
+        const usedNames = new Set([...this.state.players.values()].map(p => p.displayName));
+        if (usedNames.has(displayName)) {
+            let suffix = 2;
+            while (usedNames.has(`${displayName} (${suffix})`)) suffix++;
+            displayName = `${displayName} (${suffix})`.slice(0, 32);
+        }
 
         const usedSlots = new Set([...this.state.players.values()].map(p => p.slot));
         const nextSlot = Array.from(
@@ -170,7 +176,10 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
         const roomData = await matchMaker.createRoom(ROOM_GAME, { lobbyRoomId: this.roomId });
         this.state.gameRoomId = roomData.roomId;
 
-        this.broadcast("game_starting", { roomId: roomData.roomId });
+        for (const client of this.clients) {
+            const player = this.state.players.get(client.sessionId);
+            client.send("game_starting", { roomId: roomData.roomId, myDisplayName: player?.displayName ?? "" });
+        }
         console.log(`[LobbyRoom] Game room created: ${roomData.roomId}`);
 
         // Hold open briefly so all clients receive the broadcast before the room closes.

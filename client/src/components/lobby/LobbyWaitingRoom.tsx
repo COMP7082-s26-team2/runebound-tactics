@@ -6,6 +6,7 @@ import { useLobbyRoom, useLobbyRoomMessage, useLobbyRoomState } from "@/context/
 import { SlotList } from "./SlotList";
 import { Button } from "@/components/ui/Button";
 import { clearLobbyToken } from "@/lib/multiplayer/reconnect";
+import { setDisplayName } from "@/lib/multiplayer/identity";
 
 export function LobbyWaitingRoom({ expectedRoomId }: { expectedRoomId: string }) {
     const { room, error } = useLobbyRoom();
@@ -23,9 +24,10 @@ export function LobbyWaitingRoom({ expectedRoomId }: { expectedRoomId: string })
         if (!roomMatches) return;
         setCountdown(null);
     });
-    useLobbyRoomMessage("game_starting", (payload: { roomId: string }) => {
+    useLobbyRoomMessage("game_starting", (payload: { roomId: string; myDisplayName?: string }) => {
         if (!roomMatches) return;
         clearLobbyToken();
+        if (payload.myDisplayName) setDisplayName(payload.myDisplayName);
         router.push(`/game/${payload.roomId}`);
     });
 
