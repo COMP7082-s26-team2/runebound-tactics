@@ -6,14 +6,14 @@ services:
     plan: free
     # Notice: No rootDir here so Render can see /shared
     port: 2567
-    buildCommand: yarn install && yarn workspace @runebound-tactics/server build
+    buildCommand: yarn install && yarn workspace @runebound-tactics/database prisma generate && yarn workspace @runebound-tactics/server build
     startCommand: yarn workspace @runebound-tactics/server start
 
 - type: web
     name: nextjs-frontend
     env: node
     plan: free
-    buildCommand: yarn install && yarn workspace @runebound-tactics/client build
+    buildCommand: yarn install && yarn workspace @runebound-tactics/database prisma generate && yarn workspace @runebound-tactics/client build
     # Using 'serve' via yarn instead of npx to ensure package reliability
     startCommand: yarn serve -s client/out -l $PORT
     autoDeploy: false
