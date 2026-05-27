@@ -17,6 +17,3 @@ services:
     # Using 'serve' via yarn instead of npx to ensure package reliability
     startCommand: yarn serve -s client/out -l $PORT
     autoDeploy: false
-    envVars:
-      - key: NODE_VERSION
-        value: v22.18.0 # Match this to your local Node version
