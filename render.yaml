@@ -10,9 +10,9 @@ services:
     startCommand: yarn workspace @runebound-tactics/server start
   # 2. The Next Frontend Client
   - type: web
-    name: nextjs-frontend
+    name: rune-frontend
     env: node
     plan: free
-    buildCommand: yarn install && yarn workspace @runebound-tactics/client build
+    buildCommand: yarn install && yarn prisma generate --schema=./database/schema.prisma && yarn workspace @runebound-tactics/client build
     startCommand: yarn serve -s client/out -l $PORT
     autoDeploy: false
