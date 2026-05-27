@@ -5,13 +5,13 @@ services:
     env: node
     plan: free
     # Notice: No rootDir here so Render can see /shared
-    buildCommand: yarn install && yarn workspace && yarn workspace @runebound-tactics/server build
+    buildCommand: yarn install && yarn workspace @runebound-tactics/server build
     startCommand: yarn workspace @runebound-tactics/server start
   # 2. The Next Frontend Client
   - type: web
     name: rune-frontend
     env: node
     plan: free
-    buildCommand: yarn install && yarn prisma generate --schema=../database/schema.prisma && yarn workspace @runebound-tactics/client build
+    buildCommand: yarn install && yarn prisma generate --schema=./prisma/schema.prisma && yarn workspace @runebound-tactics/client build
     startCommand: yarn serve -s client/out -l $PORT
     autoDeploy: false
