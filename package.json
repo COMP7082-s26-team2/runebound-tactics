@@ -17,6 +17,7 @@
         "typecheck": "yarn workspaces run typecheck"
     },
     "devDependencies": {
+        "@types/node": "^20",
         "concurrently": "^9.2.1",
         "typescript": "^5.8.3"
     },
