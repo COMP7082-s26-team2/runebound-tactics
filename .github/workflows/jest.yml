@@ -1,0 +1,27 @@
+name: Run Jest Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-xversion: '20' # Specify your Node.js version here
+          cache: 'yarn'       # Changes to 'yarn' or 'pnpm' if applicable
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile 
+
+      - name: Run Jest tests
+        run: yarn test
