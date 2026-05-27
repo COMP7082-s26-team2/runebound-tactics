@@ -58,11 +58,18 @@ export class UnitRenderSystem implements GameComponent {
             const appearance = this._world.unitAppearance.get(entityId);
             if (!appearance) continue;
 
-            const { assetKey, animationState, facingLeft, color } = appearance;
+            const { assetKey, animationState, facingLeft, color, exhausted, alpha, scale } = appearance;
             const tweenDirection = this._tweens?.getDirection(entityId);
             const effectiveFacingLeft = tweenDirection && tweenDirection.x !== 0
                 ? tweenDirection.x < 0
                 : facingLeft;
+
+            const exhaustedFilter = exhausted
+                ? "grayscale(100%) brightness(0.6)"
+                : "none";
+
+            // Skip render entirely when fully faded out (FadeStep death fallback).
+            if (alpha !== undefined && alpha <= 0) continue;
 
             // Try to render sprite if asset handler and asset are available
             if (assetKey && this._assetHandler && this._assetHandler.has(assetKey)) {
@@ -77,32 +84,45 @@ export class UnitRenderSystem implements GameComponent {
                     const sw = sheet.frameWidth;
                     const sh = sheet.frameHeight;
 
-                    // Disable image smoothing for pixel-perfect rendering if enabled
-                    const smoothingWasEnabled = ctx.imageSmoothingEnabled;
+                    ctx.save();
+                    ctx.filter = exhaustedFilter;
                     if (sheet.pixelPerfect) {
                         ctx.imageSmoothingEnabled = false;
                     }
+                    if (alpha !== undefined && alpha !== 1) {
+                        ctx.globalAlpha *= alpha;
+                    }
+                    if (scale !== undefined && scale !== 1) {
+                        // Scale around the cell center so the sprite shrinks in place.
+                        const cx = x + this._cellSize / 2;
+                        const cy = y + this._cellSize / 2;
+                        ctx.translate(cx, cy);
+                        ctx.scale(scale, scale);
+                        ctx.translate(-cx, -cy);
+                    }
 
                     if (effectiveFacingLeft) {
-                        ctx.save();
                         ctx.scale(-1, 1);
                         ctx.drawImage(img, sx, sy, sw, sh, -(x + this._cellSize), y, this._cellSize, this._cellSize);
-                        ctx.restore();
                     } else {
                         ctx.drawImage(img, sx, sy, sw, sh, x, y, this._cellSize, this._cellSize);
                     }
-
-                    // Restore image smoothing state
-                    ctx.imageSmoothingEnabled = smoothingWasEnabled;
+                    ctx.restore();
                 } else {
                     // Fallback to color if sprite sheet definition is missing
-                    ctx.fillStyle = color ?? "gray";
+                    ctx.save();
+                    if (alpha !== undefined && alpha !== 1) ctx.globalAlpha *= alpha;
+                    ctx.fillStyle = exhausted ? "#666" : (color ?? "gray");
                     ctx.fillRect(x, y, this._cellSize, this._cellSize);
+                    ctx.restore();
                 }
             } else {
                 // Fallback to colored rectangle if no asset or handler
-                ctx.fillStyle = color ?? "gray";
+                ctx.save();
+                if (alpha !== undefined && alpha !== 1) ctx.globalAlpha *= alpha;
+                ctx.fillStyle = exhausted ? "#666" : (color ?? "gray");
                 ctx.fillRect(x, y, this._cellSize, this._cellSize);
+                ctx.restore();
             }
         }
     }

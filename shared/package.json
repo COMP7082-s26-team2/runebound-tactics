@@ -5,15 +5,20 @@
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
+        "clean" : "tsc --build --clean",
         "build": "tsc --build",
         "typecheck": "tsc --noEmit",
-        "lint": "eslint src"
+        "lint": "eslint src",
+        "test": "jest"
     },
     "peerDependencies": {
         "@colyseus/schema": "^4.x"
     },
     "devDependencies": {
         "@colyseus/schema": "^4.0.0",
+        "@types/jest": "^29.5.12",
+        "jest": "^29.7.0",
+        "ts-jest": "^29.1.5",
         "typescript": "^5.8.3"
     }
 }

@@ -1,19 +1,18 @@
-import { Server } from "colyseus";
+import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { createServer } from "http";
 import { registerRooms } from "./rooms";
 
 export function createGameServer() {
     const httpServer = createServer();
-
-    const gameServer = new Server({
-        transport: new WebSocketTransport({ server: httpServer }),
-    });
-
     const clientOrigin = process.env.CLIENT_ORIGIN ?? "http://localhost:3000";
 
-    // Health check + CORS for HTTP requests (WebSocket upgrades don't need CORS headers)
+    // Register before Colyseus so CORS headers are set before its listeners run.
+    // The headersSent guard protects against any edge case where a prior listener
+    // already completed the response.
     httpServer.on("request", (req, res) => {
+        if (res.headersSent) return;
+
         res.setHeader("Access-Control-Allow-Origin", clientOrigin);
         res.setHeader(
             "Access-Control-Allow-Methods",
@@ -34,6 +33,27 @@ export function createGameServer() {
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ status: "ok" }));
         }
+
+        else if (req.method === "GET" && req.url?.startsWith("/rooms/")) {
+            const roomName = decodeURIComponent(req.url.slice("/rooms/".length));
+            matchMaker.query({ name: roomName }).then(rooms => {
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify(rooms.map(r => ({
+                    roomId: r.roomId,
+                    name: r.name,
+                    clients: r.clients,
+                    maxClients: r.maxClients,
+                    metadata: r.metadata,
+                }))));
+            }).catch(err => {
+                res.writeHead(500, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+            });
+        }
+    });
+
+    const gameServer = new Server({
+        transport: new WebSocketTransport({ server: httpServer }),
     });
 
     registerRooms(gameServer);

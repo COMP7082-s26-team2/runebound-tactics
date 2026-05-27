@@ -7,6 +7,7 @@ client/tsconfig.tsbuildinfo
 client/next-env.d.ts
 client/.env*
 !client/.env.example
+client/.next
 
 # ─── server (Colyseus) ────────────────────────────────────────────────────────
 server/dist/
@@ -16,6 +17,7 @@ server/.env*
 
 # ─── local design notes ───────────────────────────────────────────────────────
 ai_notes/
+graphify-out
 
 # ─── repo-wide ────────────────────────────────────────────────────────────────
 .DS_Store
@@ -39,3 +41,11 @@ next-env.d.ts
 dist
 
 node_modules
+.env
+.env*
+
+# ai
+.claude
+memory
+.playwright-mcp
+superpowers

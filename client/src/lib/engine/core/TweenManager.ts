@@ -11,6 +11,18 @@ interface Tween {
     stepDuration: number;
     elapsed: number;
     onComplete?: () => void;
+    /**
+     * If true, `getDirection()` returns null for this tween so consumers
+     * like UnitRenderSystem don't flip the entity's facing direction.
+     * Used by RecoilStep — a hit unit shouldn't visually turn around just
+     * because it's being knocked back.
+     */
+    preserveFacing?: boolean;
+}
+
+export interface TweenOptions {
+    onComplete?: () => void;
+    preserveFacing?: boolean;
 }
 
 export class TweenManager implements GameComponent {
@@ -22,27 +34,37 @@ export class TweenManager implements GameComponent {
         from: Vector2D,
         to: Vector2D,
         duration: number,
-        onComplete?: () => void,
+        onCompleteOrOptions?: (() => void) | TweenOptions,
     ): void {
-        this.startPath(entityId, [from, to], duration, onComplete);
+        this.startPath(entityId, [from, to], duration, onCompleteOrOptions);
     }
 
     /**
      * Animate through an ordered list of pixel waypoints.
      * Each segment takes `stepDuration` seconds.
+     *
+     * Pass `TweenOptions` (or a bare callback) to control completion and
+     * facing-direction behavior.
      */
     startPath(
         entityId: EntityId,
         waypoints: Vector2D[],
         stepDuration: number,
-        onComplete?: () => void,
+        onCompleteOrOptions?: (() => void) | TweenOptions,
     ): void {
         if (waypoints.length < 2) return;
+
+        const options: TweenOptions =
+            typeof onCompleteOrOptions === "function"
+                ? { onComplete: onCompleteOrOptions }
+                : onCompleteOrOptions ?? {};
+
         this._tweens.set(entityId, {
             waypoints: [...waypoints],
             stepDuration,
             elapsed: 0,
-            onComplete,
+            onComplete: options.onComplete,
+            preserveFacing: options.preserveFacing,
         });
     }
 
@@ -55,10 +77,15 @@ export class TweenManager implements GameComponent {
         return tween.waypoints[0].lerp(tween.waypoints[1], t);
     }
 
-    /** Returns the current segment direction, or null if no tween is active. */
+    /**
+     * Returns the current segment direction, or null if no tween is active.
+     * Tweens flagged with `preserveFacing: true` also return null so the
+     * caller treats them as facing-neutral.
+     */
     getDirection(entityId: EntityId): Vector2D | null {
         const tween = this._tweens.get(entityId);
         if (!tween || tween.waypoints.length < 2) return null;
+        if (tween.preserveFacing) return null;
 
         return tween.waypoints[1].sub(tween.waypoints[0]);
     }
@@ -68,7 +95,12 @@ export class TweenManager implements GameComponent {
     }
 
     update(dt: number): void {
-        for (const [entityId, tween] of this._tweens) {
+        // Snapshot entries up front — `onComplete` callbacks may call
+        // `this.start(...)` to chain a follow-up tween, which mutates the
+        // backing Map mid-iteration. Iterating over a static snapshot keeps
+        // the loop deterministic.
+        const entries = Array.from(this._tweens.entries());
+        for (const [entityId, tween] of entries) {
             tween.elapsed += dt;
 
             // Advance through completed steps without losing leftover time
@@ -79,7 +111,14 @@ export class TweenManager implements GameComponent {
 
             if (tween.elapsed >= tween.stepDuration && tween.waypoints.length <= 2) {
                 tween.onComplete?.();
-                this._tweens.delete(entityId);
+                // `onComplete` may have replaced the entry by chaining a new
+                // tween for this entity. Only delete if the entry is still
+                // the same tween we just finished — otherwise we'd wipe the
+                // freshly-queued follow-up. Bug fix: chained LungeStep /
+                // RecoilStep used to lose their return half this way.
+                if (this._tweens.get(entityId) === tween) {
+                    this._tweens.delete(entityId);
+                }
             }
         }
     }

@@ -1,14 +1,22 @@
-import { Server } from "colyseus";
+import { Server, LobbyRoom as ColyseusLobbyRoom } from "colyseus";
 import { TestRoom } from "./TestRoom";
+import { LobbyRoom } from "./LobbyRoom";
+import { GameRoom } from "./GameRoom";
 
-// Room name constants — import these on the client side too to avoid string drift
-export const ROOM_TEST = "test";
-// export const ROOM_LOBBY = "lobby";
-// export const ROOM_LOBBY_LIST = "lobby-list";
+export { ROOM_TEST, ROOM_LOBBY, ROOM_GAME, ROOM_LOBBY_LIST } from "@runebound-tactics/shared";
+import { ROOM_TEST, ROOM_LOBBY, ROOM_GAME, ROOM_LOBBY_LIST } from "@runebound-tactics/shared";
 
 // Register all Colyseus room types here. Adding a new room = one line.
 export function registerRooms(server: Server): void {
     server.define(ROOM_TEST, TestRoom);
-    // server.define(ROOM_LOBBY, LobbyRoom);
-    // server.define(ROOM_LOBBY_LIST, LobbyListRoom, { maxClients: 200 });
+
+    // Custom lobby waiting room — players join here before a match.
+    // .enableRealtimeListing() makes it visible to ColyseusLobbyRoom (lobby-list).
+    server.define(ROOM_LOBBY, LobbyRoom).enableRealtimeListing();
+
+    // Active game session — created programmatically by LobbyRoom, not joinable directly.
+    server.define(ROOM_GAME, GameRoom);
+
+    // Built-in Colyseus lobby room — consumed by createLobbyContext() on the client.
+    server.define(ROOM_LOBBY_LIST, ColyseusLobbyRoom);
 }
