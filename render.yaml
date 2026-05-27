@@ -8,6 +8,9 @@ services:
     port: 2567
     buildCommand: yarn install && yarn workspace @runebound-tactics/server build
     startCommand: yarn workspace @runebound-tactics/server start
+    envVars:
+      - key: NODE_VERSION
+        value: 22.18.0 # <-- Forces Render to use a stable LTS Node version
 
 - type: web
     name: nextjs-frontend
@@ -17,3 +20,6 @@ services:
     # Using 'serve' via yarn instead of npx to ensure package reliability
     startCommand: yarn serve -s client/out -l $PORT
     autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: 22.18.0 # <-- Forces Render to use a stable LTS Node version    
