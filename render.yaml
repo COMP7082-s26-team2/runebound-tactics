@@ -8,12 +8,11 @@ services:
     port: 2567
     buildCommand: yarn install && yarn workspace @runebound-tactics/database prisma generate && yarn workspace @runebound-tactics/server build
     startCommand: yarn workspace @runebound-tactics/server start
-
-- type: web
+  # 2. The Next Frontend Client
+  - type: web
     name: nextjs-frontend
     env: node
     plan: free
-    buildCommand: yarn install && yarn workspace @runebound-tactics/database prisma generate && yarn workspace @runebound-tactics/client build
-    # Using 'serve' via yarn instead of npx to ensure package reliability
+    buildCommand: yarn install && npx prisma generate --schema=./database/schema.prisma && yarn workspace @runebound-tactics/client build    # Using 'serve' via yarn instead of npx to ensure package reliability
     startCommand: yarn serve -s client/out -l $PORT
     autoDeploy: false
