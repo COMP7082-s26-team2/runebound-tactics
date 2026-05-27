@@ -13,5 +13,5 @@ services:
     env: node
     plan: free
     buildCommand: yarn install && yarn prisma generate --schema=./prisma/schema.prisma && yarn workspace @runebound-tactics/client build
-    startCommand: yarn serve -s client/out -l $PORT
+    startCommand: yarn workspace @runebound-tactics/client start
     autoDeploy: false
