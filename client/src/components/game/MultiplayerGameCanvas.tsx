@@ -91,9 +91,14 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
         };
     }, [room]);
 
+    // Reconcile on every state tick AND once when the scene becomes ready —
+    // the latter handles the initial population so the non-active player
+    // sees their units even before the opponent acts. See:
+    // runebound-tactics/initial-state-reconcile/initial_state_reconcile_design_v1.0.md
     useEffect(() => {
+        if (phase !== "ready") return;
         sceneRef.current?.reconcile(state);
-    }, [state]);
+    }, [state, phase]);
 
     return (
         <div
