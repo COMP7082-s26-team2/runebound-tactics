@@ -1,4 +1,5 @@
 import { Scene, World, SquareGrid } from "@/lib/engine";
+import EventBus from "@/lib/engine/EventBus";
 import {
     GridRenderSystem,
     UnitRenderSystem,
@@ -6,6 +7,7 @@ import {
 } from "@/lib/game/systems";
 import { MultiplayerSelectionSystem } from "@/lib/game/systems/MultiplayerSelectionSystem";
 import { MovementRangeRenderSystem } from "@/lib/game/systems/MovementRangeRenderSystem";
+import { EnemyTargetOutlineSystem } from "@/lib/game/systems/EnemyTargetOutlineSystem";
 import {
     unitTypeToStats,
     unitTypeToAppearance,
@@ -26,12 +28,17 @@ import type { Room } from "@colyseus/sdk";
  * canvas input and to the Colyseus room. Reconciles `state.units` snapshots
  * from the server into the local `World` on each state change.
  *
- * Movement scope only — no combat rendering, no HP bars, no end-turn UI
- * inside the scene (the wrapping React `GameHUD` owns those).
+ * Emits `combat:damage` and `unit:despawn` events on the scene's EventBus
+ * when reconcile detects HP decrease or unit removal. A future
+ * CombatFeedbackSystem will subscribe to render floating damage numbers,
+ * death sparks, etc. For now consumers can `scene.eventBus.on(...)`
+ * directly.
  */
 export class MultiplayerGameScene extends Scene {
     private _world: World;
     private _selection: MultiplayerSelectionSystem;
+    private _eventBus = new EventBus();
+    private _lastSeenHp = new Map<string, number>();
     public input: InputSystem;
 
     constructor(
@@ -48,6 +55,10 @@ export class MultiplayerGameScene extends Scene {
             this.input,
             this._room,
         );
+    }
+
+    get eventBus(): EventBus {
+        return this._eventBus;
     }
 
     init(): void {
@@ -80,6 +91,13 @@ export class MultiplayerGameScene extends Scene {
                 CELL_SIZE,
             ),
         );
+        this.components.add(
+            new EnemyTargetOutlineSystem(
+                this._world,
+                CELL_SIZE,
+                this._selection,
+            ),
+        );
         this.components.add(this.input);
     }
 
@@ -92,8 +110,10 @@ export class MultiplayerGameScene extends Scene {
     /**
      * Inline reconciler.
      *
-     * Spawn-or-update for each unit in `state.units`. No removal in
-     * movement scope (combat / death is future work).
+     * Spawn-or-update for each unit in `state.units`. Detects:
+     *   - HP decrease → emit `combat:damage` event
+     *   - Unit despawn (in snapshot but not in incoming entries) → remove
+     *     from World and emit `unit:despawn` event
      *
      * `@colyseus/react`'s `useRoomState` hook returns a plain-object
      * snapshot, whereas the live `room.state` exposes MapSchema. Iterate
@@ -110,6 +130,7 @@ export class MultiplayerGameScene extends Scene {
             unitType: string;
             x: number;
             y: number;
+            hp: number;
             hasMoved: boolean;
         };
 
@@ -128,10 +149,23 @@ export class MultiplayerGameScene extends Scene {
         }
 
         const mySessionId = this._room.sessionId;
+        const seenUnitIds = new Set<string>();
 
         for (const [unitId, unit] of entries) {
+            seenUnitIds.add(unitId);
             const isMine = unit.ownerId === mySessionId;
             const exhausted = isMine && unitIsExhausted(unit);
+
+            // HP delta detection
+            const prevHp = this._lastSeenHp.get(unitId);
+            if (prevHp !== undefined && unit.hp < prevHp) {
+                this._eventBus.emit("combat:damage", {
+                    unitId,
+                    amount: prevHp - unit.hp,
+                    newHp: unit.hp,
+                });
+            }
+            this._lastSeenHp.set(unitId, unit.hp);
 
             const existing = this._world.getEntityByServerId(unitId);
             if (existing === undefined) {
@@ -159,6 +193,18 @@ export class MultiplayerGameScene extends Scene {
             ) {
                 this._world.moveUnit(existing, { q: unit.x, r: unit.y });
             }
+        }
+
+        // Despawn: any local entity bound to a serverId no longer in
+        // serverState.units must be removed.
+        for (const serverId of this._world.getAllServerIds()) {
+            if (seenUnitIds.has(serverId)) continue;
+            const entityId = this._world.getEntityByServerId(serverId);
+            if (entityId !== undefined) {
+                this._world.removeUnit(entityId);
+            }
+            this._lastSeenHp.delete(serverId);
+            this._eventBus.emit("unit:despawn", { unitId: serverId });
         }
     }
 }
