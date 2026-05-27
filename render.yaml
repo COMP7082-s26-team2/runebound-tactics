@@ -5,16 +5,18 @@ services:
     env: node
     plan: free
     # Notice: No rootDir here so Render can see /shared
+    port: 2567
     buildCommand: yarn install && yarn workspace @runebound-tactics/server build
     startCommand: yarn workspace @runebound-tactics/server start
 
-#  # 2. The Next.js Frontend
-#  - type: web
-#    # runtime: static
-#    name: nextjs-frontend
-#    env: node
-#    plan: free
-#    buildCommand: yarn install && yarn workspace @runebound-tactics/client build
-#    # Using npx serve to host the static output folder
-#    startCommand: npx serve@latest client/out --listen $PORT    
-#    autoDeploy: false
+- type: web
+    name: nextjs-frontend
+    env: node
+    plan: free
+    buildCommand: yarn install && yarn workspace @runebound-tactics/client build
+    # Using 'serve' via yarn instead of npx to ensure package reliability
+    startCommand: yarn serve -s client/out -l $PORT
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: v22.18.0 # Match this to your local Node version
