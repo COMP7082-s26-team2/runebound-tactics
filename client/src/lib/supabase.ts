@@ -12,7 +12,12 @@ export function createClient() {
 }
 
 /**
- * Server-side Supabase client (for Server Actions and API Routes)
+ * Server-side Supabase client (for Server Actions and API Routes).
+ *
+ * This is intentionally request-scoped instead of a singleton. The server can
+ * handle many users at once, and each request has its own auth cookies/JWT.
+ * Creating the client inside the request context ensures Supabase reads and
+ * writes the correct user's session instead of sharing stale auth state.
  */
 export async function createServerSideClient() {
     const cookieStore = await cookies();
