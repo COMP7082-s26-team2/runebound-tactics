@@ -12,6 +12,8 @@ export async function GET(request: Request) {
         console.log("--- Auth Callback Started ---");
         console.log("Code:", code);
 
+        // The callback route is part of the server-side auth flow. It exchanges
+        // Supabase's one-time code for a session tied to this request's cookies.
         const supabase = await createServerSideClient();
         const { data, error } =
             await supabase.auth.exchangeCodeForSession(code);
@@ -31,7 +33,9 @@ export async function GET(request: Request) {
             console.log("User session established for:", data.user.email);
 
             try {
-                // Check if player profile already exists
+                // Supabase Auth confirms identity, but gameplay uses our player
+                // table. Keep the mapping idempotent so callback retries do not
+                // create duplicate player profiles.
                 const existingPlayer = await prisma.player.findUnique({
                     where: { auth_id: data.user.id },
                 });
