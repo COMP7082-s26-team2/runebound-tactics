@@ -220,8 +220,7 @@ export default function ProfileModal() {
             {/* Modal Backdrop + Panel */}
             {isOpen && (
                 <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center"
-                    style={{ animation: 'fadeIn 0.2s ease-out' }}
+                    className="fixed inset-0 z-[100] flex items-center justify-center transition-opacity duration-200 ease-out"
                 >
                     {/* Backdrop */}
                     <div
@@ -231,8 +230,7 @@ export default function ProfileModal() {
 
                     {/* Panel */}
                     <div
-                        className="relative w-full max-w-sm mx-4 bg-[#111111]/95 border border-[#222222] backdrop-blur-md shadow-2xl"
-                        style={{ animation: 'scaleIn 0.2s ease-out' }}
+                        className="relative w-full max-w-sm mx-4 bg-[#111111]/95 border border-[#222222] backdrop-blur-md shadow-2xl transition-transform duration-200 ease-out"
                     >
                         {/* Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-[#222222]">
@@ -403,7 +401,7 @@ export default function ProfileModal() {
                                                 </div>
 
                                                 {passwordStep === 'verify' && (
-                                                    <div className="space-y-2.5" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+                                                    <div className="space-y-2.5 transition-opacity duration-200 ease-out">
                                                         <div className="space-y-1">
                                                             <input
                                                                 type="password"
@@ -444,7 +442,7 @@ export default function ProfileModal() {
                                                 )}
 
                                                 {passwordStep === 'update' && (
-                                                    <div className="space-y-2.5" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+                                                    <div className="space-y-2.5 transition-opacity duration-200 ease-out">
                                                         <div className="space-y-1">
                                                             <input
                                                                 type="password"
@@ -527,18 +525,6 @@ export default function ProfileModal() {
                     </div>
                 </div>
             )}
-
-            {/* Animations */}
-            <style jsx>{`
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes scaleIn {
-                    from { opacity: 0; transform: scale(0.95); }
-                    to { opacity: 1; transform: scale(1); }
-                }
-            `}</style>
         </>
     );
 }
