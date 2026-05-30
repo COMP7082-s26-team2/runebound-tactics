@@ -1,25 +1,60 @@
-import { createServerSideClient, assertTokenNotExpired } from "@/lib/supabase";
-import { signOut } from "@/app/auth/actions";
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-export default async function DashboardPage() {
-    // Enforce strict absolute session expiration boundaries
-    const isExpired = await assertTokenNotExpired();
-    if (isExpired) {
-        redirect("/auth/login");
+export default function DashboardPage() {
+    const router = useRouter();
+    const supabase = useMemo(() => createClient(), []);
+    const [username, setUsername] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let mounted = true;
+
+        async function verifySession() {
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+
+            const expiresAt = session?.expires_at;
+            const isExpired = expiresAt
+                ? Date.now() / 1000 > expiresAt
+                : false;
+
+            if (!session || isExpired) {
+                if (isExpired) {
+                    await supabase.auth.signOut();
+                }
+                router.replace("/auth/login");
+                return;
+            }
+
+            if (!mounted) return;
+
+            setUsername(
+                session.user.user_metadata?.username ||
+                    session.user.email ||
+                    "Player",
+            );
+            setLoading(false);
+        }
+
+        verifySession();
+
+        return () => {
+            mounted = false;
+        };
+    }, [router, supabase]);
+
+    async function handleSignOut() {
+        await supabase.auth.signOut();
+        router.replace("/");
     }
 
-    const supabase = await createServerSideClient();
-    const {
-        data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-        redirect("/auth/login");
-    }
-
-    const username = session.user.user_metadata?.username || session.user.email;
+    if (loading) return null;
 
     return (
         <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-6 font-sans">
@@ -61,9 +96,10 @@ export default async function DashboardPage() {
                     </Link>
                 </div>
 
-                <form action={signOut}>
+                <form>
                     <button
-                        type="submit"
+                        type="button"
+                        onClick={handleSignOut}
                         className="text-[9px] uppercase tracking-[0.2em] text-[#555555] hover:text-[#ff6666] transition-colors font-bold"
                     >
                         Disconnect Session
