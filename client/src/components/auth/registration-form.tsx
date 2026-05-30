@@ -73,7 +73,7 @@ export default function RegistrationForm() {
             setError(result.error);
         } else if (result?.success) {
             setSuccess("Verification successful! Entering the realm...");
-            window.location.href = "/";
+            window.location.href = "/dashboard";
         }
     }
 
