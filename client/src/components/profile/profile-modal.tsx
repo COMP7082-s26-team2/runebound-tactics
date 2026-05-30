@@ -38,7 +38,7 @@ export default function ProfileModal() {
     const [pwError, setPwError] = useState<string | null>(null);
     const [pwSuccess, setPwSuccess] = useState<string | null>(null);
 
-    const fetchProfile = useCallback(async () => {
+    const fetchProfile = async () => {
         setLoading(true);
         setError(null);
         const result = await getProfile();
@@ -50,7 +50,7 @@ export default function ProfileModal() {
             setNewUsername(result.profile.username || '');
         }
         setLoading(false);
-    }, []);
+    }
 
     useEffect(() => {
         fetchProfile();
