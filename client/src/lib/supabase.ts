@@ -1,5 +1,4 @@
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 
 /**
  * Client-side Supabase client
@@ -20,6 +19,7 @@ export function createClient() {
  * writes the correct user's session instead of sharing stale auth state.
  */
 export async function createServerSideClient() {
+    const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
 
     return createServerClient(
@@ -51,6 +51,7 @@ export async function createServerSideClient() {
  * If expired, it purges all auth cookies to guarantee immediate sign-out without relying on silent refresh.
  */
 export async function assertTokenNotExpired(): Promise<boolean> {
+    const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
     const authCookie = cookieStore
         .getAll()
