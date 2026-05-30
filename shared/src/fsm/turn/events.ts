@@ -1,17 +1,27 @@
 /**
  * Turn FSM — event union, context shape, payload types.
  *
- * active     — one player's turn is in progress.
- * resolving  — turn-end transition: host (server or LocalGameSession)
- *              subscribes and performs schema-side work (reset hasMoved /
- *              actionPoints, write currentTurnId), then fires TURN_ADVANCED.
+ * action-phase     — active player's turn; waiting for move/attack/end-turn input.
+ * declare-end-turn — player declared end of turn; turn-advance in progress.
+ * quick-play       — placeholder: opponent response window (card system pending).
+ * combat           — resolving a pending attack (damage applied, unit possibly removed).
+ * post-combat      — placeholder: death cleanup + gold award (gold system pending).
  */
 
-export type TurnState = "active" | "resolving";
+export type TurnState =
+    | "action-phase"
+    | "declare-end-turn"
+    | "quick-play"
+    | "combat"
+    | "post-combat";
 
 export type TurnEvent =
     | "END_TURN"
     | "ALL_UNITS_MOVED"
+    | "ATTACK_DECLARED"
+    | "QUICK_PLAY_RESOLVED"
+    | "COMBAT_RESOLVED"
+    | "POST_COMBAT_RESOLVED"
     | "TURN_ADVANCED";
 
 export interface TurnContext {

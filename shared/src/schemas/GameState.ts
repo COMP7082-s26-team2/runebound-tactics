@@ -96,4 +96,11 @@ export class GameState extends Schema {
      * e.g. "two_player_grasslands"
      */
     @type("string") mapId: string = "";
+
+    /**
+     * Current within-turn resolution phase, mirroring TurnMachine state.
+     * Values: "action-phase" | "declare-end-turn" | "quick-play" | "combat" | "post-combat"
+     * Written exclusively by the GameRoom TurnMachine subscriber.
+     */
+    @type("string") turnPhase: string = "action-phase";
 }

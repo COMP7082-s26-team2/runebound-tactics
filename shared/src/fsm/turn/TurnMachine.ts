@@ -1,14 +1,23 @@
 import { Machine } from "../Machine";
-import { ActiveState } from "./states/ActiveState";
-import { ResolvingState } from "./states/ResolvingState";
+import { ActionPhaseState } from "./states/ActionPhaseState";
+import { DeclareEndTurnState } from "./states/DeclareEndTurnState";
+import { QuickPlayState } from "./states/QuickPlayState";
+import { CombatState } from "./states/CombatState";
+import { PostCombatState } from "./states/PostCombatState";
 import type { TurnContext, TurnEvent } from "./events";
 
 export type TurnMachine = Machine<TurnContext, TurnEvent>;
 
 export function createTurnMachine(initialPlayerId: string): TurnMachine {
     return new Machine<TurnContext, TurnEvent>({
-        initial: "active",
+        initial: "action-phase",
         context: { currentPlayerId: initialPlayerId },
-        states: [new ActiveState(), new ResolvingState()],
+        states: [
+            new ActionPhaseState(),
+            new DeclareEndTurnState(),
+            new QuickPlayState(),
+            new CombatState(),
+            new PostCombatState(),
+        ],
     });
 }

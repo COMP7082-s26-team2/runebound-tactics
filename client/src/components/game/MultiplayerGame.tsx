@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useGameRoom, useGameRoomState } from "@/context/colyseus";
 import { Button } from "@/components/ui/Button";
@@ -25,6 +26,29 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const router = useRouter();
 
     const roomMatches = room?.roomId === expectedRoomId;
+
+    const prevPhaseRef = useRef<string | undefined>(undefined);
+    const prevTurnIdRef = useRef<string | undefined>(undefined);
+    const prevTurnNumberRef = useRef<number | undefined>(undefined);
+
+    useEffect(() => {
+        const phase = state?.phase;
+        const currentTurnId = state?.currentTurnId;
+        const turnNumber = state?.turnNumber;
+
+        if (phase !== prevPhaseRef.current) {
+            console.log(`[GameState] phase: ${prevPhaseRef.current ?? "null"} → ${phase}`);
+            prevPhaseRef.current = phase;
+        }
+        if (currentTurnId !== prevTurnIdRef.current) {
+            console.log(`[GameState] currentTurnId: ${prevTurnIdRef.current ?? "null"} → ${currentTurnId}`);
+            prevTurnIdRef.current = currentTurnId;
+        }
+        if (turnNumber !== prevTurnNumberRef.current) {
+            console.log(`[GameState] turnNumber: ${prevTurnNumberRef.current ?? "null"} → ${turnNumber}`);
+            prevTurnNumberRef.current = turnNumber;
+        }
+    }, [state?.phase, state?.currentTurnId, state?.turnNumber]);
 
     if (error && (!room || roomMatches)) {
         return (
