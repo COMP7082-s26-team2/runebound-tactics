@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
 export async function signUp(formData: FormData) {
+    // Request-scoped server client: Supabase Auth reads/writes cookies for the
+    // current request, so this should not be shared as a server singleton.
     const supabase = await createServerSideClient();
 
     const email = formData.get("email") as string;
@@ -42,7 +44,9 @@ export async function signUp(formData: FormData) {
         return { error: "This email is already registered and confirmed." };
     }
 
-    // 3. Sign up with Supabase Auth
+    // 3. Delegate credential creation and email verification to Supabase Auth.
+    // The app stores only game/profile data; Supabase owns passwords, auth
+    // users, verification emails, and session creation.
     const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -70,9 +74,12 @@ export async function verifyOtp(
     token: string,
     username: string,
 ) {
+    // Uses the current request's cookies/session context while completing the
+    // signup verification flow.
     const supabase = await createServerSideClient();
 
-    // 1. Verify the OTP code with Supabase
+    // 1. Verify the OTP code with Supabase. A successful response gives us the
+    // Supabase user id that links auth identity to the app's player profile.
     const { data, error: authError } = await supabase.auth.verifyOtp({
         email,
         token,
@@ -89,7 +96,8 @@ export async function verifyOtp(
         };
     }
 
-    // 2. Finalize registration by creating the player profile
+    // 2. Finalize registration by creating the player profile. This keeps
+    // application-specific player data separate from Supabase Auth credentials.
     try {
         const existingPlayer = await prisma.player.findUnique({
             where: { auth_id: data.user.id },
@@ -118,12 +126,16 @@ export async function verifyOtp(
 }
 
 export async function signOut() {
+    // Sign out must use the request-scoped server client so Supabase clears the
+    // correct user's auth cookies.
     const supabase = await createServerSideClient();
     await supabase.auth.signOut();
     redirect("/");
 }
 
 export async function logIn(formData: FormData) {
+    // Request-scoped server client: login creates/updates auth cookies for this
+    // user, so a shared server singleton would be the wrong session boundary.
     const supabase = await createServerSideClient();
 
     const email = formData.get("email") as string;
@@ -133,6 +145,8 @@ export async function logIn(formData: FormData) {
         return { error: "Please fill in all fields." };
     }
 
+    // Supabase Auth owns password verification and session creation. The app
+    // only receives success/error state and never handles password hashes.
     const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
