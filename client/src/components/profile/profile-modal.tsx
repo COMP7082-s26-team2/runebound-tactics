@@ -54,7 +54,7 @@ export default function ProfileModal() {
 
     useEffect(() => {
         fetchProfile();
-    }, [fetchProfile]);
+    }, []);
 
     function handleOpen() {
         setIsOpen(true);
