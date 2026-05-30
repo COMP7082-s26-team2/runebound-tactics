@@ -7,6 +7,7 @@ import type { Prisma } from '@prisma/client';
 const BUCKET_NAME = 'profile-pictures';
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const PROFILE_IMAGE_CACHE_SECONDS = '3600'; // 1 hour
 
 /**
  * Authenticates the current user via supabase.auth.getUser().
@@ -133,7 +134,8 @@ export async function uploadAvatar(formData: FormData) {
     const { error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
         .upload(filePath, file, {
-            cacheControl: '3600',
+            // Supabase Storage cache duration in seconds; 3600 keeps profile images cacheable for 1 hour.
+            cacheControl: PROFILE_IMAGE_CACHE_SECONDS,
             upsert: true,
         });
 
@@ -219,4 +221,3 @@ export async function updatePassword(newPassword: string) {
 
     return { success: true };
 }
-
