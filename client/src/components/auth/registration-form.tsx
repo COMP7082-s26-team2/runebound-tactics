@@ -1,16 +1,20 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { signUp, verifyOtp } from '@/app/auth/actions';
+import { useState } from "react";
+import { signUp, verifyOtp } from "@/app/auth/actions";
 
 export default function RegistrationForm() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [step, setStep] = useState<'signup' | 'verify'>('signup');
-    const [regData, setRegData] = useState({ email: '', username: '' });
+    const [step, setStep] = useState<"signup" | "verify">("signup");
+    const [regData, setRegData] = useState({ email: "", username: "" });
 
-    const [formData, setFormData] = useState({ username: '', email: '', password: '' });
+    const [formData, setFormData] = useState({
+        username: "",
+        email: "",
+        password: "",
+    });
 
     async function handleSignup(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -21,17 +25,20 @@ export default function RegistrationForm() {
         const { username, email, password } = formData;
 
         // Client-side Password Validation
-        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+        const passwordRegex =
+            /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
         if (!passwordRegex.test(password)) {
-            setError('Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a symbol.');
+            setError(
+                "Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a symbol.",
+            );
             setLoading(false);
             return;
         }
 
         const signupData = new FormData();
-        signupData.append('email', email);
-        signupData.append('username', username);
-        signupData.append('password', password);
+        signupData.append("email", email);
+        signupData.append("username", username);
+        signupData.append("password", password);
 
         const result = await signUp(signupData);
 
@@ -41,12 +48,12 @@ export default function RegistrationForm() {
             setError(result.error);
         } else if (result?.success) {
             setRegData({ email, username });
-            setStep('verify');
+            setStep("verify");
             setSuccess(result.message);
         }
     }
 
-    const [otpCode, setOtpCode] = useState('');
+    const [otpCode, setOtpCode] = useState("");
 
     async function handleVerify(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -54,30 +61,42 @@ export default function RegistrationForm() {
         setError(null);
         setSuccess(null);
 
-        const result = await verifyOtp(regData.email, otpCode, regData.username);
+        const result = await verifyOtp(
+            regData.email,
+            otpCode,
+            regData.username,
+        );
 
         setLoading(false);
 
         if (result?.error) {
             setError(result.error);
         } else if (result?.success) {
-            setSuccess('Verification successful! Entering the realm...');
-            window.location.href = '/';
+            setSuccess("Verification successful! Entering the realm...");
+            window.location.href = "/dashboard";
         }
     }
 
-    if (step === 'verify') {
+    if (step === "verify") {
         return (
-            <form key="verify-form" onSubmit={handleVerify} className="space-y-5">
+            <form
+                key="verify-form"
+                onSubmit={handleVerify}
+                className="space-y-5"
+            >
                 <div className="space-y-1.5 text-center mb-6">
                     <p className="text-[10px] uppercase tracking-widest text-[#999999]">
                         Enter the 8-digit code sent to
                     </p>
-                    <p className="text-xs font-bold text-[#66ff66]">{regData.email}</p>
+                    <p className="text-xs font-bold text-[#66ff66]">
+                        {regData.email}
+                    </p>
                 </div>
 
                 <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase tracking-[0.2em] text-[#666666] font-bold">Verification Code</label>
+                    <label className="text-[10px] uppercase tracking-[0.2em] text-[#666666] font-bold">
+                        Verification Code
+                    </label>
                     <input
                         key="otp-input"
                         name="code"
@@ -108,14 +127,14 @@ export default function RegistrationForm() {
                     disabled={loading}
                     className="w-full h-12 bg-[#333333] hover:bg-[#444444] text-white font-bold uppercase tracking-widest text-xs transition-colors disabled:opacity-50"
                 >
-                    {loading ? 'Verifying...' : 'VERIFY CODE'}
+                    {loading ? "Verifying..." : "VERIFY CODE"}
                 </button>
 
                 <button
                     type="button"
                     onClick={() => {
-                        setStep('signup');
-                        setOtpCode('');
+                        setStep("signup");
+                        setOtpCode("");
                     }}
                     className="w-full text-[9px] uppercase tracking-[0.1em] text-[#555555] hover:text-[#777777] transition-colors"
                 >
@@ -128,47 +147,69 @@ export default function RegistrationForm() {
     return (
         <form key="signup-form" onSubmit={handleSignup} className="space-y-5">
             <div className="space-y-1.5">
-                <label className="text-[10px] uppercase tracking-[0.2em] text-[#666666] font-bold">Username</label>
+                <label className="text-[10px] uppercase tracking-[0.2em] text-[#666666] font-bold">
+                    Username
+                </label>
                 <input
                     key="username-input"
                     name="username"
                     type="text"
                     required
                     value={formData.username}
-                    onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                    onChange={(e) =>
+                        setFormData((prev) => ({
+                            ...prev,
+                            username: e.target.value,
+                        }))
+                    }
                     className="w-full bg-[#1a1a1a] border border-[#333333] px-4 py-3 text-sm focus:outline-none focus:border-[#555555] transition-colors"
                     placeholder="your username"
                 />
             </div>
 
             <div className="space-y-1.5">
-                <label className="text-[10px] uppercase tracking-[0.2em] text-[#666666] font-bold">Email</label>
+                <label className="text-[10px] uppercase tracking-[0.2em] text-[#666666] font-bold">
+                    Email
+                </label>
                 <input
                     key="email-input"
                     name="email"
                     type="email"
                     required
                     value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    onChange={(e) =>
+                        setFormData((prev) => ({
+                            ...prev,
+                            email: e.target.value,
+                        }))
+                    }
                     className="w-full bg-[#1a1a1a] border border-[#333333] px-4 py-3 text-sm focus:outline-none focus:border-[#555555] transition-colors"
                     placeholder="youremail@email.com"
                 />
             </div>
 
             <div className="space-y-1.5">
-                <label className="text-[10px] uppercase tracking-[0.2em] text-[#666666] font-bold">Password</label>
+                <label className="text-[10px] uppercase tracking-[0.2em] text-[#666666] font-bold">
+                    Password
+                </label>
                 <input
                     key="password-input"
                     name="password"
                     type="password"
                     required
                     value={formData.password}
-                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                    onChange={(e) =>
+                        setFormData((prev) => ({
+                            ...prev,
+                            password: e.target.value,
+                        }))
+                    }
                     className="w-full bg-[#1a1a1a] border border-[#333333] px-4 py-3 text-sm focus:outline-none focus:border-[#555555] transition-colors"
                     placeholder="••••••••"
                 />
                 <p className="text-[9px] text-[#444444] leading-tight">
-                    Must be 8+ chars with uppercase, lowercase, digit, and symbol (@$!%*?&#)
+                    Must be 8+ chars with uppercase, lowercase, digit, and
+                    symbol (@$!%*?&#)
                 </p>
             </div>
             {error && (
@@ -187,8 +228,17 @@ export default function RegistrationForm() {
                 disabled={loading}
                 className="w-full h-12 bg-[#333333] hover:bg-[#444444] text-white font-bold uppercase tracking-widest text-xs transition-colors disabled:opacity-50"
             >
-                {loading ? 'Initializing...' : 'JOIN'}
+                {loading ? "Initializing..." : "JOIN"}
             </button>
+
+            <div className="text-center mt-4">
+                <a
+                    href="/auth/login"
+                    className="text-[9px] uppercase tracking-[0.1em] text-[#555555] hover:text-[#777777] transition-colors"
+                >
+                    Already have an account? Log in
+                </a>
+            </div>
         </form>
     );
 }
