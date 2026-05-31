@@ -5,8 +5,8 @@ import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
 export async function signUp(formData: FormData) {
-    // Request-scoped server client: Supabase Auth reads/writes cookies for the
-    // current request, so this should not be shared as a server singleton.
+    // Request-scoped singleton: reused during this server request while keeping
+    // each user's cookies/JWT isolated from other requests.
     const supabase = await createServerSideClient();
 
     const email = formData.get("email") as string;
@@ -47,7 +47,7 @@ export async function signUp(formData: FormData) {
     // 3. Delegate credential creation and email verification to Supabase Auth.
     // The app stores only game/profile data; Supabase owns passwords, auth
     // users, verification emails, and session creation.
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -74,8 +74,8 @@ export async function verifyOtp(
     token: string,
     username: string,
 ) {
-    // Uses the current request's cookies/session context while completing the
-    // signup verification flow.
+    // Uses the current request-scoped singleton while completing the signup
+    // verification flow.
     const supabase = await createServerSideClient();
 
     // 1. Verify the OTP code with Supabase. A successful response gives us the
@@ -126,16 +126,16 @@ export async function verifyOtp(
 }
 
 export async function signOut() {
-    // Sign out must use the request-scoped server client so Supabase clears the
-    // correct user's auth cookies.
+    // Sign out uses the request-scoped singleton so Supabase clears the correct
+    // user's auth cookies.
     const supabase = await createServerSideClient();
     await supabase.auth.signOut();
     redirect("/");
 }
 
 export async function logIn(formData: FormData) {
-    // Request-scoped server client: login creates/updates auth cookies for this
-    // user, so a shared server singleton would be the wrong session boundary.
+    // Login reuses the request-scoped singleton. It behaves like a singleton for
+    // this request without sharing auth cookies across different users.
     const supabase = await createServerSideClient();
 
     const email = formData.get("email") as string;

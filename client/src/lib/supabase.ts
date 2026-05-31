@@ -1,24 +1,32 @@
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
+import { cache } from "react";
 
 /**
- * Client-side Supabase client
+ * Client-side Supabase singleton.
+ *
+ * Browser sessions belong to one user at a time, so the same browser client can
+ * be reused across client components instead of creating a new instance on each
+ * render.
  */
+let browserClient: ReturnType<typeof createBrowserClient> | null = null;
+
 export function createClient() {
-    return createBrowserClient(
+    browserClient ??= createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     );
+
+    return browserClient;
 }
 
 /**
- * Server-side Supabase client (for Server Actions and API Routes).
+ * Request-scoped server-side Supabase singleton.
  *
- * This is intentionally request-scoped instead of a singleton. The server can
- * handle many users at once, and each request has its own auth cookies/JWT.
- * Creating the client inside the request context ensures Supabase reads and
- * writes the correct user's session instead of sharing stale auth state.
+ * Server code can handle many users at once, and each request has its own auth
+ * cookies/JWT. React cache() gives us singleton-style reuse within the current
+ * request without sharing one user's session with another request.
  */
-export async function createServerSideClient() {
+export const createServerSideClient = cache(async () => {
     const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
 
@@ -44,7 +52,7 @@ export async function createServerSideClient() {
             },
         },
     );
-}
+});
 
 /**
  * Programmatically checks if the physical Supabase access token inside cookies has expired.
