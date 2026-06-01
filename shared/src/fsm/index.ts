@@ -24,6 +24,11 @@ export type {
     TurnContext,
     TurnAdvancedPayload,
 } from "./turn/events";
+export { ActionPhaseState } from "./turn/states/ActionPhaseState";
+export { DeclareEndTurnState } from "./turn/states/DeclareEndTurnState";
+export { QuickPlayState } from "./turn/states/QuickPlayState";
+export { CombatState } from "./turn/states/CombatState";
+export { PostCombatState } from "./turn/states/PostCombatState";
 
 // Deprecated — legacy config-object primitive. Kept for back-compat during
 // migration; removed in a follow-up sprint once no consumers remain.

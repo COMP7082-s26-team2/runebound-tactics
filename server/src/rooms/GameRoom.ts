@@ -3,6 +3,8 @@ import {
     GamePlayerSlot,
     GameState,
     GameUnit,
+    createTurnMachine,
+    type TurnMachine,
     cellKey,
     computeReachableTiles,
     computeAttackDamage,
@@ -44,6 +46,14 @@ interface AttackUnitPayload {
     moveTo?: { q: number; r: number };
 }
 
+interface PendingAttack {
+    attackerId: string;
+    targetId: string;
+    damage: number;
+    defenderDied: boolean;
+    newHp: number;
+}
+
 export class GameRoom extends Room<{ state: GameState }> {
     /** Players expected to join, keyed by displayName. Set in onCreate. */
     private _pendingPlayers = new Map<string, PendingPlayer>();
@@ -55,6 +65,15 @@ export class GameRoom extends Room<{ state: GameState }> {
      * O(1) lookup for move_unit validation.
      */
     private _reachabilityCache = new Map<string, Set<string>>();
+    /** TurnMachine — tracks which resolution phase the current turn is in. */
+    private _turnMachine!: TurnMachine;
+    /** Previous TurnMachine phase, used only for transition logging. */
+    private _prevTurnPhase: string | null = null;
+    /**
+     * Pending attack committed in the attack_unit handler, resolved in the
+     * "combat" subscriber. Null outside of the quick-play → combat window.
+     */
+    private _pendingAttack: PendingAttack | null = null;
 
     onCreate(options: GameRoomOptions): void {
         const pending = pendingGames.get(options.lobbyRoomId);
@@ -88,6 +107,8 @@ export class GameRoom extends Room<{ state: GameState }> {
             unit.y = payload.y;
             unit.hasMoved = true;
 
+            console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: move ${unit.unitId} (${prevPos.q},${prevPos.r}) → (${payload.x},${payload.y})`);
+
             this._updateReachabilityAfterMove(unit.unitId, prevPos, {
                 q: payload.x,
                 r: payload.y,
@@ -100,7 +121,8 @@ export class GameRoom extends Room<{ state: GameState }> {
 
         this.onMessage("end_turn", (client) => {
             if (!this._isCurrentTurn(client)) return;
-            this._advanceTurn();
+            console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: end_turn from ${client.sessionId}`);
+            this._turnMachine.send("END_TURN");
         });
     }
 
@@ -117,7 +139,7 @@ export class GameRoom extends Room<{ state: GameState }> {
         this._pendingPlayers.delete(displayName);
         this._turnOrder.push(client.sessionId);
 
-        console.log(`[GameRoom] ${displayName} joined (${client.sessionId})`);
+        console.log(`[${new Date().toISOString()}] [GameRoom] ${displayName} joined (${client.sessionId})`);
 
         if (this._allPlayersJoined()) {
             this._startGame();
@@ -127,9 +149,9 @@ export class GameRoom extends Room<{ state: GameState }> {
     async onDrop(client: Client, code?: number): Promise<void> {
         try {
             await this.allowReconnection(client, 30);
-            console.log(`[GameRoom] ${client.sessionId} reconnected`);
+            console.log(`[${new Date().toISOString()}] [GameRoom] ${client.sessionId} reconnected`);
         } catch {
-            console.log(`[GameRoom] ${client.sessionId} reconnect window expired (code ${code})`);
+            console.log(`[${new Date().toISOString()}] [GameRoom] ${client.sessionId} reconnect window expired (code ${code})`);
             this._eliminatePlayer(client.sessionId);
         }
     }
@@ -142,10 +164,16 @@ export class GameRoom extends Room<{ state: GameState }> {
         const player = this.state.players.get(sessionId);
         if (player) {
             player.isEliminated = true;
-            console.log(`[GameRoom] ${player.displayName} eliminated`);
+            console.log(`[${new Date().toISOString()}] [GameRoom] ${player.displayName} eliminated`);
         }
         if (this.state.currentTurnId === sessionId) {
-            this._advanceTurn();
+            // Only fire END_TURN if the machine is in action-phase. If
+            // mid-resolution (quick-play / combat / post-combat), the pipeline
+            // will complete and land back in action-phase naturally. If in
+            // declare-end-turn, TURN_ADVANCED is already pending.
+            if (this._turnMachine && this._turnMachine.state === "action-phase") {
+                this._turnMachine.send("END_TURN");
+            }
         }
         this._checkWinCondition();
     }
@@ -155,15 +183,65 @@ export class GameRoom extends Room<{ state: GameState }> {
     }
 
     private _startGame(): void {
+        console.log(`[${new Date().toISOString()}] [GameRoom] phase: setup → active`);
         this.state.phase = "active";
         this.state.currentTurnId = this._turnOrder[0] ?? "";
 
         this._spawnInitialUnits();
         this._rebuildReachabilityCache(this.state.currentTurnId);
 
+        this._turnMachine = createTurnMachine(this.state.currentTurnId);
+        this._turnMachine.subscribe((phase) => this._onTurnPhase(phase));
+
         console.log(
-            `[GameRoom] Game started. First turn: ${this.state.currentTurnId}. Units: ${this.state.units.size}`,
+            `[${new Date().toISOString()}] [GameRoom] Game started. First turn: ${this.state.currentTurnId}. Units: ${this.state.units.size}`,
         );
+    }
+
+    /**
+     * TurnMachine subscriber. All Colyseus mutations triggered by phase
+     * transitions happen here. Fires synchronously within the same call
+     * stack as the send() that caused the transition.
+     *
+     * Re-entrancy: when "quick-play" fires and immediately calls
+     * send("QUICK_PLAY_RESOLVED"), the "combat" case runs before this
+     * "quick-play" case returns. Max stack depth: 4 send() calls (attack
+     * path). Safe — Node.js is single-threaded.
+     */
+    private _onTurnPhase(phase: string): void {
+        console.log(`[${new Date().toISOString()}] [GameRoom] turnPhase: ${this._prevTurnPhase ?? "null"} → ${phase}`);
+        this._prevTurnPhase = phase;
+        this.state.turnPhase = phase;
+
+        switch (phase) {
+            case "action-phase":
+                console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: awaiting input from ${this.state.currentTurnId}`);
+                break;
+
+            case "declare-end-turn":
+                this._performTurnAdvance();
+                this._turnMachine.send("TURN_ADVANCED", {
+                    playerId: this.state.currentTurnId,
+                });
+                break;
+
+            case "quick-play":
+                console.log(`[${new Date().toISOString()}] [GameRoom] quick-play: no opponent responses`);
+                this._turnMachine.send("QUICK_PLAY_RESOLVED");
+                break;
+
+            case "combat":
+                this._resolvePendingAttack();
+                if (this.state.phase !== "ended") {
+                    this._turnMachine.send("COMBAT_RESOLVED");
+                }
+                break;
+
+            case "post-combat":
+                console.log(`[${new Date().toISOString()}] [GameRoom] post-combat: gold distribution pending`);
+                this._turnMachine.send("POST_COMBAT_RESOLVED");
+                break;
+        }
     }
 
     /**
@@ -206,15 +284,20 @@ export class GameRoom extends Room<{ state: GameState }> {
     }
 
     private _isCurrentTurn(client: Client): boolean {
-        return this.state.phase === "active" && this.state.currentTurnId === client.sessionId;
+        return (
+            this.state.phase === "active" &&
+            this.state.currentTurnId === client.sessionId &&
+            this._turnMachine.state === "action-phase"
+        );
     }
 
     /**
      * Atomic combined move+attack transaction.
      *
-     * Validates and applies both halves as a single state mutation, so the
-     * Colyseus patch broadcast carries either both updates or neither —
-     * clients never see a half-applied state.
+     * Validates and commits both halves (move-half + attacker exhaustion),
+     * sets _pendingAttack, then fires ATTACK_DECLARED into the TurnMachine.
+     * Actual HP mutation and unit deletion are deferred to the "combat"
+     * subscriber via _resolvePendingAttack().
      *
      * 1-AP model: any successful attack flips `hasMoved = true` (and the
      * legacy `hasActed = true` for back-compat). `unitIsExhausted` gates
@@ -233,6 +316,7 @@ export class GameRoom extends Room<{ state: GameState }> {
      * outcome.
      */
     private _handleAttack(sessionId: string, payload: AttackUnitPayload | undefined): void {
+        if (!this._turnMachine || this._turnMachine.state !== "action-phase") return;
         if (this.state.phase !== "active") return;
         if (this.state.currentTurnId !== sessionId) return;
 
@@ -281,28 +365,70 @@ export class GameRoom extends Room<{ state: GameState }> {
             return;
         }
 
-        target.hp = Math.max(0, target.hp - damage);
-        const defenderDied = target.hp <= 0;
+        const newHp = Math.max(0, target.hp - damage);
+        const defenderDied = newHp <= 0;
 
         // 1-AP exhaustion: flip on any successful attack.
         attacker.hasMoved = true;
         attacker.hasActed = true;
 
-        if (defenderDied) {
-            this.state.units.delete(target.unitId);
-            this._checkWinCondition();
-        }
-
-        // Update reachability cache only when an actual move applied.
+        // Update reachability cache. Move+attack uses surgical update;
+        // zero-move attack just removes the now-exhausted attacker.
         if (moveTo && !moveToIsCurrentPos) {
             this._updateReachabilityAfterMove(attacker.unitId, posBefore, {
                 q: moveTo.q,
                 r: moveTo.r,
             });
+        } else {
+            this._reachabilityCache.delete(attacker.unitId);
+        }
+
+        this._pendingAttack = {
+            attackerId: attacker.unitId,
+            targetId: target.unitId,
+            damage,
+            defenderDied,
+            newHp,
+        };
+
+        console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: attack declared ${attacker.unitId} → ${target.unitId} (dmg ${damage}${defenderDied ? ", lethal" : ""})`);
+
+        // Fires: action-phase → quick-play → combat → post-combat → action-phase
+        // (synchronous call stack, safe in single-threaded Node.js)
+        this._turnMachine.send("ATTACK_DECLARED");
+    }
+
+    /**
+     * Apply the pending attack committed in _handleAttack(). Called from
+     * the "combat" subscriber. Sets _pendingAttack = null on exit.
+     *
+     * If defenderDied: deletes the unit from state.units and calls
+     * _checkWinCondition(). HP is NOT written in this case.
+     * If defender survived: writes newHp to target.hp.
+     */
+    private _resolvePendingAttack(): void {
+        const pa = this._pendingAttack;
+        if (!pa) return;
+        this._pendingAttack = null;
+
+        const target = this.state.units.get(pa.targetId);
+        if (!target) return;
+
+        if (pa.defenderDied) {
+            console.log(
+                `[${new Date().toISOString()}] [GameRoom] combat: ${pa.attackerId} → ${pa.targetId} | dmg ${pa.damage} | hp ${target.hp} → 0 (died)`,
+            );
+            this.state.units.delete(pa.targetId);
+            this._checkWinCondition();
+        } else {
+            console.log(
+                `[${new Date().toISOString()}] [GameRoom] combat: ${pa.attackerId} → ${pa.targetId} | dmg ${pa.damage} | hp ${target.hp} → ${pa.newHp}`,
+            );
+            target.hp = pa.newHp;
         }
     }
 
-    private _advanceTurn(): void {
+    private _performTurnAdvance(): void {
         // Reset acted/moved flags for units owned by the current player
         for (const unit of this.state.units.values()) {
             if (unit.ownerId === this.state.currentTurnId) {
@@ -321,16 +447,18 @@ export class GameRoom extends Room<{ state: GameState }> {
 
         const currentIndex = activePlayers.indexOf(this.state.currentTurnId);
         const nextIndex = (currentIndex + 1) % activePlayers.length;
+        const prevTurnId = this.state.currentTurnId;
         this.state.currentTurnId = activePlayers[nextIndex]!;
 
         // Increment round counter when we wrap back to the first player
         if (nextIndex === 0) {
             this.state.turnNumber++;
+            console.log(`[${new Date().toISOString()}] [GameRoom] turnNumber → ${this.state.turnNumber}`);
         }
 
         this._rebuildReachabilityCache(this.state.currentTurnId);
 
-        console.log(`[GameRoom] Turn advanced to ${this.state.currentTurnId}`);
+        console.log(`[${new Date().toISOString()}] [GameRoom] currentTurnId: ${prevTurnId} → ${this.state.currentTurnId}`);
     }
 
     /**
@@ -420,10 +548,11 @@ export class GameRoom extends Room<{ state: GameState }> {
 
         if (activePlayers.length === 1) {
             const winner = activePlayers[0]!;
+            console.log(`[${new Date().toISOString()}] [GameRoom] phase: active → ended`);
             this.state.phase = "ended";
             this.state.winnerId = winner.sessionId;
             this.broadcast("game_over", { winnerId: winner.sessionId, displayName: winner.displayName });
-            console.log(`[GameRoom] Game over. Winner: ${winner.displayName}`);
+            console.log(`[${new Date().toISOString()}] [GameRoom] Game over. Winner: ${winner.displayName}`);
         }
     }
 }

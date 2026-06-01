@@ -114,6 +114,7 @@ export class ClientGameState {
             throw new Error(`[ClientGameState] Unknown state "${name}"`);
         }
 
+        console.log(`[ClientGameState] ${prevName ?? "null"} → ${name}`);
         this._name = name;
         this._current = this._states.get(name) || null;
         this._current?.onEnter?.(prevName);
