@@ -30,5 +30,24 @@
     "jest": "^30.4.2",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
+  },
+    "name": "runebound-tactics-root",
+    "version": "1.0.0",
+    "private": true,
+    "workspaces": [
+        "client",
+        "shared",
+        "server"
+    ],
+    "scripts": {
+        "dev": "concurrently -n client,server -c cyan,magenta \"yarn workspace @runebound-tactics/client dev\" \"yarn workspace @runebound-tactics/server dev\"",
+        "clean": "yarn workspace @runebound-tactics/shared clean && concurrently \"yarn workspace @runebound-tactics/server clean\"",
+        "build": "yarn workspace @runebound-tactics/shared build && concurrently \"yarn workspace @runebound-tactics/client build\" \"yarn workspace @runebound-tactics/server build\"",
+        "lint": "yarn workspaces run lint",
+        "typecheck": "yarn workspaces run typecheck"
+    },
+    "devDependencies": {
+        "concurrently": "^9.1.2",
+        "typescript": "^5.8.3"
+    }
 }

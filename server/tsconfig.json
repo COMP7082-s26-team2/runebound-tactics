@@ -1,0 +1,14 @@
+{
+    "extends": "../tsconfig.base.json",
+    "compilerOptions": {
+        "rootDir": "src",
+        "outDir": "dist",
+        "composite": true,
+        "paths": {
+            "@runebound-tactics/shared": ["../shared/src/index.ts"],
+            "@runebound-tactics/shared/*": ["../shared/src/*"]
+        }
+    },
+    "references": [{ "path": "../shared" }],
+    "include": ["src"]
+}
