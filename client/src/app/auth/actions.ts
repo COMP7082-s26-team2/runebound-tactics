@@ -129,6 +129,22 @@ export async function verifyOtp(
             });
         }
 
+        // Persist only after the player profile exists because user_sessions
+        // references player.player_id through user_id.
+        const persistedSession = await persistAuthSession(data.session);
+
+        // If the session row cannot be written, the signup auth flow completed
+        if (!persistedSession.success) {
+            console.error(
+                "Auth session persistence failed during OTP verification:",
+                persistedSession.error,
+            );
+
+            return {
+                error: "Verification succeeded, but the session could not be saved. Please try logging in.",
+            };
+        }
+
         return { success: true };
     } catch (dbError: unknown) {
         console.error(
