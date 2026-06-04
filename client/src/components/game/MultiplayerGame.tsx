@@ -92,16 +92,21 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     // snapshot.
     const gameState = state as unknown as GameState;
 
-    return (
-        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-            <div className="relative inline-block">
-                <MultiplayerGameCanvas room={room} state={gameState} />
+ return (
+        <div className="min-h-screen bg-black flex items-center justify-center p-4">
+            <div className="relative flex items-start justify-center pt-8 w-[1350px] h-[950px]">
+                
+                <div className="border-2 border-slate-800 shadow-2xl rounded-lg overflow-hidden bg-slate-900">
+                    <MultiplayerGameCanvas room={room} state={gameState} />
+                </div>
+
                 <GameHUD
                     state={gameState}
                     sessionId={room.sessionId}
                     onLeave={leave}
                     onEndTurn={endTurn}
                 />
+                
             </div>
         </div>
     );

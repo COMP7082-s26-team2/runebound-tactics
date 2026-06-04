@@ -100,9 +100,9 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
         sceneRef.current?.reconcile(state);
     }, [state, phase]);
 
-    return (
+return (
         <div
-            className="relative"
+            className="relative overflow-hidden rounded-lg shadow-2xl border border-slate-800"
             style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
         >
             <canvas
@@ -110,13 +110,15 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
                 style={{ display: "block", width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
             />
             {phase === "loading" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 text-white">
-                    Loading assets…
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-md text-slate-200">
+                    <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <span className="font-mono text-lg tracking-widest text-indigo-200">LOADING ASSETS...</span>
                 </div>
             )}
             {phase === "error" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 text-red-400">
-                    Failed to load assets. Refresh to retry.
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-md text-rose-400">
+                    <span className="text-4xl mb-2">⚠️</span>
+                    <span className="font-mono text-lg text-center px-4">Failed to load assets.<br/>Refresh to retry.</span>
                 </div>
             )}
         </div>
