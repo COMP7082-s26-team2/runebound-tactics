@@ -10,6 +10,22 @@ CREATE TABLE "player" (
     CONSTRAINT "player_pkey" PRIMARY KEY ("player_id")
 );
 
+model user_sessions {
+  id                  BigInt          @id @default(autoincrement())
+  user_id             BigInt
+  supabase_session_id String          @unique
+  created_at          DateTime        @default(now()) @db.Timestamp(6)
+  expires_at          DateTime        @db.Timestamp(6)
+  is_active           Boolean         @default(true)
+  last_active_at      DateTime        @default(now()) @db.Timestamp(6)
+  player              player          @relation(fields: [user_id], references: [player_id], onDelete: Cascade, onUpdate: NoAction)
+  presence_records    user_presence[]
+
+  @@index([user_id])
+  @@index([is_active])
+  @@index([expires_at])
+}
+
 -- CreateTable
 CREATE TABLE "guild" (
     "guild_id" BIGSERIAL NOT NULL,
