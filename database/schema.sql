@@ -10,21 +10,20 @@ CREATE TABLE "player" (
     CONSTRAINT "player_pkey" PRIMARY KEY ("player_id")
 );
 
-model user_sessions {
-  id                  BigInt          @id @default(autoincrement())
-  user_id             BigInt
-  supabase_session_id String          @unique
-  created_at          DateTime        @default(now()) @db.Timestamp(6)
-  expires_at          DateTime        @db.Timestamp(6)
-  is_active           Boolean         @default(true)
-  last_active_at      DateTime        @default(now()) @db.Timestamp(6)
-  player              player          @relation(fields: [user_id], references: [player_id], onDelete: Cascade, onUpdate: NoAction)
-  presence_records    user_presence[]
+-- CreateTable
+CREATE TABLE "user_sessions" (
+    "id" BIGSERIAL NOT NULL,
+    "user_id" BIGINT NOT NULL,
+    "supabase_session_id" TEXT NOT NULL,
+    "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expires_at" TIMESTAMP(6) NOT NULL,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "last_active_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  @@index([user_id])
-  @@index([is_active])
-  @@index([expires_at])
-}
+    CONSTRAINT "user_sessions_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "user_sessions_supabase_session_id_key" UNIQUE ("supabase_session_id"),
+    CONSTRAINT "user_sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "player"("player_id") ON DELETE CASCADE ON UPDATE NO ACTION
+);
 
 -- CreateTable
 CREATE TABLE "guild" (
@@ -172,6 +171,15 @@ CREATE TABLE "game_action" (
 CREATE UNIQUE INDEX "player_username_key" ON "player"("username");
 
 -- CreateIndex
+CREATE INDEX "user_sessions_user_id_idx" ON "user_sessions"("user_id");
+
+-- CreateIndex
+CREATE INDEX "user_sessions_is_active_idx" ON "user_sessions"("is_active");
+
+-- CreateIndex
+CREATE INDEX "user_sessions_expires_at_idx" ON "user_sessions"("expires_at");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "guild_guild_name_key" ON "guild"("guild_name");
 
 -- AddForeignKey
@@ -239,4 +247,3 @@ ALTER TABLE "game_action" ADD CONSTRAINT "game_action_target_unit_id_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "game_action" ADD CONSTRAINT "game_action_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "unit"("unit_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
-
