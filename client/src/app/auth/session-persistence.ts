@@ -1,6 +1,7 @@
 "use server";
 
 import { createHmac } from "crypto";
+import prisma from "@/lib/prisma";
 import type { Session } from "@supabase/supabase-js";
 
 // Name of the server-only secret used to derive non-reversible session IDs.
@@ -17,6 +18,11 @@ export interface PersistableAuthSession {
     // HMAC-derived identifier for this Supabase session token.
     supabaseSessionId: string;
 }
+
+// Explicit result shape keeps auth actions from exposing DB details to the UI.
+export type PersistAuthSessionResult =
+    | { success: true }
+    | { success: false; error: string };
 
 // Derives a non-raw database identifier from the current access token.
 // HMAC-SHA256 lets us recognize the same token without storing the token itself.
@@ -51,4 +57,53 @@ export function toPersistableAuthSession(
         expiresAt: new Date(session.expires_at * MILLISECONDS_PER_SECOND),
         supabaseSessionId: deriveSupabaseSessionId(session.access_token),
     };
+}
+
+// Writes or refreshes the current Supabase session in our server-side DB table.
+export async function persistAuthSession(
+    session: Session | null,
+): Promise<PersistAuthSessionResult> {
+    const persistableSession = toPersistableAuthSession(session);
+
+    // Without a complete Supabase session, there is no stable device/session id
+    // to persist for later single-session enforcement or reconnect lookup.
+    if (!persistableSession) {
+        return { success: false, error: "Missing persistable auth session." };
+    }
+
+    // player.auth_id stores the Supabase Auth user UUID; user_sessions.user_id
+    // stores the app's player.player_id foreign key.
+    const player = await prisma.player.findUnique({
+        where: { auth_id: persistableSession.authId },
+        select: { player_id: true },
+    });
+
+    if (!player) {
+        return { success: false, error: "Player profile was not found." };
+    }
+
+    const now = new Date();
+
+    // Upsert makes login idempotent for the same Supabase token while refreshes
+    // can extend expires_at and last_active_at without creating duplicates.
+    await prisma.user_sessions.upsert({
+        where: {
+            supabase_session_id: persistableSession.supabaseSessionId,
+        },
+        create: {
+            user_id: player.player_id,
+            supabase_session_id: persistableSession.supabaseSessionId,
+            expires_at: persistableSession.expiresAt,
+            is_active: true,
+            last_active_at: now,
+        },
+        update: {
+            user_id: player.player_id,
+            expires_at: persistableSession.expiresAt,
+            is_active: true,
+            last_active_at: now,
+        },
+    });
+
+    return { success: true };
 }
