@@ -44,7 +44,7 @@ export default function Home() {
                         onClick={() => setCurrentScreen('gamemode')}
                         className="absolute bottom-4 right-4 text-slate-500 hover:text-slate-300 transition-colors py-2 px-4 font-medium uppercase tracking-widest text-sm z-50"
                     >
-                        Exit Demo
+                        Abort Game
                     </button>
                 </div>
             );
