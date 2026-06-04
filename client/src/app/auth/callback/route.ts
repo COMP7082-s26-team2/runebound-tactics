@@ -1,6 +1,7 @@
 import { createServerSideClient } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { persistAuthSession } from "../session-persistence";
 
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url);
@@ -72,10 +73,33 @@ export async function GET(request: Request) {
                         data.user.email,
                     );
                 }
+
+                // The callback can create sessions for OAuth/code flows, so it
+                // must also write the matching server-side user_sessions row.
+                const persistedSession = await persistAuthSession(data.session);
+
+                // Treat persistence failure as an auth-flow failure because the
+                // user would otherwise be logged in without a DB session record.
+                if (!persistedSession.success) {
+                    console.error(
+                        "Auth session persistence failed during callback:",
+                        persistedSession.error,
+                    );
+
+                    return NextResponse.redirect(
+                        `${origin}/auth/auth-code-error?error=${encodeURIComponent("Session could not be saved")}`,
+                    );
+                }
             } catch (dbError: unknown) {
                 console.error(
                     "Database error during player creation:",
                     dbError instanceof Error ? dbError.message : String(dbError),
+                );
+
+                // Stop the callback when player creation fails; user_sessions
+                // cannot be written without the player foreign key target.
+                return NextResponse.redirect(
+                    `${origin}/auth/auth-code-error?error=${encodeURIComponent("Player profile could not be saved")}`,
                 );
             }
 
