@@ -3,16 +3,21 @@
 import { createServerSideClient } from "@/lib/supabase";
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { persistAuthSession } from "./session-persistence";
 
 export async function signUp(formData: FormData) {
     // Request-scoped singleton: reused during this server request while keeping
     // each user's cookies/JWT isolated from other requests.
     const supabase = await createServerSideClient();
 
+    // Pull the signup credentials from the submitted form before doing any
+    // Supabase or database work.
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
     const username = formData.get("username") as string;
 
+    // All three fields are required to create both the Supabase auth user and
+    // the app-level player profile.
     if (!email || !password || !username) {
         return { error: "Please fill in all fields." };
     }
@@ -21,6 +26,8 @@ export async function signUp(formData: FormData) {
     // Requires: 8+ chars, at least one uppercase, one lowercase, one number, and one symbol
     const passwordRegex =
         /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    // Reject weak passwords before making a Supabase request so the user gets
+    // immediate, consistent validation feedback.
     if (!passwordRegex.test(password)) {
         return {
             error: "Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a symbol.",
@@ -32,6 +39,7 @@ export async function signUp(formData: FormData) {
         where: { username },
     });
 
+    // Username is app-owned data, so we check our player table before signup.
     if (existingPlayerByUsername) {
         return { error: "Username is already taken." };
     }
@@ -40,6 +48,7 @@ export async function signUp(formData: FormData) {
         where: { email },
     });
 
+    // Prevent duplicate confirmed player records for the same email.
     if (existingPlayerByEmail) {
         return { error: "This email is already registered and confirmed." };
     }
@@ -58,6 +67,8 @@ export async function signUp(formData: FormData) {
         },
     });
 
+    // Supabase owns auth failures such as duplicate auth users or invalid
+    // credential policy responses.
     if (error) {
         return { error: error.message };
     }
@@ -86,10 +97,13 @@ export async function verifyOtp(
         type: "signup",
     });
 
+    // Stop immediately if Supabase rejects or cannot verify the OTP code.
     if (authError) {
         return { error: authError.message };
     }
 
+    // A verified OTP should return the auth user; without it we cannot link the
+    // player profile to Supabase Auth.
     if (!data.user) {
         return {
             error: "Verification failed. User session could not be established.",
@@ -103,6 +117,8 @@ export async function verifyOtp(
             where: { auth_id: data.user.id },
         });
 
+        // OTP verification can be retried, so only create the player profile
+        // when it does not already exist for this Supabase auth id.
         if (!existingPlayer) {
             await prisma.player.create({
                 data: {
@@ -138,22 +154,41 @@ export async function logIn(formData: FormData) {
     // this request without sharing auth cookies across different users.
     const supabase = await createServerSideClient();
 
+    // Login needs only the credentials Supabase uses to create a session.
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
+    // Avoid calling Supabase when the form submission is incomplete.
     if (!email || !password) {
         return { error: "Please fill in all fields." };
     }
 
     // Supabase Auth owns password verification and session creation. The app
     // only receives success/error state and never handles password hashes.
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
     });
 
+    // Invalid credentials, disabled users, and other auth-level login failures
+    // are returned directly from Supabase.
     if (error) {
         return { error: error.message };
+    }
+
+    const persistedSession = await persistAuthSession(data.session);
+
+    // BCOMP-165 requires server-side session persistence, so login should not
+    // report success if the user_sessions row could not be written.
+    if (!persistedSession.success) {
+        console.error(
+            "Auth session persistence failed during login:",
+            persistedSession.error,
+        );
+
+        return {
+            error: "Login succeeded, but the session could not be saved. Please try again.",
+        };
     }
 
     return { success: true };
