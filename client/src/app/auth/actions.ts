@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import {
     deactivateAuthSession,
     persistAuthSession,
+    refreshPersistedAuthSession,
 } from "./session-persistence";
 
 export async function signUp(formData: FormData) {
@@ -180,6 +181,33 @@ export async function signOut() {
 
     await supabase.auth.signOut();
     redirect("/");
+}
+
+export async function refreshAuthSessionRecord() {
+    // Keep refresh server-owned: the client triggers this action, but the server
+    // reads the trusted Supabase cookies and updates user_sessions.
+    const supabase = await createServerSideClient();
+
+    // getSession may refresh Supabase cookies through the server client; the
+    // returned session is the only input needed for DB session persistence.
+    const { data } = await supabase.auth.getSession();
+
+    const refreshedSession = await refreshPersistedAuthSession(data.session);
+
+    // Return a controlled error so client callers can log/handle the failure
+    // without learning token, secret, or database details.
+    if (!refreshedSession.success) {
+        console.error(
+            "Auth session refresh persistence failed:",
+            refreshedSession.error,
+        );
+
+        return {
+            error: "Session could not be refreshed.",
+        };
+    }
+
+    return { success: true };
 }
 
 export async function logIn(formData: FormData) {

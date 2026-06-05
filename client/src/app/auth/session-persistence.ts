@@ -33,6 +33,8 @@ export type PersistAuthSessionResult =
     | { success: true }
     | { success: false; error: string };
 
+export type RefreshAuthSessionResult = PersistAuthSessionResult;
+
 export type DeactivateAuthSessionResult =
     | { success: true }
     | { success: false; error: string };
@@ -154,6 +156,16 @@ export async function persistAuthSession(
         );
         return { success: false, error: SESSION_PERSISTENCE_ERROR };
     }
+}
+
+// Refresh uses the same upsert path as login because a refreshed Supabase token
+// should reactivate/update the server-side session row with fresh timestamps.
+export async function refreshPersistedAuthSession(
+    session: Session | null,
+): Promise<RefreshAuthSessionResult> {
+    // Keep refresh behavior identical to login persistence: if Supabase rotates
+    // the token, the derived id changes; otherwise the existing row is updated.
+    return persistAuthSession(session);
 }
 
 // Marks the current Supabase session inactive when the user logs out.
