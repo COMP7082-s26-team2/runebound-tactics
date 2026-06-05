@@ -1,4 +1,5 @@
 import RegistrationForm from "@/components/auth/registration-form";
+import { refreshPersistedAuthSession } from "@/app/auth/session-persistence";
 import { createServerSideClient } from "@/lib/supabase";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -10,7 +11,15 @@ export default async function SignUpPage() {
     } = await supabase.auth.getSession();
 
     if (session) {
-        redirect("/dashboard");
+        const refreshedSession = await refreshPersistedAuthSession(session);
+
+        // Existing Supabase cookies should only bypass signup when the matching
+        // server-side session row can also be refreshed.
+        if (!refreshedSession.success) {
+            await supabase.auth.signOut();
+        } else {
+            redirect("/dashboard");
+        }
     }
 
     return (
