@@ -3,7 +3,10 @@
 import { createServerSideClient } from "@/lib/supabase";
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { persistAuthSession } from "./session-persistence";
+import {
+    deactivateAuthSession,
+    persistAuthSession,
+} from "./session-persistence";
 
 export async function signUp(formData: FormData) {
     // Request-scoped singleton: reused during this server request while keeping
@@ -161,6 +164,20 @@ export async function signOut() {
     // Sign out uses the request-scoped singleton so Supabase clears the correct
     // user's auth cookies.
     const supabase = await createServerSideClient();
+
+    // Read the current session before Supabase clears it so we can derive the
+    // same hashed session id that was stored during login.
+    const { data } = await supabase.auth.getSession();
+    const deactivatedSession = await deactivateAuthSession(data.session);
+
+    // Logout should continue even if DB deactivation fails, but the server log
+    if (!deactivatedSession.success) {
+        console.error(
+            "Auth session deactivation failed during logout:",
+            deactivatedSession.error,
+        );
+    }
+
     await supabase.auth.signOut();
     redirect("/");
 }
