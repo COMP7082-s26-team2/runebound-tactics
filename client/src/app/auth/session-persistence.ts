@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 
 import { createHmac } from "crypto";
 import prisma from "@/lib/prisma";
@@ -8,6 +8,9 @@ import type { Session } from "@supabase/supabase-js";
 const SESSION_ID_SECRET = "SESSION_ID_SECRET";
 // Supabase session.expires_at is Unix seconds, but we need date
 const MILLISECONDS_PER_SECOND = 1000;
+// Generic error returned to auth callers so token, secret, and DB details stay
+// in server logs instead of leaking to the UI.
+const SESSION_PERSISTENCE_ERROR = "Auth session could not be persisted.";
 
 // Normalized session data that is safe to persist in our own database.
 export interface PersistableAuthSession {
@@ -19,8 +22,18 @@ export interface PersistableAuthSession {
     supabaseSessionId: string;
 }
 
+// Internal parse result keeps detailed failure reasons available for logs while
+// callers still receive the generic PersistAuthSessionResult error.
+type SessionParseResult =
+    | { success: true; session: PersistableAuthSession }
+    | { success: false; error: string };
+
 // Explicit result shape keeps auth actions from exposing DB details to the UI.
 export type PersistAuthSessionResult =
+    | { success: true }
+    | { success: false; error: string };
+
+export type DeactivateAuthSessionResult =
     | { success: true }
     | { success: false; error: string };
 
@@ -40,22 +53,38 @@ export function deriveSupabaseSessionId(accessToken: string): string {
         .digest("hex");
 }
 
-// Converts Supabase's session object into the exact fields our DB layer needs.
-// Returns null when Supabase did not provide a complete persistable session.
-export function toPersistableAuthSession(
-    session: Session | null,
-): PersistableAuthSession | null {
-    // access_token identifies the browser/device session, expires_at drives DB
-    // expiry, and user.id links back to the app's player.auth_id.
-    if (!session?.access_token || !session.expires_at || !session.user?.id) {
-        return null;
+// Converts Supabase's session object into the exact fields our DB layer needs,
+// while preserving a specific server-side reason when required fields are gone.
+export function toPersistableAuthSession(session: Session | null): SessionParseResult {
+    // Preserve a specific failure reason here so persistAuthSession can log
+    // exactly why persistence was skipped.
+    if (!session) {
+        return { success: false, error: "Missing Supabase session." };
+    }
+
+    // access_token identifies the browser/device session for this ticket.
+    if (!session.access_token) {
+        return { success: false, error: "Missing Supabase access token." };
+    }
+
+    // expires_at lets the DB know when this server-side session becomes stale.
+    if (!session.expires_at) {
+        return { success: false, error: "Missing Supabase session expiry." };
+    }
+
+    // user.id maps to player.auth_id before we persist user_sessions.user_id.
+    if (!session.user?.id) {
+        return { success: false, error: "Missing Supabase user id." };
     }
 
     // Supabase expires_at is Unix seconds; Prisma/Postgres expects Date values.
     return {
-        authId: session.user.id,
-        expiresAt: new Date(session.expires_at * MILLISECONDS_PER_SECOND),
-        supabaseSessionId: deriveSupabaseSessionId(session.access_token),
+        success: true,
+        session: {
+            authId: session.user.id,
+            expiresAt: new Date(session.expires_at * MILLISECONDS_PER_SECOND),
+            supabaseSessionId: deriveSupabaseSessionId(session.access_token),
+        },
     };
 }
 
@@ -63,47 +92,107 @@ export function toPersistableAuthSession(
 export async function persistAuthSession(
     session: Session | null,
 ): Promise<PersistAuthSessionResult> {
-    const persistableSession = toPersistableAuthSession(session);
+    try {
+        const parsedSession = toPersistableAuthSession(session);
 
-    // Without a complete Supabase session, there is no stable device/session id
-    // to persist for later single-session enforcement or reconnect lookup.
-    if (!persistableSession) {
-        return { success: false, error: "Missing persistable auth session." };
+        // Without a complete Supabase session, there is no stable device/session id
+        // to persist for later single-session enforcement or reconnect lookup.
+        if (!parsedSession.success) {
+            console.error(
+                "Auth session persistence skipped:",
+                parsedSession.error,
+            );
+            return { success: false, error: SESSION_PERSISTENCE_ERROR };
+        }
+
+        // From this point forward, the session has the token, expiry, and auth
+        // user id required to create a user_sessions row.
+        const persistableSession = parsedSession.session;
+
+        // player.auth_id stores the Supabase Auth user UUID; user_sessions.user_id
+        // stores the app's player.player_id foreign key.
+        const player = await prisma.player.findUnique({
+            where: { auth_id: persistableSession.authId },
+            select: { player_id: true },
+        });
+
+        if (!player) {
+            console.error("Auth session persistence failed: player not found.");
+            return { success: false, error: SESSION_PERSISTENCE_ERROR };
+        }
+
+        const now = new Date();
+
+        // Upsert makes login idempotent for the same Supabase token while refreshes
+        // can extend expires_at and last_active_at without creating duplicates.
+        await prisma.user_sessions.upsert({
+            where: {
+                supabase_session_id: persistableSession.supabaseSessionId,
+            },
+            create: {
+                user_id: player.player_id,
+                supabase_session_id: persistableSession.supabaseSessionId,
+                expires_at: persistableSession.expiresAt,
+                is_active: true,
+                last_active_at: now,
+            },
+            update: {
+                user_id: player.player_id,
+                expires_at: persistableSession.expiresAt,
+                is_active: true,
+                last_active_at: now,
+            },
+        });
+
+        return { success: true };
+    } catch (error: unknown) {
+        // This catches secret misconfiguration, hashing failures, and database
+        // errors while still returning the same safe auth-facing message.
+        console.error(
+            "Auth session persistence failed:",
+            error instanceof Error ? error.message : String(error),
+        );
+        return { success: false, error: SESSION_PERSISTENCE_ERROR };
     }
+}
 
-    // player.auth_id stores the Supabase Auth user UUID; user_sessions.user_id
-    // stores the app's player.player_id foreign key.
-    const player = await prisma.player.findUnique({
-        where: { auth_id: persistableSession.authId },
-        select: { player_id: true },
-    });
+// Marks the current Supabase session inactive when the user logs out.
+export async function deactivateAuthSession(
+    session: Session | null,
+): Promise<DeactivateAuthSessionResult> {
+    try {
+        const parsedSession = toPersistableAuthSession(session);
 
-    if (!player) {
-        return { success: false, error: "Player profile was not found." };
+        // Logout can only update the matching row if Supabase still exposes the
+        // current access token before signOut clears the session cookies.
+        if (!parsedSession.success) {
+            console.error(
+                "Auth session deactivation skipped:",
+                parsedSession.error,
+            );
+            return { success: false, error: SESSION_PERSISTENCE_ERROR };
+        }
+
+        // Use the same HMAC-derived id as login so we update the exact
+        // user_sessions row for this browser/device session.
+        await prisma.user_sessions.update({
+            where: {
+                supabase_session_id: parsedSession.session.supabaseSessionId,
+            },
+            data: {
+                is_active: false,
+                last_active_at: new Date(),
+            },
+        });
+
+        return { success: true };
+    } catch (error: unknown) {
+        // A missing row or secret misconfiguration should be visible in server
+        // logs, but callers still receive a generic persistence error.
+        console.error(
+            "Auth session deactivation failed:",
+            error instanceof Error ? error.message : String(error),
+        );
+        return { success: false, error: SESSION_PERSISTENCE_ERROR };
     }
-
-    const now = new Date();
-
-    // Upsert makes login idempotent for the same Supabase token while refreshes
-    // can extend expires_at and last_active_at without creating duplicates.
-    await prisma.user_sessions.upsert({
-        where: {
-            supabase_session_id: persistableSession.supabaseSessionId,
-        },
-        create: {
-            user_id: player.player_id,
-            supabase_session_id: persistableSession.supabaseSessionId,
-            expires_at: persistableSession.expiresAt,
-            is_active: true,
-            last_active_at: now,
-        },
-        update: {
-            user_id: player.player_id,
-            expires_at: persistableSession.expiresAt,
-            is_active: true,
-            last_active_at: now,
-        },
-    });
-
-    return { success: true };
 }
