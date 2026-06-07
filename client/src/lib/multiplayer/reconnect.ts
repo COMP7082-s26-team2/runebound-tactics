@@ -1,6 +1,7 @@
 import type { Room } from "@colyseus/sdk";
 import { LobbyState, GameState } from "@runebound-tactics/shared";
 import { client } from "./client";
+import { getAuthenticatedJoinOptions } from "./authJoinOptions";
 
 const LOBBY_TOKEN = "lobby_token";
 const GAME_TOKEN  = "game_token";
@@ -29,7 +30,17 @@ async function joinOrReconnect<S>(
             window.sessionStorage.removeItem(storageKey);
         }
     }
-    const room = await client.joinById<S>(roomId, options, rootSchema);
+    // Attach Supabase auth to normal joins. Reconnect uses the stored Colyseus
+    // reconnection token above, while fresh joins must prove the user identity.
+    const authOptions = await getAuthenticatedJoinOptions();
+    const room = await client.joinById<S>(
+        roomId,
+        {
+            ...options,
+            ...authOptions,
+        },
+        rootSchema,
+    );
     window.sessionStorage.setItem(storageKey, room.reconnectionToken);
     return room;
 }
