@@ -1,38 +1,21 @@
 import { unitIsExhausted } from "../src/game/units/unit-status";
+import { AP_COST } from "../src/game/ActionPointSystem";
 
 describe("unitIsExhausted", () => {
-    it("returns true when hasMoved is true", () => {
-        expect(unitIsExhausted({ hasMoved: true })).toBe(true);
+    it("returns true when actionPoints is 0", () => {
+        expect(unitIsExhausted({ actionPoints: 0 })).toBe(true);
     });
 
-    it("returns false when hasMoved is false", () => {
-        expect(unitIsExhausted({ hasMoved: false })).toBe(false);
+    it("returns false when actionPoints meets MOVE cost", () => {
+        expect(unitIsExhausted({ actionPoints: AP_COST.MOVE })).toBe(false);
     });
 
-    it("accepts a minimal structural object (LiteUnit shape)", () => {
-        const lite = {
-            unitId: "u1",
-            ownerId: "p1",
-            unitType: "castle:swordsman",
-            x: 0,
-            y: 0,
-            hasMoved: true,
-        };
-        expect(unitIsExhausted(lite)).toBe(true);
+    it("returns false when actionPoints exceeds MOVE cost", () => {
+        expect(unitIsExhausted({ actionPoints: AP_COST.MOVE + 1 })).toBe(false);
     });
 
-    it("accepts an object with extra schema-class-style fields", () => {
-        const schemaLike = {
-            unitId: "u1",
-            ownerId: "p1",
-            unitType: "castle:swordsman",
-            x: 0,
-            y: 0,
-            hp: 30,
-            maxHp: 30,
-            hasActed: false,
-            hasMoved: false,
-        };
-        expect(unitIsExhausted(schemaLike)).toBe(false);
+    it("accepts a minimal structural object", () => {
+        expect(unitIsExhausted({ actionPoints: 2 })).toBe(false);
+        expect(unitIsExhausted({ actionPoints: 0 })).toBe(true);
     });
 });
