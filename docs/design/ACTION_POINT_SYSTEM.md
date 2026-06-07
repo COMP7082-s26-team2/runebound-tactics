@@ -1,250 +1,105 @@
 # Action Point System
 
-Documents the `ActionPointSystem` class (BCOMP-112) and its integration into the server turn pipeline. After this lands, BCOMP-128 can add `base_ap + bonus_ap` restoration and synced health without touching game logic.
+Documents the `ActionPointSystem` class (BCOMP-112) and how it integrates with `GameRoom`, `GameUnit`, and the exhaustion predicate.
 
 ---
 
-## Context
+## Architecture Overview
 
-Unit exhaustion today is tracked via two booleans on `GameUnit`: `hasMoved` and `hasActed`. These are checked and set directly by `GameRoom` with no shared abstraction. `unit-status.ts` already marks its `unitIsExhausted()` predicate as the sole AP-transition point (AP-5 anchor) — once `actionPoints` is live, that predicate is the only file whose signature changes.
+| Component | Lives in | Responsibility |
+|---|---|---|
+| `ActionPointSystem` | `shared/src/game/ActionPointSystem.ts` | Stateless, pure operations — `canAfford`, `deduct`, `restore` — applied to any structurally compatible unit object. Exports `AP_COST` constants consumed by all callers. |
+| `getUnitBaseAp()` | `shared/src/game/units/unit-stats.ts` | Static per-unit-type AP lookup (same pattern as `getUnitMovement`/`getUnitAttack`/`getUnitDefense`). Not in schema. |
+| `unitIsExhausted()` | `shared/src/game/units/unit-status.ts` | Sole exhaustion predicate. AP-5 anchor: this is the only file whose signature changes when AP lands. Reachability cache and selection system both call this; neither reads `actionPoints` directly. |
+| `GameUnit` additions | `shared/src/schemas/GameState.ts` | Two new Colyseus-synced fields: `actionPoints` and `bonusAp`. |
 
-`ActionPointSystem` replaces the boolean model with an explicit AP budget: each unit starts its turn with `base_ap + bonus_ap` points and spends 1 per move and 1 per attack. The `hasMoved`/`hasActed` flags remain on the schema (for client display) but are no longer the source of truth for exhaustion.
-
----
-
-## Architecture
-
-`ActionPointSystem` is a pure static-method class in `shared/src/game/`, co-located with the other game logic modules. It does not extend `StateBase` or hold runtime state — it is a typed namespace for AP operations. Mutations are applied to caller-supplied unit objects via structural typing, matching the pattern of `computeAttackDamage`.
-
-```
-shared/src/game/
-  ActionPointSystem.ts       ← new
-  units/
-    unit-stats.ts             ← add getUnitBaseAp()
-    unit-status.ts            ← update unitIsExhausted() (AP-5 anchor)
-  index.ts                    ← re-export ActionPointSystem + AP_COST
-shared/src/schemas/
-  GameState.ts                ← add actionPoints + bonusAp to GameUnit
-server/src/rooms/
-  GameRoom.ts                 ← integrate at 5 call sites
-shared/tests/
-  actionPointSystem.test.ts   ← new
-```
+`ActionPointSystem` does not extend `StateBase`, holds no runtime state, and has no dependency on Colyseus or the server. It is a typed namespace for AP operations; callers mutate the unit objects they supply.
 
 ---
 
-## Schema Changes — GameUnit
+## AP Model
 
-Two new Colyseus-synced fields in `shared/src/schemas/GameState.ts`:
+Each unit starts its turn with a budget of **`base_ap + bonus_ap`** action points.
 
-```typescript
-/** Current action points. Decrements per move/attack; restored at turn start. */
-@type("int32") actionPoints: number = 0;
+- **`base_ap`** — per-unit-type constant from `unit-stats.ts`. All current units default to **2** (1 move + 1 attack), preserving the existing 1-AP exhaustion behaviour.
+- **`bonus_ap`** — per-unit runtime field on `GameUnit`, default **0**. Reserved for the BCOMP-128 item/ability system; `restore()` already accounts for it.
 
-/** Bonus AP stacked on top of base_ap at turn-start restore. Default 0. */
-@type("int32") bonusAp: number = 0;
-```
+**Spending:**
+- Moving costs `AP_COST.MOVE` (1).
+- Attacking costs `AP_COST.ATTACK` (1).
+- AP cannot go below 0 (`deduct` clamps).
 
-`base_ap` per unit type is a static lookup in `unit-stats.ts` (not in schema, same pattern as movement/attack/defense). Both fields satisfy BCOMP-128 AC: "action_points starts each unit turn at base_ap + bonus_ap; decrements per action; cannot go below 0; synced in Colyseus game state."
+**Exhaustion:** a unit is considered exhausted when `actionPoints < AP_COST.MOVE`. The `unitIsExhausted()` predicate encodes this check; no other code should read `actionPoints` for exhaustion purposes.
 
----
+**Restoring:** `ActionPointSystem.restore(unit)` sets `unit.actionPoints = base_ap + unit.bonusAp`. It is called at two points: when a unit's owner's turn begins, and when a unit is first spawned.
 
-## New Stat Helper — unit-stats.ts
-
-Add after the existing `UNIT_DEFENSE` block:
-
-```typescript
-const UNIT_BASE_AP: Record<string, number> = {
-    "castle:swordsman":         2,
-    "castle:archer":            2,
-    "castle:paladin":           2,
-    "castle:cavalier":          2,
-    "castle:griffin":           2,
-    "necropolis:skeleton":      2,
-    "necropolis:death_knight":  2,
-    "necropolis:vampire":       2,
-    "necropolis:ghost":         2,
-    "necropolis:zombie":        2,
-};
-
-const DEFAULT_BASE_AP = 2;
-
-export function getUnitBaseAp(unitType: UnitTypeId): number {
-    return UNIT_BASE_AP[unitType] ?? DEFAULT_BASE_AP;
-}
-```
-
-Default is 2 (1 move + 1 attack per turn, preserving the current 1-AP exhaustion model). Per-unit variation goes in this table only.
+**`hasMoved` / `hasActed` flags** remain on `GameUnit` for client display purposes only. They are no longer the source of truth for exhaustion.
 
 ---
 
-## ActionPointSystem Class
+## `ActionPointSystem` API
 
-**File:** `shared/src/game/ActionPointSystem.ts`
+| Method | Signature | Guarantees |
+|---|---|---|
+| `canAfford` | `(unit, cost) → boolean` | Pure predicate; no mutation. Safe to call in any validation path. |
+| `deduct` | `(unit, cost) → void` | Decrements `unit.actionPoints` by `cost`, clamped to 0. Never produces a negative value. |
+| `restore` | `(unit) → void` | Sets `unit.actionPoints` to `getUnitBaseAp(unit.unitType) + unit.bonusAp`. Encapsulates the restore formula so callers never compute it inline. |
 
-```typescript
-import { getUnitBaseAp, type UnitTypeId } from "./units/unit-stats";
+**`AP_COST` constants:**
 
-export const AP_COST = {
-    MOVE:   1,
-    ATTACK: 1,
-} as const;
-
-export class ActionPointSystem {
-    /** True if the unit has enough AP to pay `cost`. */
-    static canAfford(unit: { actionPoints: number }, cost: number): boolean {
-        return unit.actionPoints >= cost;
-    }
-
-    /** Deduct `cost` AP from the unit, clamped to 0. */
-    static deduct(unit: { actionPoints: number }, cost: number): void {
-        unit.actionPoints = Math.max(0, unit.actionPoints - cost);
-    }
-
-    /**
-     * Restore unit AP to base_ap + bonus_ap at the start of their turn.
-     * Reads base_ap from the static unit-stats table.
-     */
-    static restore(unit: {
-        actionPoints: number;
-        bonusAp: number;
-        unitType: string;
-    }): void {
-        unit.actionPoints =
-            getUnitBaseAp(unit.unitType as UnitTypeId) + unit.bonusAp;
-    }
-}
-```
-
-**Design notes:**
-- `canAfford` is a pure predicate — no mutation, safe to call in validation paths.
-- `deduct` clamps to 0 (satisfies BCOMP-128 "cannot go below 0" AC).
-- `restore` encapsulates the `base_ap + bonus_ap` formula (BCOMP-128 AC) — callers do not compute the formula themselves.
-- `AP_COST` is exported so `unit-status.ts` and `GameRoom` share the same constants.
+| Key | Value | Used by |
+|---|---|---|
+| `MOVE` | 1 | `move_unit` handler, `unitIsExhausted` |
+| `ATTACK` | 1 | `_handleAttack()` |
 
 ---
 
-## unit-status.ts Update (AP-5 anchor)
+## Schema Data Model — GameUnit Additions
 
-Replace the existing `unitIsExhausted` function and import:
+Two new Colyseus-synced fields added to `GameUnit` in `shared/src/schemas/GameState.ts`:
 
-```typescript
-import { AP_COST } from "../ActionPointSystem";
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `actionPoints` | `int32` | `0` | Current AP. Decrements on move/attack; restored at turn start. Synced to all clients. |
+| `bonusAp` | `int32` | `0` | Bonus AP added at restore time. Default 0 until an ability/item system sets it. |
 
-export function unitIsExhausted(unit: { actionPoints: number }): boolean {
-    return unit.actionPoints < AP_COST.MOVE;
-}
-```
+`base_ap` is intentionally **not** in the schema — it is a static, per-unit-type constant (see `getUnitBaseAp()`), the same pattern used for movement range, attack, and defense values.
 
-The structural parameter type changes from `{ hasMoved: boolean }` to `{ actionPoints: number }`. All callers (`GameRoom._rebuildReachabilityCache`, reconciler, selection system) pass a `GameUnit` or a plain-object snapshot — both shapes will have `actionPoints` once the schema change is applied.
+**`base_ap` values (all unit types):**
 
----
+| Faction | Unit | `base_ap` |
+|---|---|---|
+| castle | swordsman, archer, paladin, cavalier, griffin | 2 |
+| necropolis | skeleton, death_knight, vampire, ghost, zombie | 2 |
 
-## GameRoom Integration
-
-Five call sites in `server/src/rooms/GameRoom.ts`.
-
-### 1. Add imports
-
-```diff
- import {
-+    ActionPointSystem,
-+    AP_COST,
-     GamePlayerSlot,
-     GameState,
-     GameUnit,
-     // ... existing imports
- } from "@runebound-tactics/shared";
-```
-
-### 2. move_unit handler — replace hasMoved guard with AP check
-
-```diff
--        if (unit.hasMoved) return;
-+        if (!ActionPointSystem.canAfford(unit, AP_COST.MOVE)) return;
-         // ... reachability validation unchanged ...
-         unit.x = payload.x;
-         unit.y = payload.y;
-         unit.hasMoved = true;
-+        ActionPointSystem.deduct(unit, AP_COST.MOVE);
-```
-
-`unit.hasMoved = true` is kept for backwards-compatible client display.
-
-### 3. _handleAttack() — deduct AP on successful attack commit
-
-```diff
-         // 1-AP exhaustion: flip on any successful attack.
-         attacker.hasMoved = true;
-         attacker.hasActed = true;
-+        ActionPointSystem.deduct(attacker, AP_COST.ATTACK);
-```
-
-`hasMoved`/`hasActed` flags are kept for client display; AP is the new exhaustion signal.
-
-### 4. _performTurnAdvance() — restore AP alongside flag reset
-
-```diff
-         for (const unit of this.state.units.values()) {
-             if (unit.ownerId === this.state.currentTurnId) {
-                 unit.hasMoved = false;
-                 unit.hasActed = false;
-+                ActionPointSystem.restore(unit);
-             }
-         }
-```
-
-### 5. _startGame() / unit spawn — initialise AP on creation
-
-After constructing each `GameUnit` (in the unit-spawn loop), call:
-
-```typescript
-ActionPointSystem.restore(unit);
-```
-
-This sets `actionPoints` to `base_ap + bonusAp` (0 by default) from the first state patch, so clients never see `actionPoints = 0` for a fresh, unexhausted unit.
+All units default to 2. Per-unit variation is introduced by editing only the `UNIT_BASE_AP` table in `unit-stats.ts`.
 
 ---
 
-## Export Wiring
+## Integration Touchpoints
 
-In `shared/src/game/index.ts`, add:
+`ActionPointSystem` is called by `GameRoom` at five points:
 
-```typescript
-export { ActionPointSystem, AP_COST } from "./ActionPointSystem";
-```
-
-`getUnitBaseAp` is already re-exported via `export * from "./units/unit-stats"`.
-
----
-
-## Tests
-
-**File:** `shared/tests/actionPointSystem.test.ts`
-
-Minimum coverage:
-
-| Case | Assertion |
-|---|---|
-| `canAfford` — sufficient AP | returns `true` |
-| `canAfford` — exact match | returns `true` |
-| `canAfford` — insufficient AP | returns `false` |
-| `deduct` — normal spend | `actionPoints` decrements by cost |
-| `deduct` — over-spend clamp | `actionPoints` lands at 0, not negative |
-| `restore` — sets base_ap + bonusAp | `actionPoints === getUnitBaseAp(type) + bonusAp` |
-| `restore` — bonusAp = 0 (default) | `actionPoints === getUnitBaseAp(type)` |
-| `unitIsExhausted` — AP = 0 | returns `true` |
-| `unitIsExhausted` — AP ≥ MOVE cost | returns `false` |
+| Component | Trigger | AP Operation | Notes |
+|---|---|---|---|
+| `move_unit` handler | Valid move accepted | `canAfford` guard → `deduct(MOVE)` | Replaces `if (unit.hasMoved)` guard; `unit.hasMoved = true` is kept for client display |
+| `_handleAttack()` | Successful attack committed | `deduct(ATTACK)` | `hasMoved = hasActed = true` kept for client display |
+| `_performTurnAdvance()` | Turn advances to next player | `restore()` per unit owned by the incoming player | Alongside existing `hasMoved`/`hasActed` reset |
+| `_spawnInitialUnits()` | Unit constructed at game start | `restore()` | Ensures the first Colyseus patch never shows `actionPoints = 0` for a fresh unit |
+| `unitIsExhausted()` | Reachability cache rebuild + selection guard | Reads `actionPoints < AP_COST.MOVE` | Called by `_rebuildReachabilityCache`; AP-5 anchor |
 
 ---
 
-## Verification
+## Placeholder / Extension Points
 
-1. `yarn workspace @runebound-tactics/shared tsc --noEmit` — zero errors
-2. `yarn workspace @runebound-tactics/server tsc --noEmit` — zero errors
-3. `yarn workspace @runebound-tactics/shared test` — all tests pass (including existing `unitStatus.test.ts`)
-4. Start server + two clients; confirm units spawn with `actionPoints = 2` in first state patch
-5. Issue `move_unit`; confirm `actionPoints` drops to 1 in next patch and unit can still attack
-6. Issue `attack_unit`; confirm `actionPoints` drops to 0; subsequent move/attack rejected
-7. Issue `end_turn`; confirm next player's units show `actionPoints = 2` in patch
-8. Exhaust a unit then attempt move; confirm server drops the message silently
+- **`bonusAp`** is always `0` until the BCOMP-128 item/ability system writes to it. The `restore()` formula already handles any nonzero value; no further changes are needed when that system lands.
+- **Per-unit `base_ap` variation** is introduced by editing the `UNIT_BASE_AP` record in `unit-stats.ts` only — no schema or logic changes required.
+
+---
+
+## Edge Cases & Invariants
+
+- `deduct` clamps to 0. A double-spend (e.g., a bug that calls `deduct` twice) leaves `actionPoints` at 0, not negative. This means `unitIsExhausted()` will correctly block further actions.
+- The `move_unit` handler's `canAfford` guard fires before any state mutation. If the unit cannot afford the move, nothing changes.
+- `_handleAttack()` commits `deduct(ATTACK)` only after both halves of the transaction (move-half + attack validation) succeed. A failed attack attempt leaves AP untouched.
+- `unitIsExhausted()`'s structural parameter type changes from `{ hasMoved: boolean }` to `{ actionPoints: number }`. All callers pass a live `GameUnit` or a plain-object snapshot; both shapes carry `actionPoints` once the schema change is applied.
