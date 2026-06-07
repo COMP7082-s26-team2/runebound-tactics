@@ -39,12 +39,30 @@ export type DeactivateAuthSessionResult =
     | { success: true }
     | { success: false; error: string };
 
+// Expired rows are no longer usable even if logout never ran, so mark them
+// inactive before any session lifecycle write/read path continues.
+async function deactivateExpiredAuthSessions(now = new Date()) {
+    await prisma.user_sessions.updateMany({
+        where: {
+            is_active: true,
+            expires_at: {
+                lte: now,
+            },
+        },
+        data: {
+            is_active: false,
+            last_active_at: now,
+        },
+    });
+}
+
 // Derives a non-raw database identifier from the current access token.
 // HMAC-SHA256 lets us recognize the same token without storing the token itself.
 export function deriveSupabaseSessionId(accessToken: string): string {
     const secret = process.env[SESSION_ID_SECRET];
 
     // Fail during server-side auth persistence if the deployment has not
+    // configured the secret. Storing raw Supabase tokens would be unsafe.
     if (!secret) {
         throw new Error(`${SESSION_ID_SECRET} is required`);
     }
@@ -95,6 +113,9 @@ export async function persistAuthSession(
     session: Session | null,
 ): Promise<PersistAuthSessionResult> {
     try {
+        const now = new Date();
+        await deactivateExpiredAuthSessions(now);
+
         const parsedSession = toPersistableAuthSession(session);
 
         // Without a complete Supabase session, there is no stable device/session id
@@ -111,6 +132,12 @@ export async function persistAuthSession(
         // user id required to create a user_sessions row.
         const persistableSession = parsedSession.session;
 
+        // Do not reactivate a session that Supabase already considers expired.
+        if (persistableSession.expiresAt <= now) {
+            console.error("Auth session persistence skipped: session expired.");
+            return { success: false, error: SESSION_PERSISTENCE_ERROR };
+        }
+
         // player.auth_id stores the Supabase Auth user UUID; user_sessions.user_id
         // stores the app's player.player_id foreign key.
         const player = await prisma.player.findUnique({
@@ -122,8 +149,6 @@ export async function persistAuthSession(
             console.error("Auth session persistence failed: player not found.");
             return { success: false, error: SESSION_PERSISTENCE_ERROR };
         }
-
-        const now = new Date();
 
         // Upsert makes login idempotent for the same Supabase token while refreshes
         // can extend expires_at and last_active_at without creating duplicates.
@@ -173,6 +198,9 @@ export async function deactivateAuthSession(
     session: Session | null,
 ): Promise<DeactivateAuthSessionResult> {
     try {
+        const now = new Date();
+        await deactivateExpiredAuthSessions(now);
+
         const parsedSession = toPersistableAuthSession(session);
 
         // Logout can only update the matching row if Supabase still exposes the
@@ -193,7 +221,7 @@ export async function deactivateAuthSession(
             },
             data: {
                 is_active: false,
-                last_active_at: new Date(),
+                last_active_at: now,
             },
         });
 
