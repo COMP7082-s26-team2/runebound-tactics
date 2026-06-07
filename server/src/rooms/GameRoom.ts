@@ -1,5 +1,7 @@
 import { Room, Client } from "colyseus";
 import {
+    ActionPointSystem,
+    AP_COST,
     GamePlayerSlot,
     GameState,
     GameUnit,
@@ -96,7 +98,7 @@ export class GameRoom extends Room<{ state: GameState }> {
 
             const unit = this.state.units.get(payload?.unitId);
             if (!unit || unit.ownerId !== client.sessionId) return;
-            if (unit.hasMoved) return;
+            if (!ActionPointSystem.canAfford(unit, AP_COST.MOVE)) return;
 
             const destKey = cellKey({ q: payload.x, r: payload.y });
             const reachable = this._reachabilityCache.get(unit.unitId);
@@ -106,6 +108,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             unit.x = payload.x;
             unit.y = payload.y;
             unit.hasMoved = true;
+            ActionPointSystem.deduct(unit, AP_COST.MOVE);
 
             console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: move ${unit.unitId} (${prevPos.q},${prevPos.r}) → (${payload.x},${payload.y})`);
 
@@ -278,6 +281,7 @@ export class GameRoom extends Room<{ state: GameState }> {
                 unit.maxHp = 30;
                 unit.hasMoved = false;
                 unit.hasActed = false;
+                ActionPointSystem.restore(unit);
                 this.state.units.set(unit.unitId, unit);
             }
         }
@@ -371,6 +375,7 @@ export class GameRoom extends Room<{ state: GameState }> {
         // 1-AP exhaustion: flip on any successful attack.
         attacker.hasMoved = true;
         attacker.hasActed = true;
+        ActionPointSystem.deduct(attacker, AP_COST.ATTACK);
 
         // Update reachability cache. Move+attack uses surgical update;
         // zero-move attack just removes the now-exhausted attacker.
@@ -434,6 +439,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (unit.ownerId === this.state.currentTurnId) {
                 unit.hasMoved = false;
                 unit.hasActed = false;
+                ActionPointSystem.restore(unit);
             }
         }
 
