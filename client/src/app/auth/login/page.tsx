@@ -1,5 +1,5 @@
 import LoginForm from "@/components/auth/login-form";
-import { refreshPersistedAuthSession } from "@/app/auth/session-persistence";
+import { refreshPersistedAuthSession } from "@/lib/auth/session-persistence";
 import { createServerSideClient } from "@/lib/supabase";
 import Link from "next/link";
 import { redirect } from "next/navigation";

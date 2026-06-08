@@ -1,7 +1,7 @@
 import { createServerSideClient } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { persistAuthSession } from "../session-persistence";
+import { persistAuthSession } from "@/lib/auth/session-persistence";
 
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url);

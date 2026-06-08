@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { refreshAuthSessionRecord, signOut } from "@/app/auth/actions";
+import { refreshAuthSessionRecord, signOut } from "@/lib/auth/actions";
 
 export default function DashboardPage() {
     const router = useRouter();
