@@ -2,23 +2,7 @@ import "dotenv/config";
 
 import { createClient } from "@supabase/supabase-js";
 import { prisma } from "../database/prisma";
-
-export interface AuthenticatedJoinOptions {
-    // Supabase access JWT sent from the Next client as part of Colyseus join options.
-    accessToken?: string;
-    // Temporary UI compatibility only; identity must come from the verified token/player row.
-    displayName?: string;
-}
-
-export interface VerifiedPlayerAuth {
-    // App player id from player.player_id, stringified for Colyseus state/client.auth use.
-    userId: string;
-    // Supabase Auth user UUID stored in player.auth_id.
-    authId: string;
-    // Display name from the trusted player row or Supabase fallback metadata.
-    username: string;
-    email: string | null;
-}
+import type { AuthenticatedJoinOptions, VerifiedClientAuth } from "./types";
 
 export class AuthJoinError extends Error {
     constructor(message: string) {
@@ -49,7 +33,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 export async function verifySupabaseJoinAuth(
     options?: AuthenticatedJoinOptions,
-): Promise<VerifiedPlayerAuth> {
+): Promise<VerifiedClientAuth> {
     const accessToken = options?.accessToken;
 
     if (!accessToken) {
