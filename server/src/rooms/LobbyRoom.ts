@@ -1,11 +1,9 @@
 import { Room, Client, matchMaker } from "colyseus";
 import { LobbyPlayerSlot, LobbyState, ROOM_GAME } from "@runebound-tactics/shared";
 import type { Faction, LobbySummary } from "@runebound-tactics/shared";
+import { AuthJoinError, verifySupabaseJoinAuth } from "../auth/supabaseAuth";
+import type { AuthenticatedJoinOptions, VerifiedClientAuth } from "../auth/types";
 import { pendingGames } from "./pendingGames";
-
-interface JoinOptions {
-    displayName?: string;
-}
 
 interface SetReadyPayload {
     isReady: boolean;
@@ -57,12 +55,48 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
         });
     }
 
-    onJoin(client: Client, options?: JoinOptions): void {
+    async onAuth(
+        _client: Client,
+        options?: AuthenticatedJoinOptions,
+    ): Promise<VerifiedClientAuth> {
+        try {
+            // Colyseus stores the returned payload on client.auth before onJoin
+            // runs. Every lobby mutation after this point can use verified app
+            // identity instead of trusting browser-supplied display names.
+            return await verifySupabaseJoinAuth(options);
+        } catch (error) {
+            // Avoid logging JWTs or raw join options; the helper already keeps
+            // token details out of errors. Colyseus rejects the seat reservation.
+            if (error instanceof AuthJoinError) {
+                console.warn(`[LobbyRoom] Rejected unauthenticated join: ${error.message}`);
+            } else {
+                console.error("[LobbyRoom] Auth verification failed:", error);
+            }
+            throw error;
+        }
+    }
+
+    onJoin(client: Client): void {
         if (this.state.status === "transferring") {
             throw new Error("Game is already starting");
         }
 
-        const displayName = String(options?.displayName ?? "Player").slice(0, 32);
+        const auth = client.auth as VerifiedClientAuth | undefined;
+        if (!auth?.userId) {
+            throw new Error("Missing verified lobby auth");
+        }
+
+        const alreadyJoined = [...this.state.players.values()].some(
+            player => player.userId === auth.userId,
+        );
+
+        if (alreadyJoined) {
+            throw new Error("Authenticated user is already in this lobby");
+        }
+
+        // displayName remains a client-facing field, but its value now comes
+        // from the verified player profile returned by onAuth.
+        const displayName = auth.username.slice(0, 32);
 
         const usedSlots = new Set([...this.state.players.values()].map(p => p.slot));
         const nextSlot = Array.from(
@@ -76,6 +110,7 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
 
         const slot = new LobbyPlayerSlot();
         slot.sessionId = client.sessionId;
+        slot.userId = auth.userId;
         slot.displayName = displayName;
         slot.slot = nextSlot;
         this.state.players.set(client.sessionId, slot);
@@ -85,7 +120,9 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
         }
 
         this._updateMetadata();
-        console.log(`[LobbyRoom] ${displayName} joined slot ${nextSlot} (${client.sessionId})`);
+        console.log(
+            `[LobbyRoom] ${displayName} joined slot ${nextSlot} as user ${auth.userId} (${client.sessionId})`,
+        );
     }
 
     async onDrop(client: Client, code?: number): Promise<void> {
@@ -162,6 +199,7 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
         this.state.status = "transferring";
 
         const players = [...this.state.players.values()].map(p => ({
+            userId: p.userId,
             displayName: p.displayName,
             faction: p.faction,
         }));
