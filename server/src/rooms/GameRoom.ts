@@ -14,19 +14,18 @@ import {
     GRID_ROWS,
 } from "@runebound-tactics/shared";
 import type { Faction, GridCoord } from "@runebound-tactics/shared";
+import { AuthJoinError, verifySupabaseJoinAuth } from "../auth/supabaseAuth";
+import type { AuthenticatedJoinOptions, VerifiedClientAuth } from "../auth/types";
 import { pendingGames } from "./pendingGames";
 
 interface PendingPlayer {
+    userId: string;
     displayName: string;
     faction: string;
 }
 
 interface GameRoomOptions {
     lobbyRoomId: string;
-}
-
-interface JoinOptions {
-    displayName?: string;
 }
 
 interface MoveUnitPayload {
@@ -55,7 +54,7 @@ interface PendingAttack {
 }
 
 export class GameRoom extends Room<{ state: GameState }> {
-    /** Players expected to join, keyed by displayName. Set in onCreate. */
+    /** Players expected to join, keyed by verified player.user_id. Set in onCreate. */
     private _pendingPlayers = new Map<string, PendingPlayer>();
     /** Ordered turn list — session IDs in the order players joined. */
     private _turnOrder: string[] = [];
@@ -87,11 +86,18 @@ export class GameRoom extends Room<{ state: GameState }> {
         this.setState(new GameState());
         this.maxClients = pending.players.length;
 
+        // LobbyRoom already verified the users that started this match and
+        // wrote their app player IDs into pendingGames. GameRoom keys this
+        // waiting list by userId so a client cannot claim a slot by spoofing a
+        // display name in join options.
         for (const p of pending.players) {
-            this._pendingPlayers.set(p.displayName, p);
+            this._pendingPlayers.set(p.userId, p);
         }
 
         this.onMessage<MoveUnitPayload>("move_unit", (client, payload) => {
+            // _isCurrentTurn includes the auth/session match check. After that
+            // bridge guard passes, existing gameplay rules can continue using
+            // sessionId-owned units until reconnect work migrates ownership.
             if (!this._isCurrentTurn(client)) return;
 
             const unit = this.state.units.get(payload?.unitId);
@@ -116,30 +122,77 @@ export class GameRoom extends Room<{ state: GameState }> {
         });
 
         this.onMessage<AttackUnitPayload>("attack_unit", (client, payload) => {
-            this._handleAttack(client.sessionId, payload);
+            // Pass the whole Client so _handleAttack can verify client.auth
+            // before it uses client.sessionId for current gameplay ownership.
+            this._handleAttack(client, payload);
         });
 
         this.onMessage("end_turn", (client) => {
+            // End-turn authorization follows the same bridge rule as movement:
+            // verified app user first, then current sessionId turn ownership.
             if (!this._isCurrentTurn(client)) return;
             console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: end_turn from ${client.sessionId}`);
             this._turnMachine.send("END_TURN");
         });
     }
 
-    onJoin(client: Client, options?: JoinOptions): void {
-        const displayName = String(options?.displayName ?? "Player").slice(0, 32);
-        const pending = this._pendingPlayers.get(displayName);
+    async onAuth(
+        _client: Client,
+        options?: AuthenticatedJoinOptions,
+    ): Promise<VerifiedClientAuth> {
+        try {
+            // onAuth is the gate before onJoin. The returned payload becomes
+            // client.auth, which lets the room connect this Colyseus session to
+            // a verified app player instead of trusting join options.
+            return await verifySupabaseJoinAuth(options);
+        } catch (error) {
+            // Never log the raw access token or join options here.
+            if (error instanceof AuthJoinError) {
+                console.warn(`[GameRoom] Rejected unauthenticated join: ${error.message}`);
+            } else {
+                console.error("[GameRoom] Auth verification failed:", error);
+            }
+            throw error;
+        }
+    }
+
+    onJoin(client: Client): void {
+        // Colyseus sets client.auth from the value returned by onAuth. If it is
+        // missing here, the room should fail closed rather than creating an
+        // anonymous GamePlayerSlot.
+        const auth = client.auth as VerifiedClientAuth | undefined;
+        if (!auth?.userId) {
+            throw new Error("Missing verified game auth");
+        }
+
+        // Only players transferred from the lobby can claim game slots. The
+        // lookup is by verified app userId, not displayName, because displayName
+        // is client-controlled in older flows.
+        const pending = this._pendingPlayers.get(auth.userId);
+        if (!pending) {
+            throw new Error("Authenticated user is not expected in this game");
+        }
+
+        const displayName = pending.displayName.slice(0, 32);
 
         const slot = new GamePlayerSlot();
+        // sessionId is still used by the current GameRoom maps, turn order, and
+        // unit owner IDs. userId is the durable identity that future reconnect
+        // and enforcement tickets can use when sessionId changes.
         slot.sessionId = client.sessionId;
+        slot.userId = auth.userId;
         slot.displayName = displayName;
-        slot.faction = (pending?.faction ?? "") as Faction;
+        slot.faction = pending.faction as Faction;
         this.state.players.set(client.sessionId, slot);
 
-        this._pendingPlayers.delete(displayName);
+        // Remove the verified user from the pending list after they claim their
+        // seat; _allPlayersJoined() uses this to decide when the match can start.
+        this._pendingPlayers.delete(auth.userId);
         this._turnOrder.push(client.sessionId);
 
-        console.log(`[${new Date().toISOString()}] [GameRoom] ${displayName} joined (${client.sessionId})`);
+        console.log(
+            `[${new Date().toISOString()}] [GameRoom] ${displayName} joined as user ${auth.userId} (${client.sessionId})`,
+        );
 
         if (this._allPlayersJoined()) {
             this._startGame();
@@ -286,9 +339,21 @@ export class GameRoom extends Room<{ state: GameState }> {
     private _isCurrentTurn(client: Client): boolean {
         return (
             this.state.phase === "active" &&
+            // Prevents a stale or forged Colyseus connection from using a
+            // sessionId unless it also belongs to the verified app user.
+            this._isVerifiedClientSession(client) &&
             this.state.currentTurnId === client.sessionId &&
             this._turnMachine.state === "action-phase"
         );
+    }
+
+    private _isVerifiedClientSession(client: Client): boolean {
+        const auth = client.auth as VerifiedClientAuth | undefined;
+        const player = this.state.players.get(client.sessionId);
+
+        // sessionId is still the current connection key, but the connected
+        // client must also match the verified userId stored when they joined.
+        return !!auth?.userId && !!player && player.userId === auth.userId;
     }
 
     /**
@@ -315,9 +380,17 @@ export class GameRoom extends Room<{ state: GameState }> {
      * mutation. Caller (the message handler) does not need to act on the
      * outcome.
      */
-    private _handleAttack(sessionId: string, payload: AttackUnitPayload | undefined): void {
+    private _handleAttack(client: Client, payload: AttackUnitPayload | undefined): void {
         if (!this._turnMachine || this._turnMachine.state !== "action-phase") return;
         if (this.state.phase !== "active") return;
+        // Attack has its own guard because it enters through a helper instead
+        // of _isCurrentTurn directly.
+        if (!this._isVerifiedClientSession(client)) return;
+
+        // Keep the current gameplay model sessionId-based for now. BCOMP-175's
+        // first step is to prove that this session belongs to the authenticated
+        // user before allowing sessionId-based ownership checks.
+        const sessionId = client.sessionId;
         if (this.state.currentTurnId !== sessionId) return;
 
         const attacker = this.state.units.get(payload?.attackerId ?? "");
