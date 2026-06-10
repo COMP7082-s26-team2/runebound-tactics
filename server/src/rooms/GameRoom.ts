@@ -8,6 +8,12 @@ import {
     cellKey,
     computeReachableTiles,
     computeAttackDamage,
+    getUnitAttack,
+    getUnitBaseAp,
+    getUnitBaseHealth,
+    getUnitDefaultWeakness,
+    getUnitDefense,
+    getUnitDamageType,
     getUnitMovement,
     squareGridNeighbors,
     unitIsExhausted,
@@ -269,13 +275,26 @@ export class GameRoom extends Room<{ state: GameState }> {
 
             for (let j = 0; j < unitTypes.length; j++) {
                 const unit = new GameUnit();
-                unit.unitId = `${sessionId}:u${j + 1}`;
+                unit.unitId  = `${sessionId}:u${j + 1}`;
                 unit.ownerId = sessionId;
                 unit.unitType = unitTypes[j]!;
                 unit.x = 2 + j * 2;
                 unit.y = row;
-                unit.hp = 30;
-                unit.maxHp = 30;
+
+                unit.baseMaxHealth    = getUnitBaseHealth(unit.unitType);
+                unit.baseAttackDamage = getUnitAttack(unit.unitType);
+                unit.baseDefense      = getUnitDefense(unit.unitType);
+                unit.baseMovement     = getUnitMovement(unit.unitType);
+                unit.baseAp           = getUnitBaseAp(unit.unitType);
+
+                unit.hp = unit.baseMaxHealth;
+
+                const dt = getUnitDamageType(unit.unitType);
+                unit.damageType = dt ?? "";
+                for (const w of getUnitDefaultWeakness(unit.unitType)) {
+                    unit.weakness.push(w);
+                }
+
                 unit.hasMoved = false;
                 unit.hasActed = false;
                 this.state.units.set(unit.unitId, unit);
@@ -355,7 +374,7 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
 
         // ── Half 2: resolve attack ────────────────────────────────────
-        const damage = computeAttackDamage(attacker.unitType, target.unitType);
+        const damage = computeAttackDamage(attacker, target);
         if (damage <= 0) {
             // Defensive: rollback move-half if applied, then bail.
             if (moveTo && !moveToIsCurrentPos) {
