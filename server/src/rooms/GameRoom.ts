@@ -95,13 +95,18 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
 
         this.onMessage<MoveUnitPayload>("move_unit", (client, payload) => {
-            // _isCurrentTurn includes the auth/session match check. After that
-            // bridge guard passes, existing gameplay rules can continue using
-            // sessionId-owned units until reconnect work migrates ownership.
-            if (!this._isCurrentTurn(client)) return;
+            // Resolve the verified player first. The action is attributed to
+            // player.userId, then bridged to the current sessionId-based game
+            // model for unit ownership and turn checks.
+            const player = this._getVerifiedPlayer(client);
+            if (!player) return;
+
+            const playerSessionId = player.sessionId;
+            const verifiedUserId = player.userId;
+            if (!this._isCurrentTurn(player)) return;
 
             const unit = this.state.units.get(payload?.unitId);
-            if (!unit || unit.ownerId !== client.sessionId) return;
+            if (!unit || unit.ownerId !== playerSessionId) return;
             if (unit.hasMoved) return;
 
             const destKey = cellKey({ q: payload.x, r: payload.y });
@@ -128,9 +133,14 @@ export class GameRoom extends Room<{ state: GameState }> {
         });
 
         this.onMessage("end_turn", (client) => {
-            // End-turn authorization follows the same bridge rule as movement:
-            // verified app user first, then current sessionId turn ownership.
-            if (!this._isCurrentTurn(client)) return;
+            // End-turn also starts from the verified player slot. The
+            // sessionId comparison below is derived from that slot, not trusted
+            // directly from the raw Colyseus client.
+            const player = this._getVerifiedPlayer(client);
+            if (!player) return;
+
+            const verifiedUserId = player.userId;
+            if (!this._isCurrentTurn(player)) return;
             console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: end_turn from ${client.sessionId}`);
             this._turnMachine.send("END_TURN");
         });
@@ -336,13 +346,10 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
     }
 
-    private _isCurrentTurn(client: Client): boolean {
+    private _isCurrentTurn(player: GamePlayerSlot): boolean {
         return (
             this.state.phase === "active" &&
-            // Prevents a stale or forged Colyseus connection from using a
-            // sessionId unless it also belongs to the verified app user.
-            this._isVerifiedClientSession(client) &&
-            this.state.currentTurnId === client.sessionId &&
+            this.state.currentTurnId === player.sessionId &&
             this._turnMachine.state === "action-phase"
         );
     }
@@ -404,13 +411,14 @@ export class GameRoom extends Room<{ state: GameState }> {
         // Keep the current gameplay model sessionId-based for now. BCOMP-175's
         // first step is to prove that this session belongs to the authenticated
         // user before allowing sessionId-based ownership checks.
-        const sessionId = player.sessionId;
-        if (this.state.currentTurnId !== sessionId) return;
+        const playerSessionId = player.sessionId;
+        const verifiedUserId = player.userId;
+        if (this.state.currentTurnId !== playerSessionId) return;
 
         const attacker = this.state.units.get(payload?.attackerId ?? "");
         const target = this.state.units.get(payload?.targetId ?? "");
         if (!attacker || !target) return;
-        if (attacker.ownerId !== sessionId) return;
+        if (attacker.ownerId !== playerSessionId) return;
         if (attacker.ownerId === target.ownerId) return;     // friendly-fire blocked
         if (unitIsExhausted(attacker)) return;               // 1-AP exhaustion
 
