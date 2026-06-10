@@ -160,15 +160,15 @@ export class GameRoom extends Room<{ state: GameState }> {
         // Colyseus sets client.auth from the value returned by onAuth. If it is
         // missing here, the room should fail closed rather than creating an
         // anonymous GamePlayerSlot.
-        const auth = client.auth as VerifiedClientAuth | undefined;
-        if (!auth?.userId) {
+        const userId = this._getVerifiedUserId(client);
+        if (!userId) {
             throw new Error("Missing verified game auth");
         }
 
         // Only players transferred from the lobby can claim game slots. The
         // lookup is by verified app userId, not displayName, because displayName
         // is client-controlled in older flows.
-        const pending = this._pendingPlayers.get(auth.userId);
+        const pending = this._pendingPlayers.get(userId);
         if (!pending) {
             throw new Error("Authenticated user is not expected in this game");
         }
@@ -180,18 +180,18 @@ export class GameRoom extends Room<{ state: GameState }> {
         // unit owner IDs. userId is the durable identity that future reconnect
         // and enforcement tickets can use when sessionId changes.
         slot.sessionId = client.sessionId;
-        slot.userId = auth.userId;
+        slot.userId = userId;
         slot.displayName = displayName;
         slot.faction = pending.faction as Faction;
         this.state.players.set(client.sessionId, slot);
 
         // Remove the verified user from the pending list after they claim their
         // seat; _allPlayersJoined() uses this to decide when the match can start.
-        this._pendingPlayers.delete(auth.userId);
+        this._pendingPlayers.delete(userId);
         this._turnOrder.push(client.sessionId);
 
         console.log(
-            `[${new Date().toISOString()}] [GameRoom] ${displayName} joined as user ${auth.userId} (${client.sessionId})`,
+            `[${new Date().toISOString()}] [GameRoom] ${displayName} joined as user ${userId} (${client.sessionId})`,
         );
 
         if (this._allPlayersJoined()) {
@@ -348,12 +348,25 @@ export class GameRoom extends Room<{ state: GameState }> {
     }
 
     private _isVerifiedClientSession(client: Client): boolean {
+        return this._getVerifiedPlayer(client) !== null;
+    }
+
+    private _getVerifiedUserId(client: Client): string | null {
         const auth = client.auth as VerifiedClientAuth | undefined;
+        return auth?.userId ?? null;
+    }
+
+    private _getVerifiedPlayer(client: Client): GamePlayerSlot | null {
+        const userId = this._getVerifiedUserId(client);
         const player = this.state.players.get(client.sessionId);
 
         // sessionId is still the current connection key, but the connected
         // client must also match the verified userId stored when they joined.
-        return !!auth?.userId && !!player && player.userId === auth.userId;
+        if (!userId || !player || player.userId !== userId) {
+            return null;
+        }
+
+        return player;
     }
 
     /**
@@ -385,12 +398,13 @@ export class GameRoom extends Room<{ state: GameState }> {
         if (this.state.phase !== "active") return;
         // Attack has its own guard because it enters through a helper instead
         // of _isCurrentTurn directly.
-        if (!this._isVerifiedClientSession(client)) return;
+        const player = this._getVerifiedPlayer(client);
+        if (!player) return;
 
         // Keep the current gameplay model sessionId-based for now. BCOMP-175's
         // first step is to prove that this session belongs to the authenticated
         // user before allowing sessionId-based ownership checks.
-        const sessionId = client.sessionId;
+        const sessionId = player.sessionId;
         if (this.state.currentTurnId !== sessionId) return;
 
         const attacker = this.state.units.get(payload?.attackerId ?? "");
