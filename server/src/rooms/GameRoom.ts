@@ -102,7 +102,6 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (!player) return;
 
             const playerSessionId = player.sessionId;
-            const verifiedUserId = player.userId;
             if (!this._isCurrentTurn(player)) return;
 
             const unit = this.state.units.get(payload?.unitId);
@@ -139,7 +138,6 @@ export class GameRoom extends Room<{ state: GameState }> {
             const player = this._getVerifiedPlayer(client);
             if (!player) return;
 
-            const verifiedUserId = player.userId;
             if (!this._isCurrentTurn(player)) return;
             console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: end_turn from ${client.sessionId}`);
             this._turnMachine.send("END_TURN");
@@ -376,6 +374,25 @@ export class GameRoom extends Room<{ state: GameState }> {
         return player;
     }
 
+    private _canReclaimPlayerSlot(client: Client, previousClient: Client): boolean {
+        const userId = this._getVerifiedUserId(client);
+        const previousPlayer = this.state.players.get(previousClient.sessionId);
+
+        // When a player reconnects, Colyseus gives us a new/current client and
+        // the previous disconnected client. The reconnect should only succeed
+        // when the current client's verified app userId matches the userId that
+        // was stored on the previous player slot.
+        //
+        // This prevents another authenticated player from reclaiming someone
+        // else's game slot even if they somehow reach the same room/reconnect
+        // path. The durable userId is the authority here, not the Colyseus
+        // sessionId, which can change across reconnect flows.
+        //
+        // Reconnect ownership is based on the durable app userId stored in the
+        // previous player slot, not on either Colyseus sessionId by itself.
+        return !!userId && !!previousPlayer && previousPlayer.userId === userId;
+    }
+
     /**
      * Atomic combined move+attack transaction.
      *
@@ -412,7 +429,6 @@ export class GameRoom extends Room<{ state: GameState }> {
         // first step is to prove that this session belongs to the authenticated
         // user before allowing sessionId-based ownership checks.
         const playerSessionId = player.sessionId;
-        const verifiedUserId = player.userId;
         if (this.state.currentTurnId !== playerSessionId) return;
 
         const attacker = this.state.units.get(payload?.attackerId ?? "");
