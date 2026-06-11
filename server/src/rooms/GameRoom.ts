@@ -10,6 +10,7 @@ import {
     cellKey,
     computeReachableTiles,
     computeAttackDamage,
+    getEffectiveMaxHealth,
     getUnitAttack,
     getUnitBaseAp,
     getUnitBaseHealth,
@@ -291,7 +292,7 @@ export class GameRoom extends Room<{ state: GameState }> {
                 unit.baseMovement     = getUnitMovement(unit.unitType);
                 unit.baseAp           = getUnitBaseAp(unit.unitType);
 
-                unit.hp = unit.baseMaxHealth;
+                unit.hp = getEffectiveMaxHealth(unit);
 
                 const dt = getUnitDamageType(unit.unitType);
                 unit.damageType = dt ?? "";
