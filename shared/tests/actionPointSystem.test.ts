@@ -5,8 +5,8 @@ import { getUnitBaseAp } from "../src/game/units/unit-stats";
 const unit = (ap: number) => ({ actionPoints: ap });
 const spawnUnit = (unitType: string, bonusAp = 0) => ({
     actionPoints: 0,
+    baseAp: getUnitBaseAp(unitType),
     bonusAp,
-    unitType,
 });
 
 describe("ActionPointSystem.canAfford", () => {
@@ -38,16 +38,22 @@ describe("ActionPointSystem.deduct", () => {
 });
 
 describe("ActionPointSystem.restore", () => {
-    it("sets actionPoints to base_ap when bonusAp is 0", () => {
+    it("sets actionPoints to baseAp when bonusAp is 0", () => {
         const u = spawnUnit("castle:swordsman");
         ActionPointSystem.restore(u);
         expect(u.actionPoints).toBe(getUnitBaseAp("castle:swordsman"));
     });
 
-    it("sets actionPoints to base_ap + bonusAp", () => {
+    it("sets actionPoints to baseAp + bonusAp", () => {
         const u = spawnUnit("castle:swordsman", 1);
         ActionPointSystem.restore(u);
         expect(u.actionPoints).toBe(getUnitBaseAp("castle:swordsman") + 1);
+    });
+
+    it("clamps to 0 when baseAp + bonusAp would be negative", () => {
+        const u = spawnUnit("castle:swordsman", -10);
+        ActionPointSystem.restore(u);
+        expect(u.actionPoints).toBe(0);
     });
 });
 
