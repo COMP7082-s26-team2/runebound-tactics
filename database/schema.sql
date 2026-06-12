@@ -11,6 +11,18 @@ CREATE TABLE "player" (
 );
 
 -- CreateTable
+CREATE TABLE "user_presence" (
+    "user_id" BIGINT NOT NULL,
+    "current_lobby_id" TEXT,
+    "current_room_id" TEXT,
+    "last_seen_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "connection_status" VARCHAR(20) NOT NULL DEFAULT 'offline',
+
+    CONSTRAINT "user_presence_pkey" PRIMARY KEY ("user_id"),
+    CONSTRAINT "user_presence_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "player"("player_id") ON DELETE CASCADE ON UPDATE NO ACTION
+);
+
+-- CreateTable
 CREATE TABLE "guild" (
     "guild_id" BIGSERIAL NOT NULL,
     "guild_name" VARCHAR(255),
@@ -156,6 +168,15 @@ CREATE TABLE "game_action" (
 CREATE UNIQUE INDEX "player_username_key" ON "player"("username");
 
 -- CreateIndex
+CREATE INDEX "user_presence_current_lobby_id_idx" ON "user_presence"("current_lobby_id");
+
+-- CreateIndex
+CREATE INDEX "user_presence_current_room_id_idx" ON "user_presence"("current_room_id");
+
+-- CreateIndex
+CREATE INDEX "user_presence_connection_status_idx" ON "user_presence"("connection_status");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "guild_guild_name_key" ON "guild"("guild_name");
 
 -- AddForeignKey
@@ -223,4 +244,3 @@ ALTER TABLE "game_action" ADD CONSTRAINT "game_action_target_unit_id_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "game_action" ADD CONSTRAINT "game_action_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "unit"("unit_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
-

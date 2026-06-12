@@ -22,6 +22,20 @@ model player {
   resources              resource[]
   turns                  turn[]
   units                  unit[]
+  presence               user_presence?
+}
+
+model user_presence {
+  user_id           BigInt   @id
+  current_lobby_id  String?
+  current_room_id   String?
+  last_seen_at      DateTime @default(now()) @db.Timestamp(6)
+  connection_status String   @default("offline") @db.VarChar(20)
+  player            player   @relation(fields: [user_id], references: [player_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([current_lobby_id])
+  @@index([current_room_id])
+  @@index([connection_status])
 }
 
 model guild {
