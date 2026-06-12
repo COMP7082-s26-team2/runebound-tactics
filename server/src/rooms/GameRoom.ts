@@ -207,6 +207,22 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
     }
 
+    onReconnect(client: Client): void {
+        // This installed Colyseus version calls onReconnect with only the
+        // reconnected client, not (client, previousClient). During
+        // allowReconnection, Colyseus reserves the original sessionId and copies
+        // previousClient.auth onto the reconnected client, so the correct guard
+        // here is: does this client.auth.userId still match the player slot
+        // stored under this sessionId?
+        if (!this._getVerifiedPlayer(client)) {
+            throw new Error("Reconnect user does not match player slot");
+        }
+
+        // No sessionId replacement is needed in this Colyseus reconnect path:
+        // the reconnected client reclaims the same sessionId that owns the
+        // GamePlayerSlot, turn order, and unit owner IDs.
+    }
+
     async onDrop(client: Client, code?: number): Promise<void> {
         try {
             await this.allowReconnection(client, 30);
