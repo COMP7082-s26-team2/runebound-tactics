@@ -3,6 +3,7 @@ import { LobbyPlayerSlot, LobbyState, ROOM_GAME } from "@runebound-tactics/share
 import type { Faction, LobbySummary } from "@runebound-tactics/shared";
 import { AuthJoinError, verifySupabaseJoinAuth } from "../auth/supabaseAuth";
 import type { AuthenticatedJoinOptions, VerifiedClientAuth } from "../auth/types";
+import { markUserInLobby, markUserLeftLobby } from "../presence/userPresence";
 import { pendingGames } from "./pendingGames";
 
 interface SetReadyPayload {
@@ -76,7 +77,7 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
         }
     }
 
-    onJoin(client: Client): void {
+    async onJoin(client: Client): Promise<void> {
         if (this.state.status === "transferring") {
             throw new Error("Game is already starting");
         }
@@ -115,6 +116,20 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
         slot.slot = nextSlot;
         this.state.players.set(client.sessionId, slot);
 
+        // Presence is written after the lobby slot exists so the database only
+        // tracks users who were actually accepted into this room.
+        try {
+            await markUserInLobby(auth.userId, this.roomId);
+        } catch (error) {
+            // Presence persistence should not break the live Colyseus room. If
+            // the DB write fails, the server logs it for diagnosis while the
+            // player can continue through the current lobby flow.
+            console.error(
+                `[LobbyRoom] Failed to mark user ${auth.userId} in lobby ${this.roomId}:`,
+                error,
+            );
+        }
+
         if (this.state.players.size === 1) {
             this._hostSessionId = client.sessionId;
         }
@@ -131,22 +146,35 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
             console.log(`[LobbyRoom] ${client.sessionId} reconnected`);
         } catch {
             console.log(`[LobbyRoom] ${client.sessionId} reconnect window expired (code ${code})`);
-            this._removePlayer(client.sessionId);
+            await this._removePlayer(client.sessionId);
         }
     }
 
-    onLeave(client: Client): void {
-        this._removePlayer(client.sessionId);
+    async onLeave(client: Client): Promise<void> {
+        await this._removePlayer(client.sessionId);
     }
 
     onDispose(): void {
         this._cancelCountdown();
     }
 
-    private _removePlayer(sessionId: string): void {
+    private async _removePlayer(sessionId: string): Promise<void> {
         const player = this.state.players.get(sessionId);
         console.log(`[LobbyRoom] ${player?.displayName ?? sessionId} left`);
         this.state.players.delete(sessionId);
+
+        if (player?.userId) {
+            // The helper only clears the lobby if this room is still the stored
+            // current_lobby_id, protecting newer lobby joins from stale leaves.
+            try {
+                await markUserLeftLobby(player.userId, this.roomId);
+            } catch (error) {
+                console.error(
+                    `[LobbyRoom] Failed to clear lobby presence for user ${player.userId} in lobby ${this.roomId}:`,
+                    error,
+                );
+            }
+        }
 
         if (sessionId === this._hostSessionId) {
             const next = this.state.players.keys().next().value as string | undefined;
