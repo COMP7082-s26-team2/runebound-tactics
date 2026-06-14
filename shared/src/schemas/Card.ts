@@ -21,6 +21,6 @@ export class Card extends Schema {
 }
 
 export class DeckState extends Schema {
-    // We use ArraySchema<Card> so Colyseus can track mutations inside the array
     @type([ Card ]) cards = new ArraySchema<Card>();
+    @type([ Card ]) discardPile = new ArraySchema<Card=>();
 }
