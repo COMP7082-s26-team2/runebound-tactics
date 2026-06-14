@@ -1,8 +1,8 @@
 import { Schema, type, ArraySchema } from "@colyseus/schema";
 
 export enum CardType {
-  CARD_STATUS_EFFECT = 'status',
-  CARD_SPELL_EFFECT = 'spell'
+  CARD_STATUS_EFFECT = "status",
+  CARD_SPELL_EFFECT = "spell"
 }
 
 export class Card extends Schema {
