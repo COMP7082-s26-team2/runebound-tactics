@@ -173,6 +173,7 @@ export class GameRoom extends Room<{ state: GameState }> {
         if (!userId) {
             throw new Error("Missing verified game auth");
         }
+        const auth = client.auth as VerifiedClientAuth;
 
         // Only players transferred from the lobby can claim game slots. The
         // lookup is by verified app userId, not displayName, because displayName
@@ -197,7 +198,7 @@ export class GameRoom extends Room<{ state: GameState }> {
         // Game presence is written only after the verified user has claimed a
         // real game slot. markUserInGame also clears any lobby id left over
         // from the lobby-to-game transfer.
-        await this._markPlayerInGame(userId);
+        await this._markPlayerInGame(userId, auth.supabaseSessionId);
 
         // Remove the verified user from the pending list after they claim their
         // seat; _allPlayersJoined() uses this to decide when the match can start.
@@ -228,10 +229,11 @@ export class GameRoom extends Room<{ state: GameState }> {
         // the reconnected client reclaims the same sessionId that owns the
         // GamePlayerSlot, turn order, and unit owner IDs.
         const userId = this._getVerifiedUserId(client);
-        if (userId) {
+        const auth = client.auth as VerifiedClientAuth | undefined;
+        if (userId && auth?.supabaseSessionId) {
             // A successful reconnect means the same verified player is back in
             // the active game room, so restore their DB presence to in_game.
-            await this._markPlayerInGame(userId);
+            await this._markPlayerInGame(userId, auth.supabaseSessionId);
         }
     }
 
@@ -431,9 +433,12 @@ export class GameRoom extends Room<{ state: GameState }> {
         return !!userId && !!previousPlayer && previousPlayer.userId === userId;
     }
 
-    private async _markPlayerInGame(userId: string): Promise<void> {
+    private async _markPlayerInGame(
+        userId: string,
+        supabaseSessionId: string,
+    ): Promise<void> {
         try {
-            await markUserInGame(userId, this.roomId);
+            await markUserInGame(userId, this.roomId, supabaseSessionId);
         } catch (error) {
             console.error(
                 `[GameRoom] Failed to mark user ${userId} in game ${this.roomId}:`,
