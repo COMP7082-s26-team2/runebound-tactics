@@ -1,5 +1,6 @@
 import "dotenv/config";
 
+import { createHmac } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { prisma } from "../database/prisma";
 import type { AuthenticatedJoinOptions, VerifiedClientAuth } from "./types";
@@ -13,6 +14,18 @@ export class AuthJoinError extends Error {
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SESSION_ID_HASH_ALGORITHM = "sha256";
+const SESSION_ID_DIGEST_ENCODING = "hex";
+
+function requireEnv(name: string): string {
+    const value = process.env[name];
+
+    if (!value) {
+        throw new Error(`${name} is required for Colyseus auth`);
+    }
+
+    return value;
+}
 
 // The Colyseus process verifies JWTs directly with Supabase Auth, so it needs
 // the same project URL/key used by the Next app. These are not service-role DB credentials.
@@ -22,6 +35,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
     );
 }
 
+// The server must derive the same non-raw session identifier used by auth
+// persistence. Never fall back to storing or comparing raw Supabase JWTs.
+const sessionIdSecret = requireEnv("SESSION_ID_SECRET");
+
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         // This server only validates tokens passed in join options; it should
@@ -30,6 +47,12 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         autoRefreshToken: false,
     },
 });
+
+function deriveSupabaseSessionId(accessToken: string): string {
+    return createHmac(SESSION_ID_HASH_ALGORITHM, sessionIdSecret)
+        .update(accessToken)
+        .digest(SESSION_ID_DIGEST_ENCODING);
+}
 
 export async function verifySupabaseJoinAuth(
     options?: AuthenticatedJoinOptions,
@@ -66,9 +89,33 @@ export async function verifySupabaseJoinAuth(
         throw new AuthJoinError("Player profile not found for authenticated user");
     }
 
+    const supabaseSessionId = deriveSupabaseSessionId(accessToken);
+
+    // records user_presence.supabase_session_id as a FK to
+    // user_sessions. Require the persisted active session row to exist before
+    // the room join can write presence against it.
+    const activeSession = await prisma.user_sessions.findFirst({
+        where: {
+            user_id: player.player_id,
+            supabase_session_id: supabaseSessionId,
+            is_active: true,
+            expires_at: {
+                gt: new Date(),
+            },
+        },
+        select: {
+            supabase_session_id: true,
+        },
+    });
+
+    if (!activeSession) {
+        throw new AuthJoinError("Active persisted Supabase session not found");
+    }
+
     return {
         userId: player.player_id.toString(),
         authId: player.auth_id,
+        supabaseSessionId: activeSession.supabase_session_id,
         // Prefer the application username because client-provided displayName
         // is not trusted identity data.
         username:
