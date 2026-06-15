@@ -4,8 +4,8 @@ import { useState } from "react";
 import MainMenu from "@/components/MainMenu";
 import GameModeScreen from "@/components/GameModeScreen";
 import MultiplayerScreen from "@/components/lobby/MultiplayerScreen"; 
-import GridMovementCanvas from "@/components/scenes/GridMovementCanvas"; 
-import { ShowcaseHUD } from "@/components/game/ShowcaseHUD";
+// Import your new GameCanvas that contains the layout
+import GameCanvas from "@/components/game/GameCanvas";
 
 type AppState = 'main' | 'gamemode' | 'singleplayer' | 'multiplayer' | 'game';
 
@@ -32,19 +32,16 @@ export default function Home() {
 
         case 'singleplayer':
             return (
-                <div className="relative w-full h-screen bg-black overflow-hidden">
-                    {/* Your UI Showcase Overlay */}
-                    <ShowcaseHUD />
-                    
-                    {/* The Game Engine Canvas */}
-                    <GridMovementCanvas />
+                <div className="relative w-full h-screen bg-black">
+                    {/* Your new GameCanvas now handles its own layout and HUD */}
+                    <GameCanvas />
 
-                    {/* Exit Demo Button */}
+                    {/* Exit Game Button */}
                     <button 
                         onClick={() => setCurrentScreen('gamemode')}
                         className="absolute bottom-4 right-4 text-slate-500 hover:text-slate-300 transition-colors py-2 px-4 font-medium uppercase tracking-widest text-sm z-50"
                     >
-                        Abort Game
+                        Exit Game
                     </button>
                 </div>
             );
@@ -66,7 +63,9 @@ export default function Home() {
                         ← Abort Game
                     </button>
                     
-                    <GridMovementCanvas />
+                    {/* Note: If you want to use the new layout here too, 
+                        you can replace GridMovementCanvas with <GameCanvas /> */}
+                    <GameCanvas />
                 </div>
             );
 
