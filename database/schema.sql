@@ -15,11 +15,13 @@ CREATE TABLE "user_presence" (
     "user_id" BIGINT NOT NULL,
     "current_lobby_id" TEXT,
     "current_room_id" TEXT,
+    "supabase_session_id" TEXT,
     "last_seen_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "connection_status" VARCHAR(20) NOT NULL DEFAULT 'offline',
 
     CONSTRAINT "user_presence_pkey" PRIMARY KEY ("user_id"),
-    CONSTRAINT "user_presence_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "player"("player_id") ON DELETE CASCADE ON UPDATE NO ACTION
+    CONSTRAINT "user_presence_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "player"("player_id") ON DELETE CASCADE ON UPDATE NO ACTION,
+    CONSTRAINT "user_presence_supabase_session_id_fkey" FOREIGN KEY ("supabase_session_id") REFERENCES "user_sessions"("supabase_session_id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -174,7 +176,19 @@ CREATE INDEX "user_presence_current_lobby_id_idx" ON "user_presence"("current_lo
 CREATE INDEX "user_presence_current_room_id_idx" ON "user_presence"("current_room_id");
 
 -- CreateIndex
+CREATE INDEX "user_presence_supabase_session_id_idx" ON "user_presence"("supabase_session_id");
+
+-- CreateIndex
 CREATE INDEX "user_presence_connection_status_idx" ON "user_presence"("connection_status");
+
+-- CreateIndex
+CREATE INDEX "user_sessions_user_id_idx" ON "user_sessions"("user_id");
+
+-- CreateIndex
+CREATE INDEX "user_sessions_is_active_idx" ON "user_sessions"("is_active");
+
+-- CreateIndex
+CREATE INDEX "user_sessions_expires_at_idx" ON "user_sessions"("expires_at");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "guild_guild_name_key" ON "guild"("guild_name");

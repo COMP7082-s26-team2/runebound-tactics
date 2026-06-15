@@ -23,18 +23,22 @@ model player {
   turns                  turn[]
   units                  unit[]
   presence               user_presence?
+  sessions               user_sessions[]
 }
 
 model user_presence {
-  user_id           BigInt   @id
-  current_lobby_id  String?
-  current_room_id   String?
-  last_seen_at      DateTime @default(now()) @db.Timestamp(6)
-  connection_status String   @default("offline") @db.VarChar(20)
-  player            player   @relation(fields: [user_id], references: [player_id], onDelete: Cascade, onUpdate: NoAction)
+  user_id             BigInt         @id
+  current_lobby_id    String?
+  current_room_id     String?
+  supabase_session_id String?
+  last_seen_at        DateTime       @default(now()) @db.Timestamp(6)
+  connection_status   String         @default("offline") @db.VarChar(20)
+  player              player         @relation(fields: [user_id], references: [player_id], onDelete: Cascade, onUpdate: NoAction)
+  session             user_sessions? @relation(fields: [supabase_session_id], references: [supabase_session_id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([current_lobby_id])
   @@index([current_room_id])
+  @@index([supabase_session_id])
   @@index([connection_status])
 }
 
