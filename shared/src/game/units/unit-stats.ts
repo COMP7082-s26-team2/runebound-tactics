@@ -1,12 +1,11 @@
+import type { DamageType } from "../../types/game";
+
 /**
- * Minimal unit stats lookup — movement + combat (v1).
+ * Unit stats lookup — movement, combat, action points, health, and damage types.
  *
- * Used by server (for reachability cache + move validation + damage formula)
- * and client (when displaying movement highlights + computed attack stats).
+ * Used by server (reachability cache, move validation, damage formula, unit spawn)
+ * and client (movement highlights, computed attack stats).
  * Keep in sync across both sides via this single shared module.
- *
- * When the full UnitStats system lands, this file is the seed for the
- * canonical table — extend the record types and add any new helpers here.
  */
 
 export type UnitTypeId = string;
@@ -80,6 +79,25 @@ export function getUnitDefense(unitType: UnitTypeId): number {
     return UNIT_DEFENSE[unitType] ?? DEFAULT_DEFENSE;
 }
 
+const UNIT_BASE_HEALTH: Record<string, number> = {
+    "castle:swordsman":        30,
+    "castle:archer":           20,
+    "castle:paladin":          40,
+    "castle:cavalier":         30,
+    "castle:griffin":          25,
+    "necropolis:skeleton":     20,
+    "necropolis:death_knight": 40,
+    "necropolis:vampire":      30,
+    "necropolis:ghost":        20,
+    "necropolis:zombie":       35,
+};
+
+const DEFAULT_BASE_HEALTH = 25;
+
+export function getUnitBaseHealth(unitType: UnitTypeId): number {
+    return UNIT_BASE_HEALTH[unitType] ?? DEFAULT_BASE_HEALTH;
+}
+
 const UNIT_BASE_AP: Record<string, number> = {
     "castle:swordsman":        2,
     "castle:archer":           2,
@@ -99,16 +117,78 @@ export function getUnitBaseAp(unitType: UnitTypeId): number {
     return UNIT_BASE_AP[unitType] ?? DEFAULT_BASE_AP;
 }
 
+const UNIT_DAMAGE_TYPE: Record<string, DamageType> = {
+    "castle:swordsman":        "melee",
+    "castle:archer":           "range",
+    "castle:paladin":          "melee",
+    "castle:cavalier":         "cavalry",
+    "castle:griffin":          "range",
+    "necropolis:skeleton":     "melee",
+    "necropolis:death_knight": "melee",
+    "necropolis:vampire":      "melee",
+    "necropolis:ghost":        "pure",
+    "necropolis:zombie":       "melee",
+};
+
+const DEFAULT_WEAKNESS: Record<DamageType, DamageType[]> = {
+    melee:   ["cavalry"],
+    cavalry: ["range"],
+    range:   ["melee"],
+    pure:    [],
+};
+
+export function getUnitDamageType(unitType: UnitTypeId): DamageType | null {
+    return UNIT_DAMAGE_TYPE[unitType] ?? null;
+}
+
+export function getUnitDefaultWeakness(unitType: UnitTypeId): DamageType[] {
+    const dt = getUnitDamageType(unitType);
+    return dt !== null ? DEFAULT_WEAKNESS[dt] : [];
+}
+
+export function getEffectiveMaxHealth(u: {
+    baseMaxHealth: number;
+    bonusMaxHealth: number;
+}): number {
+    return Math.max(0, u.baseMaxHealth + u.bonusMaxHealth);
+}
+
+export function getEffectiveAttack(u: {
+    baseAttackDamage: number;
+    bonusAttackDamage: number;
+}): number {
+    return Math.max(0, u.baseAttackDamage + u.bonusAttackDamage);
+}
+
+export function getEffectiveDefense(u: {
+    baseDefense: number;
+    bonusDefense: number;
+}): number {
+    return Math.max(0, u.baseDefense + u.bonusDefense);
+}
+
+export function getEffectiveMovement(u: {
+    baseMovement: number;
+    bonusMovement: number;
+}): number {
+    return Math.max(0, u.baseMovement + u.bonusMovement);
+}
+
+export function getEffectiveAp(u: {
+    baseAp: number;
+    bonusAp: number;
+}): number {
+    return Math.max(0, u.baseAp + u.bonusAp);
+}
+
 /**
  * Server-authoritative damage formula. Pure — same inputs always produce
  * the same output, with a minimum of 1 damage per hit (so attacks always
  * have some effect; balancing of "0-damage" cases is a future design).
  */
 export function computeAttackDamage(
-    attackerType: UnitTypeId,
-    defenderType: UnitTypeId,
+    attacker: { baseAttackDamage: number; bonusAttackDamage: number },
+    defender: { baseDefense: number; bonusDefense: number },
 ): number {
-    const atk = getUnitAttack(attackerType);
-    const def = getUnitDefense(defenderType);
-    return Math.max(1, atk - def);
+    return Math.max(1, getEffectiveAttack(attacker) - getEffectiveDefense(defender));
 }
