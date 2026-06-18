@@ -48,6 +48,12 @@ export class GameUnit extends Schema {
      * Reset to false at the start of the owning player's turn.
      */
     @type("boolean") hasMoved: boolean = false;
+
+    /** Current action points. Decrements per move/attack; restored at turn start. */
+    @type("int32") actionPoints: number = 0;
+
+    /** Bonus AP stacked on top of base_ap at turn-start restore. Default 0. */
+    @type("int32") bonusAp: number = 0;
 }
 
 /**
