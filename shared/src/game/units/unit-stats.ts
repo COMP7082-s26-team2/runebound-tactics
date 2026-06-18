@@ -80,6 +80,25 @@ export function getUnitDefense(unitType: UnitTypeId): number {
     return UNIT_DEFENSE[unitType] ?? DEFAULT_DEFENSE;
 }
 
+const UNIT_BASE_AP: Record<string, number> = {
+    "castle:swordsman":        2,
+    "castle:archer":           2,
+    "castle:paladin":          2,
+    "castle:cavalier":         2,
+    "castle:griffin":          2,
+    "necropolis:skeleton":     2,
+    "necropolis:death_knight": 2,
+    "necropolis:vampire":      2,
+    "necropolis:ghost":        2,
+    "necropolis:zombie":       2,
+};
+
+const DEFAULT_BASE_AP = 2;
+
+export function getUnitBaseAp(unitType: UnitTypeId): number {
+    return UNIT_BASE_AP[unitType] ?? DEFAULT_BASE_AP;
+}
+
 /**
  * Server-authoritative damage formula. Pure — same inputs always produce
  * the same output, with a minimum of 1 damage per hit (so attacks always
