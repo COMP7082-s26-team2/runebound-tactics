@@ -368,10 +368,6 @@ export class GameRoom extends Room<{ state: GameState }> {
         );
     }
 
-    private _isVerifiedClientSession(client: Client): boolean {
-        return this._getVerifiedPlayer(client) !== null;
-    }
-
     private _getVerifiedUserId(client: Client): string | null {
         const auth = client.auth as VerifiedClientAuth | undefined;
         return auth?.userId ?? null;
@@ -388,25 +384,6 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
 
         return player;
-    }
-
-    private _canReclaimPlayerSlot(client: Client, previousClient: Client): boolean {
-        const userId = this._getVerifiedUserId(client);
-        const previousPlayer = this.state.players.get(previousClient.sessionId);
-
-        // When a player reconnects, Colyseus gives us a new/current client and
-        // the previous disconnected client. The reconnect should only succeed
-        // when the current client's verified app userId matches the userId that
-        // was stored on the previous player slot.
-        //
-        // This prevents another authenticated player from reclaiming someone
-        // else's game slot even if they somehow reach the same room/reconnect
-        // path. The durable userId is the authority here, not the Colyseus
-        // sessionId, which can change across reconnect flows.
-        //
-        // Reconnect ownership is based on the durable app userId stored in the
-        // previous player slot, not on either Colyseus sessionId by itself.
-        return !!userId && !!previousPlayer && previousPlayer.userId === userId;
     }
 
     /**
