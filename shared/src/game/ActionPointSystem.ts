@@ -1,5 +1,3 @@
-import { getUnitBaseAp, type UnitTypeId } from "./units/unit-stats";
-
 export const AP_COST = {
     MOVE:   1,
     ATTACK: 1,
@@ -16,10 +14,9 @@ export class ActionPointSystem {
 
     static restore(unit: {
         actionPoints: number;
+        baseAp: number;
         bonusAp: number;
-        unitType: string;
     }): void {
-        unit.actionPoints =
-            getUnitBaseAp(unit.unitType as UnitTypeId) + unit.bonusAp;
+        unit.actionPoints = Math.max(0, unit.baseAp + unit.bonusAp);
     }
 }
