@@ -48,6 +48,25 @@ async function findOpenLobbyRoom(
     return room;
 }
 
+async function clearStaleLobbyPresence(
+    userId: bigint,
+    lobbyRoomId: string,
+): Promise<void> {
+    // Guard by both user and lobby id so an old app-load check cannot clear a
+    // newer lobby that was written after this action started.
+    await prisma.user_presence.updateMany({
+        where: {
+            user_id: userId,
+            current_lobby_id: lobbyRoomId,
+        },
+        data: {
+            current_lobby_id: null,
+            connection_status: "online",
+            last_seen_at: new Date(),
+        },
+    });
+}
+
 // Server action used on app/lobby-selection load. It reads the authenticated
 // player's persisted presence row and returns where the client should go next.
 export async function getLobbyReconnectTarget(): Promise<LobbyReconnectTarget> {
@@ -95,6 +114,7 @@ export async function getLobbyReconnectTarget(): Promise<LobbyReconnectTarget> {
     const openLobby = await findOpenLobbyRoom(presence.current_lobby_id);
 
     if (!openLobby) {
+        await clearStaleLobbyPresence(player.player_id, presence.current_lobby_id);
         return { target: "none" };
     }
 
