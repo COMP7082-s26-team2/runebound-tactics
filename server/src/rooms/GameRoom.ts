@@ -335,21 +335,25 @@ export class GameRoom extends Room<{ state: GameState }> {
             // handshake and automatically sends the room's current full
             // schema state to the restored client.
         } catch {
-            // allowReconnection rejects when the timer expires or the room can
-            // no longer restore the client. At that point the reserved slot is
-            // released by treating the disconnected player as forfeited.
-            this._reconnectingSessionIds.delete(client.sessionId);
-
-            // Broadcast before forfeit processing so clients can distinguish a
-            // reconnect timeout from combat elimination or intentional leave.
-            this.broadcast("player_reconnect_timeout", {
-                userId: player.userId,
-                sessionId: player.sessionId,
-                displayName: player.displayName,
-            });
-
-            await this._forfeitPlayer(client.sessionId);
+            await this._handleReconnectTimeout(player);
         }
+    }
+
+    private async _handleReconnectTimeout(player: GamePlayerSlot): Promise<void> {
+        // Release the in-memory reservation before changing player/game state.
+        this._reconnectingSessionIds.delete(player.sessionId);
+
+        // Notify clients before forfeit processing so they can distinguish a
+        // reconnect timeout from combat elimination or intentional leave.
+        this.broadcast("player_reconnect_timeout", {
+            userId: player.userId,
+            sessionId: player.sessionId,
+            displayName: player.displayName,
+        });
+
+        // Forfeit marks this player eliminated, clears their current game
+        // presence, and evaluates the remaining players for a winner.
+        await this._forfeitPlayer(player.sessionId);
     }
 
     private async _eliminatePlayer(sessionId: string): Promise<void> {
