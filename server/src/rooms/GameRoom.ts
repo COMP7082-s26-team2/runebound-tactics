@@ -286,6 +286,15 @@ export class GameRoom extends Room<{ state: GameState }> {
         const reconnectWindowSeconds = getReconnectWindowSeconds();
         this._reconnectingSessionIds.add(client.sessionId);
 
+        // Notify the remaining connected players that this slot is reserved
+        // temporarily rather than eliminated immediately.
+        this.broadcast("player_disconnected", {
+            userId: player.userId,
+            sessionId: player.sessionId,
+            displayName: player.displayName,
+            reconnectWindowSeconds,
+        });
+
         // Mark the player offline for presence, but keep current_room_id and
         // all game state intact so the slot can be reclaimed during the window.
         await this._markPlayerOffline(player.userId);
@@ -312,11 +321,28 @@ export class GameRoom extends Room<{ state: GameState }> {
                 reconnectedPlayer.userId,
                 auth.supabaseSessionId,
             );
+
+            // Let connected players remove any disconnected indicator after
+            // the returning player has been verified and presence is restored.
+            this.broadcast("player_reconnected", {
+                userId: reconnectedPlayer.userId,
+                sessionId: reconnectedPlayer.sessionId,
+                displayName: reconnectedPlayer.displayName,
+            });
         } catch {
             // allowReconnection rejects when the timer expires or the room can
             // no longer restore the client. At that point the reserved slot is
             // released by treating the disconnected player as forfeited.
             this._reconnectingSessionIds.delete(client.sessionId);
+
+            // Broadcast before forfeit processing so clients can distinguish a
+            // reconnect timeout from combat elimination or intentional leave.
+            this.broadcast("player_reconnect_timeout", {
+                userId: player.userId,
+                sessionId: player.sessionId,
+                displayName: player.displayName,
+            });
+
             await this._forfeitPlayer(client.sessionId);
         }
     }
