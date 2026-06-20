@@ -253,8 +253,9 @@ export class GameRoom extends Room<{ state: GameState }> {
 
     private async _holdSlotForReconnection(client: Client): Promise<void> {
         const player = this._getVerifiedPlayer(client);
+        const auth = client.auth as VerifiedClientAuth | undefined;
 
-        if (!player) {
+        if (!player || !auth?.supabaseSessionId) {
             // If the disconnected client no longer maps to a verified player
             // slot, there is no safe identity to reserve.
             await this._forfeitPlayer(client.sessionId);
@@ -294,30 +295,29 @@ export class GameRoom extends Room<{ state: GameState }> {
 
         try {
             const reconnectedClient = await reconnection;
-            const reconnectedPlayer = this._getVerifiedPlayer(reconnectedClient);
-            const auth = reconnectedClient.auth as VerifiedClientAuth | undefined;
 
             this._reconnectingSessionIds.delete(client.sessionId);
 
-            // The reconnected client must still resolve to the same verified
-            // game slot and carry the persisted session id used for presence.
-            if (!reconnectedPlayer || !auth?.supabaseSessionId) {
+            // Colyseus reconnect tokens reserve the original session ID. Check
+            // that invariant directly instead of depending on the timing of
+            // auth restoration on the replacement Client object.
+            if (reconnectedClient.sessionId !== player.sessionId) {
                 reconnectedClient.leave();
                 await this._forfeitPlayer(client.sessionId);
                 return;
             }
 
             await this._markPlayerInGame(
-                reconnectedPlayer.userId,
+                player.userId,
                 auth.supabaseSessionId,
             );
 
             // Let connected players remove any disconnected indicator after
             // the returning player has been verified and presence is restored.
             this.broadcast("player_reconnected", {
-                userId: reconnectedPlayer.userId,
-                sessionId: reconnectedPlayer.sessionId,
-                displayName: reconnectedPlayer.displayName,
+                userId: player.userId,
+                sessionId: player.sessionId,
+                displayName: player.displayName,
             });
 
             // No manual state reconstruction is needed here. After this
