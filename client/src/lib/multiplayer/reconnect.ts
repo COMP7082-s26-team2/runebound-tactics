@@ -9,6 +9,37 @@ import { getAuthenticatedJoinOptions } from "./authJoinOptions";
 const LOBBY_TOKEN = "lobby_token";
 const GAME_TOKEN  = "game_token";
 
+interface GameConnectOptions {
+    reconnectOnly?: boolean;
+}
+
+interface InFlightGameReconnect {
+    roomId: string;
+    promise: Promise<Room<unknown, GameState>>;
+}
+
+interface GameConnectionCallbacks {
+    onDrop?: () => void;
+    onReconnect?: () => void;
+    onLeave?: (wasDropped: boolean, message: string | null) => void;
+    onFailure?: (message: string) => void;
+}
+
+let inFlightGameReconnect: InFlightGameReconnect | null = null;
+
+function getStoredRoomToken(storageKey: string, roomId: string): string | null {
+    const stored = window.sessionStorage.getItem(storageKey);
+    if (!stored) return null;
+
+    const [tokenRoomId] = stored.split(":");
+    if (tokenRoomId === roomId) {
+        return stored;
+    }
+
+    window.sessionStorage.removeItem(storageKey);
+    return null;
+}
+
 async function joinOrReconnect<S>(
     storageKey: string,
     roomId: string,
@@ -18,18 +49,13 @@ async function joinOrReconnect<S>(
     if (typeof window === "undefined") {
         throw new Error("Cannot join from server-side");
     }
-    const stored = window.sessionStorage.getItem(storageKey);
+    const stored = getStoredRoomToken(storageKey, roomId);
     if (stored) {
-        const [tokenRoomId] = stored.split(":");
-        if (tokenRoomId === roomId) {
-            try {
-                const room = await client.reconnect<S>(stored, rootSchema);
-                window.sessionStorage.setItem(storageKey, room.reconnectionToken);
-                return room;
-            } catch {
-                window.sessionStorage.removeItem(storageKey);
-            }
-        } else {
+        try {
+            const room = await client.reconnect<S>(stored, rootSchema);
+            window.sessionStorage.setItem(storageKey, room.reconnectionToken);
+            return room;
+        } catch {
             window.sessionStorage.removeItem(storageKey);
         }
     }
@@ -48,9 +74,69 @@ async function joinOrReconnect<S>(
     return room;
 }
 
-interface GameReconnectCallbacks {
-    onReconnect?: () => void;
-    onFailure?: (message: string) => void;
+async function joinOrReconnectGameRoom(
+    roomId: string,
+    displayName: string,
+    options: GameConnectOptions = {},
+): Promise<Room<unknown, GameState>> {
+    if (typeof window === "undefined") {
+        throw new Error("Cannot join from server-side");
+    }
+
+    const storedToken = getStoredRoomToken(GAME_TOKEN, roomId);
+
+    if (storedToken) {
+        // A reconnection token is single-use. Remove it before the attempt so
+        // another caller cannot consume the same token concurrently.
+        window.sessionStorage.removeItem(GAME_TOKEN);
+
+        if (!inFlightGameReconnect) {
+            const promise = client.reconnect<GameState>(
+                storedToken,
+                GameState,
+            );
+            inFlightGameReconnect = { roomId, promise };
+        } else if (inFlightGameReconnect.roomId !== roomId) {
+            throw new Error("Another game reconnection is already in progress.");
+        }
+
+        try {
+            const room = await inFlightGameReconnect.promise;
+
+            // Explicit reconnects are coordinated by useRoomConnect, so disable
+            // the SDK's independent retry loop before a future connection drop.
+            room.reconnection.enabled = false;
+            window.sessionStorage.setItem(
+                GAME_TOKEN,
+                room.reconnectionToken,
+            );
+            return room;
+        } catch (error) {
+            if (options.reconnectOnly) {
+                throw error;
+            }
+        } finally {
+            inFlightGameReconnect = null;
+        }
+    }
+
+    if (options.reconnectOnly) {
+        throw new Error("The game reconnection token is unavailable or expired.");
+    }
+
+    const authOptions = await getAuthenticatedJoinOptions();
+    const room = await client.joinById<GameState>(
+        roomId,
+        {
+            displayName,
+            ...authOptions,
+        },
+        GameState,
+    );
+
+    room.reconnection.enabled = false;
+    window.sessionStorage.setItem(GAME_TOKEN, room.reconnectionToken);
+    return room;
 }
 
 /**
@@ -70,13 +156,11 @@ export function useRoomConnect() {
     );
 
     const joinOrReconnectGame = useCallback(
-        (roomId: string, displayName: string) =>
-            joinOrReconnect<GameState>(
-                GAME_TOKEN,
-                roomId,
-                { displayName },
-                GameState,
-            ),
+        (
+            roomId: string,
+            displayName: string,
+            options?: GameConnectOptions,
+        ) => joinOrReconnectGameRoom(roomId, displayName, options),
         [],
     );
 
@@ -95,46 +179,35 @@ export function useRoomConnect() {
     const watchGameConnection = useCallback(
         (
             room: Room<unknown, GameState>,
-            callbacks: GameReconnectCallbacks = {},
+            callbacks: GameConnectionCallbacks = {},
         ) => {
-            let reconnecting = false;
+            let wasDropped = false;
 
             const handleDrop = () => {
-                reconnecting = true;
-
-                // The installed Colyseus SDK automatically attempts to reclaim
-                // this room using its current reconnection token.
-                window.sessionStorage.setItem(
-                    GAME_TOKEN,
-                    room.reconnectionToken,
-                );
+                wasDropped = true;
+                callbacks.onDrop?.();
             };
 
             const handleReconnect = () => {
-                reconnecting = false;
-
-                // The old token was consumed. Store the replacement issued by
-                // Colyseus so another later disconnect can also recover.
-                queueMicrotask(() => {
-                    window.sessionStorage.setItem(
-                        GAME_TOKEN,
-                        room.reconnectionToken,
-                    );
-                });
+                wasDropped = false;
                 callbacks.onReconnect?.();
             };
 
             const handleLeave = (_code: number, reason?: string) => {
-                // Normal intentional leaves are handled by their own buttons.
-                // A leave after onDrop means automatic reconnect retries ended.
-                if (!reconnecting) return;
-
-                reconnecting = false;
-                clearGameToken();
-                callbacks.onFailure?.(
-                    reason?.trim() ||
-                        "The game connection could not be restored.",
+                const message = reason?.trim() || null;
+                callbacks.onLeave?.(
+                    wasDropped,
+                    message,
                 );
+
+                // Existing consumers use this terminal callback until
+                // connection ownership moves to the persistent coordinator.
+                if (wasDropped && callbacks.onFailure) {
+                    callbacks.onFailure(
+                        message ||
+                            "The game connection could not be restored.",
+                    );
+                }
             };
 
             room.onDrop(handleDrop);
@@ -147,7 +220,7 @@ export function useRoomConnect() {
                 room.onLeave.remove(handleLeave);
             };
         },
-        [clearGameToken],
+        [],
     );
 
     return {
