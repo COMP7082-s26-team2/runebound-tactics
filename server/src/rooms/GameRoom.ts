@@ -54,6 +54,22 @@ interface PendingAttack {
     newHp: number;
 }
 
+// Product default for how long a disconnected game player keeps their slot.
+// Deployments can override this with GAME_RECONNECT_WINDOW_SECONDS.
+const DEFAULT_RECONNECT_WINDOW_SECONDS = 60;
+
+// Reads the reconnect window from env and falls back to the product default if
+// the env var is missing, non-numeric, or invalid.
+function getReconnectWindowSeconds(): number {
+    const raw = Number(process.env.GAME_RECONNECT_WINDOW_SECONDS);
+
+    // Keep local/dev behavior deterministic while still letting deployments
+    // tune the reconnect grace period through environment config.
+    return Number.isFinite(raw) && raw > 0
+        ? raw
+        : DEFAULT_RECONNECT_WINDOW_SECONDS;
+}
+
 export class GameRoom extends Room<{ state: GameState }> {
     /** Players expected to join, keyed by verified player.user_id. Set in onCreate. */
     private _pendingPlayers = new Map<string, PendingPlayer>();
@@ -69,6 +85,11 @@ export class GameRoom extends Room<{ state: GameState }> {
     private _turnMachine!: TurnMachine;
     /** Previous TurnMachine phase, used only for transition logging. */
     private _prevTurnPhase: string | null = null;
+    /**
+     * Session IDs currently inside an allowReconnection window. The player
+     * slot and units stay in state while the id is present here.
+     */
+    private _reconnectingSessionIds = new Set<string>();
     /**
      * Pending attack committed in the attack_unit handler, resolved in the
      * "combat" subscriber. Null outside of the quick-play → combat window.
