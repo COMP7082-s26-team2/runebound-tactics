@@ -329,6 +329,11 @@ export class GameRoom extends Room<{ state: GameState }> {
                 sessionId: reconnectedPlayer.sessionId,
                 displayName: reconnectedPlayer.displayName,
             });
+
+            // No manual state reconstruction is needed here. After this
+            // reconnect handler completes, Colyseus finishes the JOIN_ROOM
+            // handshake and automatically sends the room's current full
+            // schema state to the restored client.
         } catch {
             // allowReconnection rejects when the timer expires or the room can
             // no longer restore the client. At that point the reserved slot is
