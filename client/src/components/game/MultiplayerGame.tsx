@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useGameRoom, useGameRoomState } from "@/context/colyseus";
 import { Button } from "@/components/ui/Button";
-import { clearGameToken } from "@/lib/multiplayer/reconnect";
+import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 import { MultiplayerGameCanvas } from "@/components/game/MultiplayerGameCanvas";
 import { GameHUD } from "@/components/game/GameHUD";
 import type { GameState } from "@runebound-tactics/shared";
@@ -24,12 +24,37 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const { room, error } = useGameRoom();
     const state = useGameRoomState();
     const router = useRouter();
+    const pathname = usePathname();
+    const { clearGameToken, watchGameConnection } = useRoomConnect();
 
     const roomMatches = room?.roomId === expectedRoomId;
 
     const prevPhaseRef = useRef<string | undefined>(undefined);
     const prevTurnIdRef = useRef<string | undefined>(undefined);
     const prevTurnNumberRef = useRef<number | undefined>(undefined);
+
+    useEffect(() => {
+        if (!room || !roomMatches) return;
+
+        return watchGameConnection(room, {
+            onReconnect: () => {
+                const gamePath = `/game/${expectedRoomId}`;
+                if (pathname !== gamePath) {
+                    router.replace(gamePath);
+                }
+            },
+            onFailure: () => {
+                router.replace("/lobbies?reason=reconnect_failed");
+            },
+        });
+    }, [
+        expectedRoomId,
+        pathname,
+        room,
+        roomMatches,
+        router,
+        watchGameConnection,
+    ]);
 
     useEffect(() => {
         const phase = state?.phase;
