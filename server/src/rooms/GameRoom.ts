@@ -58,6 +58,9 @@ interface PendingAttack {
 // before the server treats the disconnect as a forfeit.
 // Deployments can override this with GAME_RECONNECT_WINDOW_SECONDS.
 const DEFAULT_RECONNECT_WINDOW_SECONDS = 60;
+// Colyseus uses this close code when the client intentionally calls
+// room.leave(true). Intentional exits are treated as immediate forfeits.
+const COLYSEUS_CONSENTED_LEAVE_CODE = 4000;
 
 // Reads the reconnect window from env and falls back to the product default if
 // the env var is missing, non-numeric, or invalid.
@@ -237,10 +240,16 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
     }
 
-    async onLeave(client: Client): Promise<void> {
-        // Intentional exits, network drops, tab refreshes, and browser
-        // interruptions all receive the same grace window. This avoids making
-        // a temporary navigation or explicit Leave action an immediate loss.
+    async onLeave(client: Client, code?: number): Promise<void> {
+        // A deliberate Leave action is final: eliminate the player immediately
+        // and let the existing win-condition flow award the opponent the game.
+        if (code === COLYSEUS_CONSENTED_LEAVE_CODE) {
+            await this._forfeitPlayer(client.sessionId);
+            return;
+        }
+
+        // Network drops and other unconsented disconnects keep their slot
+        // during the configured reconnect window.
         await this._holdSlotForReconnection(client);
     }
 
