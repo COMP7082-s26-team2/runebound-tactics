@@ -9,10 +9,12 @@ import { ClientOnly } from "@/components/util/ClientOnly";
 import { Button } from "@/components/ui/Button";
 import { BackButton } from "@/components/ui/BackButton";
 import { CreateLobbyModal } from "@/components/lobby/CreateLobbyModal";
+import { useGameConnection } from "@/context/colyseus";
 
 function LobbiesPageInner() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { reconnectError, clearReconnectError } = useGameConnection();
     const { rooms, error, loading, refresh } = useLobbyList<LobbySummary>(ROOM_LOBBY);
     const [createOpen, setCreateOpen] = useState(false);
     const [showReconnectError, setShowReconnectError] = useState(
@@ -29,8 +31,16 @@ function LobbiesPageInner() {
             <h1 className="text-white text-2xl">Lobbies</h1>
             {showReconnectError && (
                 <div className="flex items-center gap-2 text-red-400">
-                    <p>The game connection could not be restored.</p>
-                    <Button onClick={() => setShowReconnectError(false)}>
+                    <p>
+                        {reconnectError ??
+                            "The game connection could not be restored."}
+                    </p>
+                    <Button
+                        onClick={() => {
+                            setShowReconnectError(false);
+                            clearReconnectError();
+                        }}
+                    >
                         Dismiss
                     </Button>
                 </div>
