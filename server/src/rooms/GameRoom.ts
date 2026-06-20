@@ -58,9 +58,6 @@ interface PendingAttack {
 // before the server treats the disconnect as a forfeit.
 // Deployments can override this with GAME_RECONNECT_WINDOW_SECONDS.
 const DEFAULT_RECONNECT_WINDOW_SECONDS = 60;
-// Colyseus SDK sends this close code when the client intentionally leaves via
-// room.leave(true). Other close codes are treated as accidental disconnects.
-const COLYSEUS_CONSENTED_LEAVE_CODE = 4000;
 
 // Reads the reconnect window from env and falls back to the product default if
 // the env var is missing, non-numeric, or invalid.
@@ -240,22 +237,10 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
     }
 
-    async onLeave(client: Client, code?: number): Promise<void> {
-        // This Colyseus version passes a WebSocket close code here. A consented
-        // close means the user intentionally left; any other close is treated
-        // as a dropped connection that may come back.
-        const consented = code === COLYSEUS_CONSENTED_LEAVE_CODE;
-
-        // A consented leave is an intentional exit, so the player forfeits
-        // immediately instead of receiving a reconnect grace window.
-        if (consented) {
-            await this._forfeitPlayer(client.sessionId);
-            return;
-        }
-
-        // Unconsented leaves are network drops, tab refreshes, or browser
-        // interruptions. Hold the slot open so the same connection can be
-        // restored within the configured window.
+    async onLeave(client: Client): Promise<void> {
+        // Intentional exits, network drops, tab refreshes, and browser
+        // interruptions all receive the same grace window. This avoids making
+        // a temporary navigation or explicit Leave action an immediate loss.
         await this._holdSlotForReconnection(client);
     }
 
