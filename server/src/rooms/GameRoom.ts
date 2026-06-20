@@ -240,46 +240,6 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
     }
 
-    async onReconnect(client: Client): Promise<void> {
-        // This installed Colyseus version calls onReconnect with only the
-        // reconnected client, not (client, previousClient). During
-        // allowReconnection, Colyseus reserves the original sessionId and copies
-        // previousClient.auth onto the reconnected client, so the correct guard
-        // here is: does this client.auth.userId still match the player slot
-        // stored under this sessionId?
-        if (!this._getVerifiedPlayer(client)) {
-            throw new Error("Reconnect user does not match player slot");
-        }
-
-        // No sessionId replacement is needed in this Colyseus reconnect path:
-        // the reconnected client reclaims the same sessionId that owns the
-        // GamePlayerSlot, turn order, and unit owner IDs.
-        const userId = this._getVerifiedUserId(client);
-        const auth = client.auth as VerifiedClientAuth | undefined;
-        if (userId && auth?.supabaseSessionId) {
-            // A successful reconnect means the same verified player is back in
-            // the active game room, so restore their DB presence to in_game.
-            await this._markPlayerInGame(userId, auth.supabaseSessionId);
-        }
-    }
-
-    async onDrop(client: Client, code?: number): Promise<void> {
-        const player = this._getVerifiedPlayer(client);
-        if (player?.userId) {
-            // Temporary disconnects must keep current_room_id for reconnection
-            // lookup. markUserOffline only updates status/last_seen_at.
-            await this._markPlayerOffline(player.userId);
-        }
-
-        try {
-            await this.allowReconnection(client, 30);
-            console.log(`[${new Date().toISOString()}] [GameRoom] ${client.sessionId} reconnected`);
-        } catch {
-            console.log(`[${new Date().toISOString()}] [GameRoom] ${client.sessionId} reconnect window expired (code ${code})`);
-            await this._eliminatePlayer(client.sessionId);
-        }
-    }
-
     async onLeave(client: Client, code?: number): Promise<void> {
         // This Colyseus version passes a WebSocket close code here. A consented
         // close means the user intentionally left; any other close is treated
