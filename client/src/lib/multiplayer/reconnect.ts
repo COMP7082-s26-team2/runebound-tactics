@@ -22,7 +22,6 @@ interface GameConnectionCallbacks {
     onDrop?: () => void;
     onReconnect?: () => void;
     onLeave?: (wasDropped: boolean, message: string | null) => void;
-    onFailure?: (message: string) => void;
 }
 
 let inFlightGameReconnect: InFlightGameReconnect | null = null;
@@ -199,15 +198,6 @@ export function useRoomConnect() {
                     wasDropped,
                     message,
                 );
-
-                // Existing consumers use this terminal callback until
-                // connection ownership moves to the persistent coordinator.
-                if (wasDropped && callbacks.onFailure) {
-                    callbacks.onFailure(
-                        message ||
-                            "The game connection could not be restored.",
-                    );
-                }
             };
 
             room.onDrop(handleDrop);
