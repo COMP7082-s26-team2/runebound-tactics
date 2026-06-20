@@ -271,6 +271,14 @@ export class GameRoom extends Room<{ state: GameState }> {
         const reconnectWindowSeconds = getReconnectWindowSeconds();
         this._reconnectingSessionIds.add(client.sessionId);
 
+        // Reserve the Colyseus seat before any asynchronous presence work.
+        // This closes the race where a fast navigation attempts to reconnect
+        // before the server has registered the reconnection token.
+        const reconnection = this.allowReconnection(
+            client,
+            reconnectWindowSeconds,
+        );
+
         // Notify the remaining connected players that this slot is reserved
         // temporarily rather than eliminated immediately.
         this.broadcast("player_disconnected", {
@@ -285,10 +293,7 @@ export class GameRoom extends Room<{ state: GameState }> {
         await this._markPlayerOffline(player.userId);
 
         try {
-            const reconnectedClient = await this.allowReconnection(
-                client,
-                reconnectWindowSeconds,
-            );
+            const reconnectedClient = await reconnection;
             const reconnectedPlayer = this._getVerifiedPlayer(reconnectedClient);
             const auth = reconnectedClient.auth as VerifiedClientAuth | undefined;
 
