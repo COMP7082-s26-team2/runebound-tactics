@@ -54,9 +54,13 @@ interface PendingAttack {
     newHp: number;
 }
 
-// Product default for how long a disconnected game player keeps their slot.
+// Product default for how long a disconnected game player keeps their slot
+// before the server treats the disconnect as a forfeit.
 // Deployments can override this with GAME_RECONNECT_WINDOW_SECONDS.
 const DEFAULT_RECONNECT_WINDOW_SECONDS = 60;
+// Colyseus SDK sends this close code when the client intentionally leaves via
+// room.leave(true). Other close codes are treated as accidental disconnects.
+const COLYSEUS_CONSENTED_LEAVE_CODE = 4000;
 
 // Reads the reconnect window from env and falls back to the product default if
 // the env var is missing, non-numeric, or invalid.
@@ -87,7 +91,8 @@ export class GameRoom extends Room<{ state: GameState }> {
     private _prevTurnPhase: string | null = null;
     /**
      * Session IDs currently inside an allowReconnection window. The player
-     * slot and units stay in state while the id is present here.
+     * slot, turn order, and units stay in state while the id is present here,
+     * which keeps the match recoverable until the timer resolves.
      */
     private _reconnectingSessionIds = new Set<string>();
     /**
@@ -275,8 +280,85 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
     }
 
-    async onLeave(client: Client): Promise<void> {
-        await this._eliminatePlayer(client.sessionId);
+    async onLeave(client: Client, code?: number): Promise<void> {
+        // This Colyseus version passes a WebSocket close code here. A consented
+        // close means the user intentionally left; any other close is treated
+        // as a dropped connection that may come back.
+        const consented = code === COLYSEUS_CONSENTED_LEAVE_CODE;
+
+        // A consented leave is an intentional exit, so the player forfeits
+        // immediately instead of receiving a reconnect grace window.
+        if (consented) {
+            await this._forfeitPlayer(client.sessionId);
+            return;
+        }
+
+        // Unconsented leaves are network drops, tab refreshes, or browser
+        // interruptions. Hold the slot open so the same connection can be
+        // restored within the configured window.
+        await this._holdSlotForReconnection(client);
+    }
+
+    private async _forfeitPlayer(sessionId: string): Promise<void> {
+        // Forfeit currently uses the same state transition as elimination:
+        // mark the player out, clear their active game presence, and let the
+        // win-condition check decide whether the match is over.
+        await this._eliminatePlayer(sessionId);
+    }
+
+    private async _holdSlotForReconnection(client: Client): Promise<void> {
+        const player = this._getVerifiedPlayer(client);
+
+        if (!player) {
+            // If the disconnected client no longer maps to a verified player
+            // slot, there is no safe identity to reserve.
+            await this._forfeitPlayer(client.sessionId);
+            return;
+        }
+
+        // If Colyseus reports another unconsented leave for the same session
+        // while a reconnect is already pending, keep the first window as the
+        // authority and avoid starting duplicate timeout work.
+        if (this._reconnectingSessionIds.has(client.sessionId)) {
+            return;
+        }
+
+        const reconnectWindowSeconds = getReconnectWindowSeconds();
+        this._reconnectingSessionIds.add(client.sessionId);
+
+        // Mark the player offline for presence, but keep current_room_id and
+        // all game state intact so the slot can be reclaimed during the window.
+        await this._markPlayerOffline(player.userId);
+
+        try {
+            const reconnectedClient = await this.allowReconnection(
+                client,
+                reconnectWindowSeconds,
+            );
+            const reconnectedPlayer = this._getVerifiedPlayer(reconnectedClient);
+            const auth = reconnectedClient.auth as VerifiedClientAuth | undefined;
+
+            this._reconnectingSessionIds.delete(client.sessionId);
+
+            // The reconnected client must still resolve to the same verified
+            // game slot and carry the persisted session id used for presence.
+            if (!reconnectedPlayer || !auth?.supabaseSessionId) {
+                reconnectedClient.leave();
+                await this._forfeitPlayer(client.sessionId);
+                return;
+            }
+
+            await this._markPlayerInGame(
+                reconnectedPlayer.userId,
+                auth.supabaseSessionId,
+            );
+        } catch {
+            // allowReconnection rejects when the timer expires or the room can
+            // no longer restore the client. At that point the reserved slot is
+            // released by treating the disconnected player as forfeited.
+            this._reconnectingSessionIds.delete(client.sessionId);
+            await this._forfeitPlayer(client.sessionId);
+        }
     }
 
     private async _eliminatePlayer(sessionId: string): Promise<void> {
