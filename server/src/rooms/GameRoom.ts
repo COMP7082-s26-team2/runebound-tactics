@@ -349,6 +349,14 @@ export class GameRoom extends Room<{ state: GameState }> {
 
     private async _eliminatePlayer(sessionId: string): Promise<void> {
         const player = this.state.players.get(sessionId);
+
+        // Multiple disconnect, timeout, or leave paths may converge here. Once
+        // a player is eliminated, do not clear presence, advance the turn, or
+        // evaluate the winner a second time.
+        if (player?.isEliminated) {
+            return;
+        }
+
         if (player) {
             player.isEliminated = true;
             console.log(`[${new Date().toISOString()}] [GameRoom] ${player.displayName} eliminated`);
