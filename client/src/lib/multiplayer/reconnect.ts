@@ -1,5 +1,8 @@
+"use client";
+
 import type { Room } from "@colyseus/sdk";
 import { LobbyState, GameState } from "@runebound-tactics/shared";
+import { useCallback } from "react";
 import { client } from "./client";
 import { getAuthenticatedJoinOptions } from "./authJoinOptions";
 
@@ -45,18 +48,113 @@ async function joinOrReconnect<S>(
     return room;
 }
 
-export function joinOrReconnectLobby(roomId: string, displayName: string) {
-    return joinOrReconnect<LobbyState>(LOBBY_TOKEN, roomId, { displayName }, LobbyState);
+interface GameReconnectCallbacks {
+    onReconnect?: () => void;
+    onFailure?: (message: string) => void;
 }
 
-export function joinOrReconnectGame(roomId: string, displayName: string) {
-    return joinOrReconnect<GameState>(GAME_TOKEN, roomId, { displayName }, GameState);
-}
+/**
+ * Provides the existing room join helpers through one React hook and manages
+ * the live game connection lifecycle after a room has been joined.
+ */
+export function useRoomConnect() {
+    const joinOrReconnectLobby = useCallback(
+        (roomId: string, displayName: string) =>
+            joinOrReconnect<LobbyState>(
+                LOBBY_TOKEN,
+                roomId,
+                { displayName },
+                LobbyState,
+            ),
+        [],
+    );
 
-export function clearLobbyToken(): void {
-    if (typeof window !== "undefined") window.sessionStorage.removeItem(LOBBY_TOKEN);
-}
+    const joinOrReconnectGame = useCallback(
+        (roomId: string, displayName: string) =>
+            joinOrReconnect<GameState>(
+                GAME_TOKEN,
+                roomId,
+                { displayName },
+                GameState,
+            ),
+        [],
+    );
 
-export function clearGameToken(): void {
-    if (typeof window !== "undefined") window.sessionStorage.removeItem(GAME_TOKEN);
+    const clearLobbyToken = useCallback(() => {
+        if (typeof window !== "undefined") {
+            window.sessionStorage.removeItem(LOBBY_TOKEN);
+        }
+    }, []);
+
+    const clearGameToken = useCallback(() => {
+        if (typeof window !== "undefined") {
+            window.sessionStorage.removeItem(GAME_TOKEN);
+        }
+    }, []);
+
+    const watchGameConnection = useCallback(
+        (
+            room: Room<unknown, GameState>,
+            callbacks: GameReconnectCallbacks = {},
+        ) => {
+            let reconnecting = false;
+
+            const handleDrop = () => {
+                reconnecting = true;
+
+                // The installed Colyseus SDK automatically attempts to reclaim
+                // this room using its current reconnection token.
+                window.sessionStorage.setItem(
+                    GAME_TOKEN,
+                    room.reconnectionToken,
+                );
+            };
+
+            const handleReconnect = () => {
+                reconnecting = false;
+
+                // The old token was consumed. Store the replacement issued by
+                // Colyseus so another later disconnect can also recover.
+                queueMicrotask(() => {
+                    window.sessionStorage.setItem(
+                        GAME_TOKEN,
+                        room.reconnectionToken,
+                    );
+                });
+                callbacks.onReconnect?.();
+            };
+
+            const handleLeave = (_code: number, reason?: string) => {
+                // Normal intentional leaves are handled by their own buttons.
+                // A leave after onDrop means automatic reconnect retries ended.
+                if (!reconnecting) return;
+
+                reconnecting = false;
+                clearGameToken();
+                callbacks.onFailure?.(
+                    reason?.trim() ||
+                        "The game connection could not be restored.",
+                );
+            };
+
+            room.onDrop(handleDrop);
+            room.onReconnect(handleReconnect);
+            room.onLeave(handleLeave);
+
+            return () => {
+                room.onDrop.remove(handleDrop);
+                room.onReconnect.remove(handleReconnect);
+                room.onLeave.remove(handleLeave);
+            };
+        },
+        [clearGameToken],
+    );
+
+    return {
+        joinOrReconnectLobby,
+        joinOrReconnectGame,
+        clearLobbyToken,
+        clearGameToken,
+        watchGameConnection,
+    };
 }
