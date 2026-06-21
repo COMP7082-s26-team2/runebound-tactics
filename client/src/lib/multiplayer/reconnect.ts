@@ -1,6 +1,6 @@
 "use client";
 
-import type { Room } from "@colyseus/sdk";
+import { MatchMakeError, type Room } from "@colyseus/sdk";
 import { LobbyState, GameState } from "@runebound-tactics/shared";
 import { useCallback } from "react";
 import { client } from "./client";
@@ -8,6 +8,9 @@ import { getAuthenticatedJoinOptions } from "./authJoinOptions";
 
 const LOBBY_TOKEN = "lobby_token";
 const GAME_TOKEN  = "game_token";
+const DEFAULT_RECONNECT_WINDOW_SECONDS = 60;
+const RECONNECT_RETRY_INTERVAL_MS = 1_000;
+const MILLISECONDS_PER_SECOND = 1_000;
 
 interface GameConnectOptions {
     reconnectOnly?: boolean;
@@ -25,6 +28,57 @@ interface GameConnectionCallbacks {
 }
 
 let inFlightGameReconnect: InFlightGameReconnect | null = null;
+
+function getReconnectWindowMs(): number {
+    const configuredSeconds = Number(
+        process.env.NEXT_PUBLIC_GAME_RECONNECT_WINDOW_SECONDS,
+    );
+    const reconnectWindowSeconds =
+        Number.isFinite(configuredSeconds) && configuredSeconds > 0
+            ? configuredSeconds
+            : DEFAULT_RECONNECT_WINDOW_SECONDS;
+
+    return reconnectWindowSeconds * MILLISECONDS_PER_SECOND;
+}
+
+function wait(delayMs: number): Promise<void> {
+    return new Promise((resolve) => {
+        window.setTimeout(resolve, delayMs);
+    });
+}
+
+async function reconnectGameWithRetry(
+    reconnectToken: string,
+): Promise<Room<unknown, GameState>> {
+    const deadline = Date.now() + getReconnectWindowMs();
+    let lastError: unknown;
+
+    while (Date.now() < deadline) {
+        try {
+            return await client.reconnect<GameState>(
+                reconnectToken,
+                GameState,
+            );
+        } catch (error) {
+            lastError = error;
+
+            // A matchmaking response means the server was reachable and
+            // explicitly rejected the token, so further retries cannot help.
+            if (error instanceof MatchMakeError) {
+                throw error;
+            }
+
+            const remainingMs = deadline - Date.now();
+            if (remainingMs <= 0) break;
+
+            await wait(Math.min(RECONNECT_RETRY_INTERVAL_MS, remainingMs));
+        }
+    }
+
+    throw lastError instanceof Error
+        ? lastError
+        : new Error("The game reconnection window expired.");
+}
 
 function getStoredRoomToken(storageKey: string, roomId: string): string | null {
     const stored = window.sessionStorage.getItem(storageKey);
@@ -102,10 +156,7 @@ async function joinOrReconnectGameRoom(
         // another caller cannot consume the same token concurrently.
         window.sessionStorage.removeItem(GAME_TOKEN);
 
-        const promise = client.reconnect<GameState>(
-            storedToken,
-            GameState,
-        );
+        const promise = reconnectGameWithRetry(storedToken);
         inFlightGameReconnect = { roomId, promise };
 
         try {
