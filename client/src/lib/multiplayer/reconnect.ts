@@ -23,8 +23,6 @@ interface InFlightGameReconnect {
 
 interface GameConnectionCallbacks {
     onDrop?: () => void;
-    onReconnect?: () => void;
-    onLeave?: (wasDropped: boolean, message: string | null) => void;
 }
 
 let inFlightGameReconnect: InFlightGameReconnect | null = null;
@@ -237,34 +235,14 @@ export function useRoomConnect() {
             room: Room<unknown, GameState>,
             callbacks: GameConnectionCallbacks = {},
         ) => {
-            let wasDropped = false;
-
             const handleDrop = () => {
-                wasDropped = true;
                 callbacks.onDrop?.();
             };
 
-            const handleReconnect = () => {
-                wasDropped = false;
-                callbacks.onReconnect?.();
-            };
-
-            const handleLeave = (_code: number, reason?: string) => {
-                const message = reason?.trim() || null;
-                callbacks.onLeave?.(
-                    wasDropped,
-                    message,
-                );
-            };
-
             room.onDrop(handleDrop);
-            room.onReconnect(handleReconnect);
-            room.onLeave(handleLeave);
 
             return () => {
                 room.onDrop.remove(handleDrop);
-                room.onReconnect.remove(handleReconnect);
-                room.onLeave.remove(handleLeave);
             };
         },
         [],
