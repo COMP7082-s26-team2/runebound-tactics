@@ -164,9 +164,9 @@ export class MultiplayerGameScene extends Scene {
     }
 
     destroy(): void {
-        // ComponentManager.remove handles per-component destroy.
-        // Scene base class doesn't expose a bulk-remove, but the engine's
-        // lifecycle disposes the scene wholesale when switched away from.
+        // InputSystem and any future stateful components receive their
+        // destroy hooks before this scene and its world are discarded.
+        this.components.clear();
         this._prevSnapshot.clear();
         this._lastSeenHp.clear();
     }

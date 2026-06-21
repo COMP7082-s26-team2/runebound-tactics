@@ -28,7 +28,11 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const { room, error } = useGameRoom();
     const state = useGameRoomState();
     const router = useRouter();
-    const { isReconnecting, leaveGame } = useGameConnection();
+    const {
+        isReconnecting,
+        stateSyncVersion,
+        leaveGame,
+    } = useGameConnection();
     const { clearGameToken } = useRoomConnect();
 
     const roomMatches = room?.roomId === expectedRoomId;
@@ -110,7 +114,11 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center">
             <div className="relative inline-block">
-                <MultiplayerGameCanvas room={room} state={gameState} />
+                <MultiplayerGameCanvas
+                    key={`${room.roomId}:${stateSyncVersion}`}
+                    room={room}
+                    state={gameState}
+                />
                 <GameHUD
                     state={gameState}
                     sessionId={room.sessionId}

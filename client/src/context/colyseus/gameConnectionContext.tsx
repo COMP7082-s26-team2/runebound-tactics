@@ -130,6 +130,12 @@ export function GameConnectionProvider({
                         return;
                     }
 
+                    // Publish the replacement room only after its state exists.
+                    // Consumers therefore never render its default schema.
+                    setRoomSnapshot({
+                        room: nextRoom,
+                        error: undefined,
+                    });
                     setStateSyncVersion((version) => version + 1);
 
                     if (!reconnectOnly) {
@@ -143,11 +149,6 @@ export function GameConnectionProvider({
                     if (pathnameRef.current !== gamePath) {
                         router.replace(gamePath);
                     }
-                });
-
-                setRoomSnapshot({
-                    room: nextRoom,
-                    error: undefined,
                 });
             } catch (error) {
                 if (connectionGenerationRef.current === generation) {
