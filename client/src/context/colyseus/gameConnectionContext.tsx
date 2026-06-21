@@ -6,6 +6,7 @@ import {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
     type ReactNode,
 } from "react";
@@ -13,22 +14,17 @@ import type { Room } from "@colyseus/sdk";
 import type { GameState } from "@runebound-tactics/shared";
 import { usePathname, useRouter } from "next/navigation";
 import {
-    GameRoomProvider,
-    useGameRoom,
+    GameRoomStoreProvider,
     useGameRoomState,
+    type GameRoomSnapshot,
 } from "@/context/colyseus/gameRoomContext";
-import { ClientOnly } from "@/components/util/ClientOnly";
 import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 
 export type GameReconnectStatus = "idle" | "reconnecting" | "failed";
 
-const INITIAL_CONNECTION_ATTEMPT = 0;
-
-interface GameConnectionTarget {
+interface ActiveGameTarget {
     roomId: string;
     displayName: string;
-    reconnectOnly: boolean;
-    attempt: number;
 }
 
 interface GameConnectionContextValue {
@@ -40,142 +36,84 @@ interface GameConnectionContextValue {
     clearReconnectError: () => void;
 }
 
-interface GameConnectionLifecycleProps {
-    target: GameConnectionTarget | null;
-    requestReconnect: () => void;
-    completeConnection: () => void;
-    failConnection: (error: unknown) => void;
+interface GameStateSyncProps {
+    activeGameRoomId: string | null;
+    reconnectStatus: GameReconnectStatus;
+    completeReconnect: () => void;
 }
 
 const GameConnectionContext =
     createContext<GameConnectionContextValue | null>(null);
 
 /**
- * Observes the room owned by the persistent provider and translates Colyseus
- * lifecycle events into one reconnect attempt at a time.
+ * Waits for the reconnected room's full state before returning the player to
+ * the game route and dismissing reconnecting state.
  */
-function GameConnectionLifecycle({
-    target,
-    requestReconnect,
-    completeConnection,
-    failConnection,
-}: GameConnectionLifecycleProps) {
-    const { room, error } = useGameRoom();
+function GameStateSync({
+    activeGameRoomId,
+    reconnectStatus,
+    completeReconnect,
+}: GameStateSyncProps) {
     const state = useGameRoomState();
     const pathname = usePathname();
     const router = useRouter();
-    const { watchGameConnection } = useRoomConnect();
 
     useEffect(() => {
-        if (!room || !target || room.roomId !== target.roomId) return;
-
-        return watchGameConnection(room, {
-            onDrop: requestReconnect,
-        });
-    }, [requestReconnect, room, target, watchGameConnection]);
-
-    useEffect(() => {
-        if (!room || !state || !target || room.roomId !== target.roomId) {
+        if (
+            reconnectStatus !== "reconnecting" ||
+            !activeGameRoomId ||
+            !state
+        ) {
             return;
         }
 
-        const restoredGamePath = `/game/${target.roomId}`;
-        const shouldRestoreRoute = target.reconnectOnly &&
-            pathname !== restoredGamePath;
+        const gamePath = `/game/${activeGameRoomId}`;
+        completeReconnect();
 
-        completeConnection();
-
-        if (shouldRestoreRoute) {
-            router.replace(restoredGamePath);
+        if (pathname !== gamePath) {
+            router.replace(gamePath);
         }
     }, [
-        completeConnection,
+        activeGameRoomId,
+        completeReconnect,
         pathname,
-        room,
+        reconnectStatus,
         router,
         state,
-        target,
     ]);
-
-    useEffect(() => {
-        if (error && target) {
-            failConnection(error);
-        }
-    }, [error, failConnection, target]);
 
     return null;
 }
 
 /**
- * Keeps the active game room mounted while the user moves between app routes.
+ * Owns one active game room across route navigation and explicitly replaces a
+ * dropped room only after its reconnect promise succeeds.
  *
- * This context owns connection status and room targeting only. Authentication,
- * display-name behavior, and token storage remain in their existing modules.
+ * Authentication, display-name behavior, and reconnect-token storage remain
+ * in their existing multiplayer modules.
  */
 export function GameConnectionProvider({
     children,
 }: {
     children: ReactNode;
 }) {
-    const [target, setTarget] = useState<GameConnectionTarget | null>(null);
+    const [target, setTarget] = useState<ActiveGameTarget | null>(null);
+    const [roomSnapshot, setRoomSnapshot] = useState<GameRoomSnapshot>({
+        room: undefined,
+        error: undefined,
+        isConnecting: false,
+    });
     const [reconnectStatus, setReconnectStatus] =
         useState<GameReconnectStatus>("idle");
     const [reconnectError, setReconnectError] = useState<string | null>(null);
+    const targetRef = useRef<ActiveGameTarget | null>(null);
+    const connectionGenerationRef = useRef(0);
     const router = useRouter();
     const {
         joinOrReconnectGame,
         clearGameToken,
+        watchGameConnection,
     } = useRoomConnect();
-
-    const connectGame = useCallback(
-        (roomId: string, displayName: string) => {
-            setReconnectError(null);
-            setReconnectStatus("idle");
-            setTarget((current) => {
-                if (current?.roomId === roomId) {
-                    return current;
-                }
-
-                return {
-                    roomId,
-                    displayName,
-                    reconnectOnly: false,
-                    attempt: INITIAL_CONNECTION_ATTEMPT,
-                };
-            });
-        },
-        [],
-    );
-
-    const requestReconnect = useCallback(() => {
-        setReconnectStatus("reconnecting");
-        setTarget((current) => {
-            if (!current || current.reconnectOnly) {
-                return current;
-            }
-
-            return {
-                ...current,
-                reconnectOnly: true,
-                attempt: current.attempt + 1,
-            };
-        });
-    }, []);
-
-    const completeConnection = useCallback(() => {
-        setReconnectStatus("idle");
-        setReconnectError(null);
-        setTarget((current) => {
-            if (!current?.reconnectOnly) {
-                return current;
-            }
-
-            return {
-                ...current,
-                reconnectOnly: false,
-            };
-        });
-    }, []);
 
     const failConnection = useCallback(
         (error: unknown) => {
@@ -184,8 +122,18 @@ export function GameConnectionProvider({
                     ? error.message
                     : "The game connection could not be restored.";
 
+            connectionGenerationRef.current += 1;
+            targetRef.current = null;
             clearGameToken();
             setTarget(null);
+            setRoomSnapshot({
+                room: undefined,
+                error:
+                    error instanceof Error
+                        ? error
+                        : new Error(message),
+                isConnecting: false,
+            });
             setReconnectStatus("failed");
             setReconnectError(message);
             router.replace("/lobbies?reason=reconnect_failed");
@@ -193,15 +141,107 @@ export function GameConnectionProvider({
         [clearGameToken, router],
     );
 
-    const leaveGame = useCallback(
-        async (room: Room<unknown, GameState>) => {
-            // Clear local reconnect ownership before the consented leave so its
-            // close event cannot start an accidental reconnect attempt.
-            clearGameToken();
-            setTarget(null);
+    const startConnection = useCallback(
+        async (
+            gameTarget: ActiveGameTarget,
+            reconnectOnly: boolean,
+        ) => {
+            const generation = connectionGenerationRef.current + 1;
+            connectionGenerationRef.current = generation;
+            setRoomSnapshot((current) => ({
+                room: reconnectOnly ? current.room : undefined,
+                error: undefined,
+                isConnecting: true,
+            }));
+
+            try {
+                const nextRoom = await joinOrReconnectGame(
+                    gameTarget.roomId,
+                    gameTarget.displayName,
+                    { reconnectOnly },
+                );
+
+                if (connectionGenerationRef.current !== generation) {
+                    await nextRoom.leave(true);
+                    return;
+                }
+
+                setRoomSnapshot({
+                    room: nextRoom,
+                    error: undefined,
+                    isConnecting: false,
+                });
+            } catch (error) {
+                if (connectionGenerationRef.current === generation) {
+                    failConnection(error);
+                }
+            }
+        },
+        [failConnection, joinOrReconnectGame],
+    );
+
+    const requestReconnect = useCallback(() => {
+        const activeTarget = targetRef.current;
+        if (!activeTarget || reconnectStatus === "reconnecting") {
+            return;
+        }
+
+        setReconnectStatus("reconnecting");
+        setReconnectError(null);
+        void startConnection(activeTarget, true);
+    }, [reconnectStatus, startConnection]);
+
+    useEffect(() => {
+        const room = roomSnapshot.room;
+        if (!room) return;
+
+        return watchGameConnection(room, {
+            onDrop: requestReconnect,
+        });
+    }, [requestReconnect, roomSnapshot.room, watchGameConnection]);
+
+    const connectGame = useCallback(
+        (roomId: string, displayName: string) => {
+            if (targetRef.current?.roomId === roomId) {
+                return;
+            }
+
+            const previousRoom = roomSnapshot.room;
+            if (previousRoom) {
+                void previousRoom.leave(true);
+            }
+
+            const nextTarget = { roomId, displayName };
+            targetRef.current = nextTarget;
+            setTarget(nextTarget);
             setReconnectStatus("idle");
             setReconnectError(null);
-            await room.leave(true);
+            void startConnection(nextTarget, false);
+        },
+        [roomSnapshot.room, startConnection],
+    );
+
+    const completeReconnect = useCallback(() => {
+        setReconnectStatus("idle");
+        setReconnectError(null);
+    }, []);
+
+    const leaveGame = useCallback(
+        async (activeRoom: Room<unknown, GameState>) => {
+            // Invalidate pending connection work before sending the consented
+            // leave so its close event cannot start another reconnect.
+            connectionGenerationRef.current += 1;
+            targetRef.current = null;
+            clearGameToken();
+            setTarget(null);
+            setRoomSnapshot({
+                room: undefined,
+                error: undefined,
+                isConnecting: false,
+            });
+            setReconnectStatus("idle");
+            setReconnectError(null);
+            await activeRoom.leave(true);
         },
         [clearGameToken],
     );
@@ -210,7 +250,7 @@ export function GameConnectionProvider({
         setReconnectError(null);
     }, []);
 
-    const value = useMemo<GameConnectionContextValue>(
+    const contextValue = useMemo<GameConnectionContextValue>(
         () => ({
             activeGameRoomId: target?.roomId ?? null,
             reconnectStatus,
@@ -229,40 +269,20 @@ export function GameConnectionProvider({
         ],
     );
 
-    const connect = target
-        ? () =>
-              joinOrReconnectGame(
-                  target.roomId,
-                  target.displayName,
-                  { reconnectOnly: target.reconnectOnly },
-              )
-        : null;
-
     return (
-        <GameConnectionContext.Provider value={value}>
-            {/* The Colyseus room store is browser-only; render normal route
-                content during SSR and mount the persistent room after hydration. */}
-            <ClientOnly fallback={children}>
-                <GameRoomProvider
-                    connect={connect}
-                    deps={[target?.roomId, target?.attempt]}
-                >
-                    <GameConnectionLifecycle
-                        target={target}
-                        requestReconnect={requestReconnect}
-                        completeConnection={completeConnection}
-                        failConnection={failConnection}
-                    />
-                    {children}
-                </GameRoomProvider>
-            </ClientOnly>
+        <GameConnectionContext.Provider value={contextValue}>
+            <GameRoomStoreProvider value={roomSnapshot}>
+                <GameStateSync
+                    activeGameRoomId={target?.roomId ?? null}
+                    reconnectStatus={reconnectStatus}
+                    completeReconnect={completeReconnect}
+                />
+                {children}
+            </GameRoomStoreProvider>
         </GameConnectionContext.Provider>
     );
 }
 
-/**
- * Accesses the persistent active-game connection coordinator.
- */
 export function useGameConnection(): GameConnectionContextValue {
     const context = useContext(GameConnectionContext);
 
