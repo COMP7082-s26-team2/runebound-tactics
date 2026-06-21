@@ -28,7 +28,7 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const { room, error } = useGameRoom();
     const state = useGameRoomState();
     const router = useRouter();
-    const { leaveGame } = useGameConnection();
+    const { isReconnecting, leaveGame } = useGameConnection();
     const { clearGameToken } = useRoomConnect();
 
     const roomMatches = room?.roomId === expectedRoomId;
@@ -79,6 +79,10 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     }
 
     async function leave() {
+        if (isReconnecting) {
+            return;
+        }
+
         try {
             if (room) {
                 await leaveGame(room);
@@ -90,6 +94,10 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     }
 
     function endTurn() {
+        if (isReconnecting) {
+            return;
+        }
+
         room?.send("end_turn", {});
     }
 
@@ -106,6 +114,7 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                 <GameHUD
                     state={gameState}
                     sessionId={room.sessionId}
+                    interactionDisabled={isReconnecting}
                     onLeave={leave}
                     onEndTurn={endTurn}
                 />

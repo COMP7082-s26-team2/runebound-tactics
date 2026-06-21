@@ -17,6 +17,7 @@ import {
     GameRoomStoreProvider,
     type GameRoomSnapshot,
 } from "@/context/colyseus/gameRoomContext";
+import { GameReconnectOverlay } from "@/components/game/GameReconnectOverlay";
 import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 
 export type GameReconnectStatus = "idle" | "reconnecting" | "failed";
@@ -27,7 +28,6 @@ interface ActiveGameTarget {
 }
 
 interface GameConnectionContextValue {
-    reconnectStatus: GameReconnectStatus;
     isReconnecting: boolean;
     stateSyncVersion: number;
     reconnectError: string | null;
@@ -222,7 +222,6 @@ export function GameConnectionProvider({
 
     const contextValue = useMemo<GameConnectionContextValue>(
         () => ({
-            reconnectStatus,
             isReconnecting: reconnectStatus === "reconnecting",
             stateSyncVersion,
             reconnectError,
@@ -244,6 +243,9 @@ export function GameConnectionProvider({
         <GameConnectionContext.Provider value={contextValue}>
             <GameRoomStoreProvider value={roomSnapshot}>
                 {children}
+                <GameReconnectOverlay
+                    visible={reconnectStatus === "reconnecting"}
+                />
             </GameRoomStoreProvider>
         </GameConnectionContext.Provider>
     );
