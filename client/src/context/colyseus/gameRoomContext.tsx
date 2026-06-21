@@ -14,13 +14,11 @@ import type { GameState } from "@runebound-tactics/shared";
 export interface GameRoomSnapshot {
     room: Room<unknown, GameState> | undefined;
     error: Error | undefined;
-    isConnecting: boolean;
 }
 
 const EMPTY_GAME_ROOM_SNAPSHOT: GameRoomSnapshot = {
     room: undefined,
     error: undefined,
-    isConnecting: false,
 };
 
 const GameRoomContext = createContext<GameRoomSnapshot>(

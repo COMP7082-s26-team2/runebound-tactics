@@ -29,8 +29,6 @@ interface ActiveGameTarget {
 }
 
 interface GameConnectionContextValue {
-    activeGameRoomId: string | null;
-    reconnectStatus: GameReconnectStatus;
     reconnectError: string | null;
     connectGame: (roomId: string, displayName: string) => void;
     leaveGame: (room: Room<unknown, GameState>) => Promise<void>;
@@ -102,7 +100,6 @@ export function GameConnectionProvider({
     const [roomSnapshot, setRoomSnapshot] = useState<GameRoomSnapshot>({
         room: undefined,
         error: undefined,
-        isConnecting: false,
     });
     const [reconnectStatus, setReconnectStatus] =
         useState<GameReconnectStatus>("idle");
@@ -133,7 +130,6 @@ export function GameConnectionProvider({
                     error instanceof Error
                         ? error
                         : new Error(message),
-                isConnecting: false,
             });
             setReconnectStatus("failed");
             setReconnectError(message);
@@ -152,7 +148,6 @@ export function GameConnectionProvider({
             setRoomSnapshot((current) => ({
                 room: reconnectOnly ? current.room : undefined,
                 error: undefined,
-                isConnecting: true,
             }));
 
             try {
@@ -170,7 +165,6 @@ export function GameConnectionProvider({
                 setRoomSnapshot({
                     room: nextRoom,
                     error: undefined,
-                    isConnecting: false,
                 });
             } catch (error) {
                 if (connectionGenerationRef.current === generation) {
@@ -238,7 +232,6 @@ export function GameConnectionProvider({
             setRoomSnapshot({
                 room: undefined,
                 error: undefined,
-                isConnecting: false,
             });
             setReconnectStatus("idle");
             setReconnectError(null);
@@ -253,8 +246,6 @@ export function GameConnectionProvider({
 
     const contextValue = useMemo<GameConnectionContextValue>(
         () => ({
-            activeGameRoomId: target?.roomId ?? null,
-            reconnectStatus,
             reconnectError,
             connectGame,
             leaveGame,
@@ -265,8 +256,6 @@ export function GameConnectionProvider({
             connectGame,
             leaveGame,
             reconnectError,
-            reconnectStatus,
-            target?.roomId,
         ],
     );
 
