@@ -18,6 +18,7 @@ import {
     useGameRoomState,
     type GameRoomSnapshot,
 } from "@/context/colyseus/gameRoomContext";
+import { ClientOnly } from "@/components/util/ClientOnly";
 import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 
 export type GameReconnectStatus = "idle" | "reconnecting" | "failed";
@@ -272,11 +273,14 @@ export function GameConnectionProvider({
     return (
         <GameConnectionContext.Provider value={contextValue}>
             <GameRoomStoreProvider value={roomSnapshot}>
-                <GameStateSync
-                    activeGameRoomId={target?.roomId ?? null}
-                    reconnectStatus={reconnectStatus}
-                    completeReconnect={completeReconnect}
-                />
+                {/* Colyseus state snapshots require a browser subscription. */}
+                <ClientOnly>
+                    <GameStateSync
+                        activeGameRoomId={target?.roomId ?? null}
+                        reconnectStatus={reconnectStatus}
+                        completeReconnect={completeReconnect}
+                    />
+                </ClientOnly>
                 {children}
             </GameRoomStoreProvider>
         </GameConnectionContext.Provider>
