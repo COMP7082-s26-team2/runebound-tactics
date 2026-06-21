@@ -1,6 +1,6 @@
 "use client";
 
-import { MatchMakeError, type Room } from "@colyseus/sdk";
+import type { Room } from "@colyseus/sdk";
 import { LobbyState, GameState } from "@runebound-tactics/shared";
 import { useCallback } from "react";
 import { client } from "./client";
@@ -62,12 +62,9 @@ async function reconnectGameWithRetry(
         } catch (error) {
             lastError = error;
 
-            // A matchmaking response means the server was reachable and
-            // explicitly rejected the token, so further retries cannot help.
-            if (error instanceof MatchMakeError) {
-                throw error;
-            }
-
+            // The server may briefly reject the token before its onLeave
+            // handler has registered allowReconnection. Retry that response
+            // alongside network failures until the reconnect window closes.
             const remainingMs = deadline - Date.now();
             if (remainingMs <= 0) break;
 
