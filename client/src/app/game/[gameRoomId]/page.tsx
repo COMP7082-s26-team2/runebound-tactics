@@ -8,13 +8,15 @@ import { ClientOnly } from "@/components/util/ClientOnly";
 
 export default function GamePage({ params }: { params: Promise<{ gameRoomId: string }> }) {
     const { gameRoomId } = use(params);
-    const { connectGame } = useGameConnection();
+    const { activeGameRoomId, connectGame } = useGameConnection();
 
     useEffect(() => {
         // Activating the target here lets the root-level coordinator keep the
         // room alive even if navigation temporarily leaves the game route.
-        connectGame(gameRoomId, getDisplayName());
-    }, [connectGame, gameRoomId]);
+        if (activeGameRoomId !== gameRoomId) {
+            connectGame(gameRoomId, getDisplayName());
+        }
+    }, [activeGameRoomId, connectGame, gameRoomId]);
 
     return (
         <ClientOnly fallback={<p className="text-white p-4">Connecting…</p>}>
