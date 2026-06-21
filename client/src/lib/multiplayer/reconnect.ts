@@ -82,6 +82,19 @@ async function joinOrReconnectGameRoom(
         throw new Error("Cannot join from server-side");
     }
 
+    if (inFlightGameReconnect) {
+        if (inFlightGameReconnect.roomId !== roomId) {
+            throw new Error("Another game reconnection is already in progress.");
+        }
+
+        // Repeated drop signals for the same room share the existing promise
+        // instead of attempting to consume the same single-use token twice.
+        const room = await inFlightGameReconnect.promise;
+        room.reconnection.enabled = false;
+        window.sessionStorage.setItem(GAME_TOKEN, room.reconnectionToken);
+        return room;
+    }
+
     const storedToken = getStoredRoomToken(GAME_TOKEN, roomId);
 
     if (storedToken) {
@@ -89,15 +102,11 @@ async function joinOrReconnectGameRoom(
         // another caller cannot consume the same token concurrently.
         window.sessionStorage.removeItem(GAME_TOKEN);
 
-        if (!inFlightGameReconnect) {
-            const promise = client.reconnect<GameState>(
-                storedToken,
-                GameState,
-            );
-            inFlightGameReconnect = { roomId, promise };
-        } else if (inFlightGameReconnect.roomId !== roomId) {
-            throw new Error("Another game reconnection is already in progress.");
-        }
+        const promise = client.reconnect<GameState>(
+            storedToken,
+            GameState,
+        );
+        inFlightGameReconnect = { roomId, promise };
 
         try {
             const room = await inFlightGameReconnect.promise;

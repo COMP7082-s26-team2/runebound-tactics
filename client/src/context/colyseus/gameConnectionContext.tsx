@@ -21,6 +21,8 @@ import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 
 export type GameReconnectStatus = "idle" | "reconnecting" | "failed";
 
+const INITIAL_CONNECTION_ATTEMPT = 0;
+
 interface GameConnectionTarget {
     roomId: string;
     displayName: string;
@@ -137,7 +139,7 @@ export function GameConnectionProvider({
                     roomId,
                     displayName,
                     reconnectOnly: false,
-                    attempt: 0,
+                    attempt: INITIAL_CONNECTION_ATTEMPT,
                 };
             });
         },
