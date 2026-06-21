@@ -17,6 +17,7 @@ import {
     useGameRoom,
     useGameRoomState,
 } from "@/context/colyseus/gameRoomContext";
+import { ClientOnly } from "@/components/util/ClientOnly";
 import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 
 export type GameReconnectStatus = "idle" | "reconnecting" | "failed";
@@ -239,18 +240,22 @@ export function GameConnectionProvider({
 
     return (
         <GameConnectionContext.Provider value={value}>
-            <GameRoomProvider
-                connect={connect}
-                deps={[target?.roomId, target?.attempt]}
-            >
-                <GameConnectionLifecycle
-                    target={target}
-                    requestReconnect={requestReconnect}
-                    completeConnection={completeConnection}
-                    failConnection={failConnection}
-                />
-                {children}
-            </GameRoomProvider>
+            {/* The Colyseus room store is browser-only; render normal route
+                content during SSR and mount the persistent room after hydration. */}
+            <ClientOnly fallback={children}>
+                <GameRoomProvider
+                    connect={connect}
+                    deps={[target?.roomId, target?.attempt]}
+                >
+                    <GameConnectionLifecycle
+                        target={target}
+                        requestReconnect={requestReconnect}
+                        completeConnection={completeConnection}
+                        failConnection={failConnection}
+                    />
+                    {children}
+                </GameRoomProvider>
+            </ClientOnly>
         </GameConnectionContext.Provider>
     );
 }
