@@ -244,9 +244,9 @@ export function GameConnectionProvider({
         <GameConnectionContext.Provider value={contextValue}>
             <GameRoomStoreProvider value={roomSnapshot}>
                 {children}
-                <GameReconnectOverlay
-                    visible={reconnectStatus === "reconnecting"}
-                />
+                {reconnectStatus === "reconnecting" && (
+                    <GameReconnectOverlay />
+                )}
             </GameRoomStoreProvider>
         </GameConnectionContext.Provider>
     );

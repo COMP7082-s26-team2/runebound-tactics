@@ -27,16 +27,19 @@ interface GameConnectionCallbacks {
 
 let inFlightGameReconnect: InFlightGameReconnect | null = null;
 
-function getReconnectWindowMs(): number {
+/** Returns the reconnect grace period shared by retries and UI warnings. */
+export function getReconnectWindowSeconds(): number {
     const configuredSeconds = Number(
         process.env.NEXT_PUBLIC_GAME_RECONNECT_WINDOW_SECONDS,
     );
-    const reconnectWindowSeconds =
-        Number.isFinite(configuredSeconds) && configuredSeconds > 0
-            ? configuredSeconds
-            : DEFAULT_RECONNECT_WINDOW_SECONDS;
 
-    return reconnectWindowSeconds * MILLISECONDS_PER_SECOND;
+    return Number.isFinite(configuredSeconds) && configuredSeconds > 0
+        ? configuredSeconds
+        : DEFAULT_RECONNECT_WINDOW_SECONDS;
+}
+
+function getReconnectWindowMs(): number {
+    return getReconnectWindowSeconds() * MILLISECONDS_PER_SECOND;
 }
 
 function wait(delayMs: number): Promise<void> {
