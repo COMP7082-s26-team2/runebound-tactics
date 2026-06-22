@@ -1,4 +1,5 @@
 import { MapSchema, Schema, type } from "@colyseus/schema";
+import { DeckManager } from "./Card"
 
 /**
  * A single unit on the game grid.
@@ -73,6 +74,8 @@ export class GameState extends Schema {
 
     /** All units on the board keyed by unitId. */
     @type({ map: GameUnit }) units = new MapSchema<GameUnit>();
+
+    @type(DeckManager) deck = new DeckManager();
 
     /** sessionId of the player whose turn it currently is. */
     @type("string") currentTurnId: string = "";
