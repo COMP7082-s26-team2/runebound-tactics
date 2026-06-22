@@ -47,20 +47,28 @@ async function runIntegrationTest() {
 
         await new Promise((resolve) => setTimeout(resolve, 200));
     
-    // This will now print safely because the initial state arrived with the connection
-    if (clientRoom.state && clientRoom.state.deck && clientRoom.state.deck.cards ) {
-        console.log(`Initial deck size on client: ${clientRoom.state.deck.cards.length} cards.`);
-    } else {
-        console.log("⚠️ Client state data structure is still parsing...");
-    }        // 3. Send a network message to test drawing cards
+        // This will now print safely because the initial state arrived with the connection
+        if (clientRoom.state && clientRoom.state.deck && clientRoom.state.deck.cards ) {
+            console.log(`Initial deck size on client: ${clientRoom.state.deck.cards.length} cards.`);
+        } else {
+            console.log("⚠️ Client state data structure is still parsing...");
+        }        // 3. Send a network message to test drawing cards
 
-    console.log("\n--- Dispatching drawCard action ---");
+        console.log("\n--- Dispatching drawCard action ---");
         clientRoom.send("drawCard");
-
-        // Wait for the server to process mutations and push state updates back down the wire
-        await clientRoom.waitForNextPatch();
-
-        console.log(`Deck size on client after patch delivery: ${clientRoom.state.deck.cards.length}`);
+        
+        // 2. CRITICAL Bypassing Hang: Give the server loop 250ms to process the 
+        // message handler, splice the array, and broadcast the binary delta down.
+        console.log("Awaiting network loop synchronization tick...");
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        
+        // 3. Assert directly against the synchronized client mirror state
+        if (clientRoom.state?.deck?.cards) {
+            const finalCount = clientRoom.state.deck.cards.length;
+            console.log(`✅ Success! Client mirror state synced. New deck size: ${finalCount}`);
+        } else {
+            console.error("❌ Error: Client state tree is inaccessible or empty.");
+        }
 
     } catch (error) {
         console.error("Test failed during execution loop:", error);

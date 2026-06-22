@@ -35,8 +35,42 @@ export class CardTestRoom extends Room<{state: GameState}> {
         console.log("[Trace 9] Registering drawCard message handler...");
         this.onMessage("drawCard", (client) => {
             console.log(`[GameRoom] drawCard executed by: ${client.sessionId}`);
+            try {
+              const deckContainer = this.state.deck;
+
+              // 1. Boundary Safety Check
+              if (!deckContainer.cards || deckContainer.cards.length === 0) {
+                console.log("[GameRoom] Action aborted: The card array collection is empty.");
+                return;
+              }
+
+              // 2. CRITICAL FIX: Target the exact final array index manually
+              const targetIndex = deckContainer.cards.length - 1;
+              const targetCardInstance = deckContainer.cards[targetIndex];
+
+              if (targetCardInstance) {
+                console.log(`[GameRoom] Splicing out card reference target: ${targetCardInstance.name}`);
+                
+                // 3. Extract the card safely using splice (DO NOT USE POP)
+                deckContainer.cards.splice(targetIndex, 1);
+                
+                // 4. Push it to the discard pile collection if utilizing the true discard pattern
+                if (deckContainer.discardPile) {
+                    deckContainer.discardPile.push(targetCardInstance);
+                }
+
+                // 5. Explicitly signal property modifications to the root state tree
+                deckContainer.$changed = true;
+                this.state.$changed = true;
+                
+                console.log(`[GameRoom] Mutation successful. Remainder count: ${deckContainer.cards.length}`);
+              }
+            } catch (handlerError) {
+                console.error("❌ Mutation Error inside handler:", handlerError.message);
+            }
         });
-        console.log("[Trace 10] drawCard handler successfully registered.");
+
+        console.log("wat")
     }
 
     onUncaughtException (err: Error, methodName: string) {
