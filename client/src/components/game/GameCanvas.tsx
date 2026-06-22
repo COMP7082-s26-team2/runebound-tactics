@@ -9,6 +9,7 @@ import { GameEngine, World } from "@/lib/";
 import { UnitRenderSystem } from "@/lib/game/";
 import { GridRenderSystem } from "@/lib/game/";
 import { SquareGrid } from "@/lib/engine/";
+import { loadTilemap, TerrainLayer } from "@/lib/game/tilemap";
 
 export interface GameCanvasOptions {
     debug?: boolean;
@@ -22,74 +23,84 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
 
         const canvas = canvasRef.current;
 
-        const engine = new GameEngine({
-            canvas,
-            width: 800,
-            height: 800,
-            fixedDelta: 1 / 60,
-            debug,
-        });
+        let engine: GameEngine | null = null;
+        let cancelled = false;
 
-        // init hook
-        engine.init = () => {
-            console.log("Engine initialized");
+        (async () => {
+            const { sheet, terrains, sets, terrainGrid } = await loadTilemap();
+            if (cancelled) return;
 
-            const grid = new SquareGrid(50);
-            const world = new World(grid);
-            world.spawnUnit(
-                { q: 2, r: 3 },
-                {
-                    attack: 10,
-                    health: 100,
-                    movement: 3,
-                    name: "Warrior",
-                    defense: 5,
-                    attackRange: 1,
-                },
-                {
-                    assetKey: "tilemap:entity:castle:swordsman",
-                    animationState: "idle",
-                    color: "red",
-                },
-            );
-            world.spawnUnit(
-                { q: 5, r: 6 },
-                {
-                    attack: 10,
-                    health: 100,
-                    movement: 3,
-                    name: "Archer",
-                    defense: 5,
-                    attackRange: 1,
-                },
-                {
-                    assetKey: "tilemap:entity:castle:archer",
-                    animationState: "idle",
-                    color: "green",
-                },
-            );
+            engine = new GameEngine({
+                canvas,
+                width: 800,
+                height: 800,
+                fixedDelta: 1 / 60,
+                debug,
+            });
 
-            engine.addComponent(new GridRenderSystem(world, 10, 10, 80));
-            engine.addComponent(new UnitRenderSystem(world, 10, 10, 80));
-        };
+            // init hook
+            engine.init = () => {
+                console.log("Engine initialized");
 
-        // render pipeline hooks
-        engine.preDraw = (ctx) => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        };
+                const grid = new SquareGrid(50);
+                const world = new World(grid);
+                world.spawnUnit(
+                    { q: 2, r: 3 },
+                    {
+                        attack: 10,
+                        health: 100,
+                        movement: 3,
+                        name: "Warrior",
+                        defense: 5,
+                        attackRange: 1,
+                    },
+                    {
+                        assetKey: "tilemap:entity:castle:swordsman",
+                        animationState: "idle",
+                        color: "red",
+                    },
+                );
+                world.spawnUnit(
+                    { q: 5, r: 6 },
+                    {
+                        attack: 10,
+                        health: 100,
+                        movement: 3,
+                        name: "Archer",
+                        defense: 5,
+                        attackRange: 1,
+                    },
+                    {
+                        assetKey: "tilemap:entity:castle:archer",
+                        animationState: "idle",
+                        color: "green",
+                    },
+                );
 
-        engine.draw = (ctx) => {
-            engine.components.draw(ctx, 1);
-        };
+                const terrainLayer = new TerrainLayer(terrainGrid, sets, terrains);
+                engine!.addComponent(new GridRenderSystem(terrainLayer, sheet, 80));
+                engine!.addComponent(new UnitRenderSystem(world, 10, 10, 80));
+            };
 
-        engine.postDraw = (ctx) => { };
+            // render pipeline hooks
+            engine.preDraw = (ctx) => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            };
 
-        // start engine
-        engine.start();
+            engine.draw = (ctx) => {
+                engine!.components.draw(ctx, 1);
+            };
+
+            engine.postDraw = () => {};
+
+            // start engine
+            engine.start();
+        })();
 
         // cleanup
         return () => {
-            engine.stop();
+            cancelled = true;
+            engine?.stop();
         };
     }, []);
 

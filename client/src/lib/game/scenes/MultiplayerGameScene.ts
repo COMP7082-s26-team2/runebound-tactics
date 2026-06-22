@@ -40,6 +40,7 @@ import {
     type GameState as ServerGameState,
 } from "@runebound-tactics/shared";
 import type { Room } from "@colyseus/sdk";
+import type { TerrainLayer } from "@/lib/game/tilemap";
 
 /**
  * Multiplayer game scene.
@@ -70,13 +71,19 @@ export class MultiplayerGameScene extends Scene {
     private _lastSeenHp = new Map<string, number>();
     private _prevSnapshot = new Map<string, LiteUnit>();
     public input: InputSystem;
+    private _terrainLayer: TerrainLayer;
+    private _tilemapSheet: HTMLImageElement;
 
     constructor(
         private _canvas: HTMLCanvasElement,
         private _room: Room<ServerGameState>,
         private _assetHandler: AssetHandler,
+        terrainLayer: TerrainLayer,
+        tilemapSheet: HTMLImageElement,
     ) {
         super();
+        this._terrainLayer = terrainLayer;
+        this._tilemapSheet = tilemapSheet;
         const grid = new SquareGrid(CELL_SIZE);
         this._world = new World(grid);
         this.input = new InputSystem(this._canvas);
@@ -128,12 +135,7 @@ export class MultiplayerGameScene extends Scene {
         this.components.add(this._tweens);
         this.components.add(this._animationController);
         this.components.add(
-            new GridRenderSystem(
-                this._world,
-                GRID_COLS,
-                GRID_ROWS,
-                CELL_SIZE,
-            ),
+            new GridRenderSystem(this._terrainLayer, this._tilemapSheet, CELL_SIZE),
         );
         this.components.add(
             new MovementRangeRenderSystem(

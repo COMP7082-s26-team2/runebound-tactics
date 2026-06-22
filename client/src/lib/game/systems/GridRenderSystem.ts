@@ -1,22 +1,27 @@
-import { World, GameComponent } from "@/lib/engine";
+import { drawTile } from "@/lib/autotile-core/canvas";
+import { GameComponent } from "@/lib/engine";
+import type { TerrainLayer } from "@/lib/game/tilemap";
 
 export class GridRenderSystem implements GameComponent {
     constructor(
-        private _world: World,
-        private _gridCols: number,
-        private _gridRows: number,
+        private _terrainLayer: TerrainLayer,
+        private _sheet: HTMLImageElement,
         private _cellSize: number,
+        private _spriteCellSize: number = 16,
+        private _spriteCols: number = 16,
     ) {}
 
     draw(ctx: CanvasRenderingContext2D) {
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.2)";
-        ctx.fillStyle = "#333";
-        for (let q = 0; q < this._gridCols; q++) {
-            for (let r = 0; r < this._gridRows; r++) {
-                const x = q * this._cellSize;
-                const y = r * this._cellSize;
-                ctx.fillRect(x, y, this._cellSize, this._cellSize);
-                ctx.strokeRect(x, y, this._cellSize, this._cellSize);
+        for (let r = 0; r < this._terrainLayer.rows; r++) {
+            for (let c = 0; c < this._terrainLayer.cols; c++) {
+                const ops = this._terrainLayer.ops(r, c);
+                for (const op of ops) {
+                    drawTile(ctx, this._sheet, op.tileId, r, c, op.clip, {
+                        cellSize: this._cellSize,
+                        spriteCellSize: this._spriteCellSize,
+                        spriteCols: this._spriteCols,
+                    });
+                }
             }
         }
     }

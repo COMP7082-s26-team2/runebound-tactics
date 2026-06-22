@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { GameEngine, AssetHandler } from "@/lib/";
 import { GridMovementScene, ASSET_MANIFEST } from "@/lib/game/";
 import type { TurnFlowPhase } from "@/lib/game/state";
+import { loadTilemap, TerrainLayer } from "@/lib/game/tilemap";
 
 export interface GridMovementCanvasProps {
     debug?: boolean;
@@ -37,22 +38,32 @@ export default function GridMovementCanvas({
 
         const assetHandler = new AssetHandler(ASSET_MANIFEST);
 
-        // Preload all assets before the engine starts
-        engine.init = async () => {
-            try {
-                await assetHandler.preload(Object.keys(ASSET_MANIFEST), (loaded, total) => {
-                    console.log(`Assets loaded: ${loaded}/${total}`);
-                });
-                console.log("All assets preloaded successfully");
-            } catch (error) {
-                console.error("Failed to preload assets:", error);
-            }
+        const onTurnBegin = (data: unknown) => {
+            const { participant } = data as { participant: { id: string } };
+            setActivePlayer(participant.id);
         };
 
-        const scene = new GridMovementScene(canvas, assetHandler);
-        sceneRef.current = scene;
-        engine.scenes.register("main", scene);
-        engine.scenes.switch("main");
+        // Preload all assets and tilemap before the engine starts
+        engine.init = async () => {
+            try {
+                const [, bundle] = await Promise.all([
+                    assetHandler.preload(Object.keys(ASSET_MANIFEST), (loaded, total) => {
+                        console.log(`Assets loaded: ${loaded}/${total}`);
+                    }),
+                    loadTilemap(),
+                ]);
+                console.log("All assets preloaded successfully");
+
+                const terrainLayer = new TerrainLayer(bundle.terrainGrid, bundle.sets, bundle.terrains);
+                const scene = new GridMovementScene(canvas, assetHandler, terrainLayer, bundle.sheet);
+                sceneRef.current = scene;
+                scene.eventBus.on("turn:begin", onTurnBegin);
+                engine.scenes.register("main", scene);
+                engine.scenes.switch("main");
+            } catch (error) {
+                console.error("Failed to preload:", error);
+            }
+        };
 
         engine.preDraw = (ctx) => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -60,23 +71,17 @@ export default function GridMovementCanvas({
 
         engine.start();
 
-        const onTurnBegin = (data: unknown) => {
-            const { participant } = data as { participant: { id: string } };
-            setActivePlayer(participant.id);
-        };
-        scene.eventBus.on("turn:begin", onTurnBegin);
-
         let rafId: number;
         const poll = () => {
-            setTurnPhase(scene.turnFlow.current);
-            setGamePhase(scene.state.current);
+            setTurnPhase(sceneRef.current?.turnFlow.current ?? null);
+            setGamePhase(sceneRef.current?.state.current ?? null);
             rafId = requestAnimationFrame(poll);
         };
         rafId = requestAnimationFrame(poll);
 
         return () => {
             engine.stop();
-            scene.eventBus.off("turn:begin", onTurnBegin);
+            sceneRef.current?.eventBus.off("turn:begin", onTurnBegin);
             cancelAnimationFrame(rafId);
         };
     }, []);
