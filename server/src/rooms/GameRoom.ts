@@ -7,6 +7,8 @@ import {
     GameUnit,
     createTurnMachine,
     type TurnMachine,
+    createReactionWindowMachine,
+    type ReactionWindowMachine,
     cellKey,
     computeReachableTiles,
     computeAttackDamage,
@@ -55,6 +57,8 @@ interface AttackUnitPayload {
     moveTo?: { q: number; r: number };
 }
 
+const REACTION_TIMEOUT_MS = 10_000;
+
 interface PendingAttack {
     attackerId: string;
     targetId: string;
@@ -83,6 +87,8 @@ export class GameRoom extends Room<{ state: GameState }> {
      * "combat" subscriber. Null outside of the quick-play → combat window.
      */
     private _pendingAttack: PendingAttack | null = null;
+    private _reactionMachine: ReactionWindowMachine | null = null;
+    private _reactionTimer: ReturnType<typeof setTimeout> | null = null;
 
     onCreate(options: GameRoomOptions): void {
         const pending = pendingGames.get(options.lobbyRoomId);
@@ -134,6 +140,26 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (!this._isCurrentTurn(client)) return;
             console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: end_turn from ${client.sessionId}`);
             this._turnMachine.send("END_TURN");
+        });
+
+        this.onMessage("pass_reaction", (client) => {
+            if (!this._reactionMachine) return;
+            const phase = this._reactionMachine.state;
+            const ctx = this._reactionMachine.context;
+            const expected =
+                phase === "defender" ? ctx.defenderOwnerId :
+                phase === "attacker-ally" ? ctx.attackerOwnerId :
+                null;
+            if (expected === null || client.sessionId !== expected) return;
+            this._clearReactionTimer();
+            this._reactionMachine.send("REACTION_PASS");
+        });
+
+        this.onMessage<{ cardId: string }>("play_reaction_card", (client, payload) => {
+            // Card system pending — reject all cards until is_reaction validation is wired.
+            console.log(`[${new Date().toISOString()}] [GameRoom] play_reaction_card: rejected (card system pending) from ${client.sessionId}`);
+            void client;
+            void payload;
         });
     }
 
@@ -237,8 +263,7 @@ export class GameRoom extends Room<{ state: GameState }> {
                 break;
 
             case "quick-play":
-                console.log(`[${new Date().toISOString()}] [GameRoom] quick-play: no opponent responses`);
-                this._turnMachine.send("QUICK_PLAY_RESOLVED");
+                this._openReactionWindow();
                 break;
 
             case "combat":
@@ -252,6 +277,95 @@ export class GameRoom extends Room<{ state: GameState }> {
                 console.log(`[${new Date().toISOString()}] [GameRoom] post-combat: gold distribution pending`);
                 this._turnMachine.send("POST_COMBAT_RESOLVED");
                 break;
+        }
+    }
+
+    private _openReactionWindow(): void {
+        const pa = this._pendingAttack;
+        if (!pa) {
+            this._turnMachine.send("QUICK_PLAY_RESOLVED");
+            return;
+        }
+
+        const attackerUnit = this.state.units.get(pa.attackerId);
+        const defenderUnit = this.state.units.get(pa.targetId);
+        if (!attackerUnit || !defenderUnit) {
+            this._turnMachine.send("QUICK_PLAY_RESOLVED");
+            return;
+        }
+
+        this._reactionMachine = createReactionWindowMachine(
+            attackerUnit.ownerId,
+            defenderUnit.ownerId,
+        );
+        this._reactionMachine.subscribe((phase) => this._onReactionPhase(phase));
+    }
+
+    private _onReactionPhase(phase: string): void {
+        console.log(`[${new Date().toISOString()}] [GameRoom] reactionPhase: ${phase}`);
+        this.state.reactionPhase = phase === "closed" ? "" : phase;
+
+        const ctx = this._reactionMachine?.context;
+        const activePlayer = this._activeReactionPlayer(
+            phase,
+            ctx?.attackerOwnerId,
+            ctx?.defenderOwnerId,
+        );
+        this.broadcast("reaction_phase", { phase, activePlayer });
+
+        switch (phase) {
+            case "defender":
+                this._startReactionTimer();
+                break;
+
+            case "defender-ally":
+                this._clearReactionTimer();
+                this._startReactionTimer();
+                this._reactionMachine?.send("REACTION_PASS");  // placeholder: auto-pass
+                break;
+
+            case "attacker-ally":
+                this._clearReactionTimer();
+                this._startReactionTimer();
+                this._reactionMachine?.send("REACTION_PASS");  // placeholder: auto-pass
+                break;
+
+            case "resolve":
+                this._clearReactionTimer();
+                this._reactionMachine?.send("REACTION_PASS");
+                break;
+
+            case "closed":
+                this._clearReactionTimer();
+                this._reactionMachine = null;
+                this._turnMachine.send("QUICK_PLAY_RESOLVED");
+                break;
+        }
+    }
+
+    private _activeReactionPlayer(
+        phase: string,
+        attackerOwnerId?: string,
+        defenderOwnerId?: string,
+    ): string {
+        if (phase === "defender") return defenderOwnerId ?? "";
+        if (phase === "attacker-ally") return attackerOwnerId ?? "";
+        return "";
+    }
+
+    private _startReactionTimer(): void {
+        this._clearReactionTimer();
+        this._reactionTimer = setTimeout(() => {
+            if (!this._reactionMachine) return;
+            this._clearReactionTimer();
+            this._reactionMachine.send("REACTION_TIMEOUT");
+        }, REACTION_TIMEOUT_MS);
+    }
+
+    private _clearReactionTimer(): void {
+        if (this._reactionTimer !== null) {
+            clearTimeout(this._reactionTimer);
+            this._reactionTimer = null;
         }
     }
 
