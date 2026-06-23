@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
 import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { Panel } from "@/components/ui/Panel";
+import { InviteFriendsModal } from "@/components/lobby/InviteFriendsModal";
 
 export interface MainMenuUser {
     displayName: string;
@@ -12,12 +14,12 @@ export interface MainMenuUser {
 
 interface MainMenuProps {
     user: MainMenuUser | null;
-    onInviteFriend?: () => void;
 }
 
-export function MainMenu({ user, onInviteFriend }: MainMenuProps) {
+export function MainMenu({ user }: MainMenuProps) {
     const router = useRouter();
     const loggedIn = user !== null;
+    const [inviteOpen, setInviteOpen] = useState(false);
 
     return (
         <main className="relative min-h-screen bg-[var(--ink-900)] text-[var(--ink-300)] flex items-center justify-center overflow-hidden">
@@ -62,14 +64,12 @@ export function MainMenu({ user, onInviteFriend }: MainMenuProps) {
                             <Button
                                 intent="secondary"
                                 onClick={() => router.push("/profile")}
-                                disabled
                             >
                                 Profile
                             </Button>
                             <Button
                                 intent="secondary"
-                                onClick={onInviteFriend}
-                                disabled={!onInviteFriend}
+                                onClick={() => setInviteOpen(true)}
                             >
                                 Friends
                             </Button>
@@ -104,6 +104,8 @@ export function MainMenu({ user, onInviteFriend }: MainMenuProps) {
                     </form>
                 )}
             </div>
+
+            <InviteFriendsModal isOpen={inviteOpen} onClose={() => setInviteOpen(false)} />
         </main>
     );
 }

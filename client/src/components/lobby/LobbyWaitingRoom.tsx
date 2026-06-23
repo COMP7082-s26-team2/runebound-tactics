@@ -8,6 +8,7 @@ import {
     useLobbyRoomState,
 } from "@/context/colyseus";
 import { SlotList } from "./SlotList";
+import { InviteFriendsModal } from "@/components/lobby/InviteFriendsModal";
 import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { Hint } from "@/components/ui/Hint";
@@ -24,6 +25,7 @@ export function LobbyWaitingRoom({
     const state = useLobbyRoomState();
     const router = useRouter();
     const [countdown, setCountdown] = useState<number | null>(null);
+    const [inviteSlot, setInviteSlot] = useState<number | null>(null);
 
     const roomMatches = room?.roomId === expectedRoomId;
 
@@ -115,6 +117,7 @@ export function LobbyWaitingRoom({
                     players={state.players}
                     maxPlayers={state.maxPlayers}
                     mySessionId={room.sessionId}
+                    onInvite={(slot) => setInviteSlot(slot)}
                 />
             </div>
 
@@ -133,6 +136,12 @@ export function LobbyWaitingRoom({
                     Leave Lobby
                 </Button>
             </div>
+
+            <InviteFriendsModal
+                isOpen={inviteSlot !== null}
+                onClose={() => setInviteSlot(null)}
+                slot={inviteSlot ?? undefined}
+            />
         </main>
     );
 }
