@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Jacquard_12, Tiny5 } from "next/font/google";
+import { Pixelify_Sans, Jacquard_12, Tiny5 } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-    variable: "--font-geist-sans",
+const pixelify = Pixelify_Sans({
+    variable: "--font-pixelify",
     subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-    variable: "--font-geist-mono",
-    subsets: ["latin"],
+    weight: ["400", "500", "600", "700"],
+    display: "swap",
 });
 
 const jacquard = Jacquard_12({
@@ -39,7 +36,7 @@ export default function RootLayout({
     return (
         <html
             lang="en"
-            className={`${geistSans.variable} ${geistMono.variable} ${jacquard.variable} ${tiny5.variable} h-full antialiased`}
+            className={`${pixelify.variable} ${jacquard.variable} ${tiny5.variable} h-full`}
             suppressHydrationWarning
         >
             <body className="min-h-full flex flex-col">{children}</body>

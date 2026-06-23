@@ -31,7 +31,7 @@ export function Numeric({
 }: NumericProps) {
     return (
         <span
-            className={`font-[family-name:var(--font-mono)] tabular-nums [font-feature-settings:'tnum'_1,'ss01'_1] ${SIZE_CLASSES[size]} ${TONE_CLASSES[tone]} ${className}`}
+            className={`font-[family-name:var(--font-mono)] tabular-nums [font-feature-settings:'tnum'_1] ${SIZE_CLASSES[size]} ${TONE_CLASSES[tone]} ${className}`}
         >
             {children}
         </span>
