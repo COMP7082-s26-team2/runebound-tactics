@@ -3,16 +3,19 @@
 import type { GameState } from "@runebound-tactics/shared";
 import { token, getFontFamily } from "@/lib/theme/tokens";
 
-const CANVAS_W = 1050;
+const CANVAS_W = 1300;
 const CANVAS_H = 880;
 const BOARD_W = 800;
 const BOARD_H = 800;
-const SIDEBAR_X = BOARD_W + 10;    // 10px gutter
-const SIDEBAR_W = CANVAS_W - SIDEBAR_X;  // 240
-const STRIP_Y = BOARD_H + 10;      // 10px gutter
-const STRIP_H = CANVAS_H - STRIP_Y - 10; // 70 px reaction strip (leaves 10px bottom margin)
+const LEFT_COL_W = 240;
+const LEFT_COL_X = 0;
+const BOARD_X = LEFT_COL_W + 10;            // 250
+const SIDEBAR_X = BOARD_X + BOARD_W + 10;   // 1060
+const SIDEBAR_W = CANVAS_W - SIDEBAR_X;     // 240
+const STRIP_Y = BOARD_H + 10;               // 810
+const STRIP_H = CANVAS_H - STRIP_Y - 10;    // 60
 
-// Sidebar box dims
+// Sidebar box dims (right column)
 const TACT_Y = 0;
 const TACT_H = 130;
 const STATS_Y = TACT_H + 10;
@@ -60,8 +63,17 @@ function resolveTheme(): ResolvedTheme {
     };
 }
 
+export interface HitRegion {
+    id: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
 export class CanvasHUDSystem {
     private theme: ResolvedTheme;
+    private hitRegions: HitRegion[] = [];
 
     constructor() {
         this.theme = resolveTheme();
@@ -74,7 +86,22 @@ export class CanvasHUDSystem {
         this.theme = resolveTheme();
     }
 
+    /**
+     * Returns the canvas-space hit regions registered during the most recent
+     * `draw()` call. Consumers route pointer events through this list.
+     */
+    getHitRegions(): ReadonlyArray<HitRegion> {
+        return this.hitRegions;
+    }
+
+    private addHitRegion(id: string, x: number, y: number, w: number, h: number): void {
+        this.hitRegions.push({ id, x, y, w, h });
+    }
+
     draw(ctx: CanvasRenderingContext2D, state: GameState | undefined, sessionId: string): void {
+        this.hitRegions = []; // reset every frame
+
+        this.drawLeftColumn(ctx, state, sessionId);
         this.drawTactician(ctx, state, sessionId);
         this.drawUnitStats(ctx);  // placeholder for foundation slice
         this.drawGameStatus(ctx, state, sessionId);
@@ -104,7 +131,116 @@ export class CanvasHUDSystem {
         ctx.fillText(text.toUpperCase(), x, y);
     }
 
-    // ── Sidebar boxes ────────────────────────────────────────────
+    private drawButton(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        w: number,
+        h: number,
+        label: string,
+        intent: "primary" | "secondary",
+        disabled: boolean,
+    ): void {
+        // Primary: brass-300 bg + black text + brass-700 border
+        // Secondary: transparent bg + brass-500 border + brass-300 text
+        // Disabled: ink-700 bg + ink-500 text + ink-500 border
+        if (disabled) {
+            ctx.fillStyle = this.theme.ink700;
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = this.theme.ink500;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+        } else if (intent === "primary") {
+            ctx.fillStyle = this.theme.brass300;
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = this.theme.brass700;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+        } else {
+            // secondary outline-brass
+            ctx.strokeStyle = this.theme.brass500;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+        }
+
+        ctx.fillStyle = disabled
+            ? this.theme.ink500
+            : intent === "primary"
+                ? "#000000"
+                : this.theme.brass300;
+        const fontSize = h >= 48 ? 18 : 14;
+        ctx.font = `bold ${fontSize}px ${this.theme.fontPixelify}, monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, x + w / 2, y + h / 2);
+
+        ctx.textAlign = "left"; // reset
+        ctx.lineWidth = 1;
+    }
+
+    // ── Left action column ───────────────────────────────────────
+    private drawLeftColumn(
+        ctx: CanvasRenderingContext2D,
+        state: GameState | undefined,
+        sessionId: string,
+    ): void {
+        const x = LEFT_COL_X;
+        const colW = LEFT_COL_W;
+
+        // Slot 1: Menu button row, top 60px
+        const menuY = 12;
+        const menuW = 80;
+        const menuH = 32;
+        const menuX = colW - menuW - 12; // right-aligned in column
+        this.drawButton(ctx, menuX, menuY, menuW, menuH, "⚙ Menu", "secondary", false);
+        this.addHitRegion("menu", menuX, menuY, menuW, menuH);
+
+        // Slot 2: Actions panel
+        const actionsY = 60;
+        const actionsH = 180;
+        this.drawBevelBox(ctx, x, actionsY, colW, actionsH);
+        this.drawEyebrow(ctx, "Actions", x + 12, actionsY + 12, this.theme.brass500);
+
+        const endTurnW = colW - 24;
+        const endTurnH = 56;
+        const endTurnX = x + 12;
+        const endTurnY = actionsY + 40;
+
+        const isMyTurn =
+            state?.currentTurnId === sessionId && state?.phase === "active";
+        this.drawButton(
+            ctx,
+            endTurnX,
+            endTurnY,
+            endTurnW,
+            endTurnH,
+            "END TURN",
+            "primary",
+            !isMyTurn,
+        );
+        if (isMyTurn) {
+            this.addHitRegion("end_turn", endTurnX, endTurnY, endTurnW, endTurnH);
+        }
+
+        // Action Points placeholder eyebrow + value
+        this.drawEyebrow(ctx, "Action Points · 1", x + 12, actionsY + actionsH - 22);
+
+        // Slot 3: History feed
+        const histY = actionsY + actionsH + 10;
+        const histH = BOARD_H - histY;
+        this.drawBevelBox(ctx, x, histY, colW, histH);
+        this.drawEyebrow(ctx, "History", x + 12, histY + 12, this.theme.brass500);
+
+        // Placeholder body
+        ctx.fillStyle = this.theme.inkFaded;
+        ctx.font = `14px ${this.theme.fontPixelify}, monospace`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText("No events yet —", x + 12, histY + histH / 2 - 10);
+        ctx.fillText("your move.", x + 12, histY + histH / 2 + 10);
+    }
+
+    // ── Right sidebar boxes ──────────────────────────────────────
 
     private drawTactician(ctx: CanvasRenderingContext2D, state: GameState | undefined, sessionId: string): void {
         const x = SIDEBAR_X;

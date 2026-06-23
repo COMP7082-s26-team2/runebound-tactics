@@ -75,6 +75,8 @@ export class MultiplayerGameScene extends Scene {
         private _canvas: HTMLCanvasElement,
         private _room: Room<ServerGameState>,
         private _assetHandler: AssetHandler,
+        private _boardOriginX: number = 0,
+        private _boardOriginY: number = 0,
     ) {
         super();
         const grid = new SquareGrid(CELL_SIZE);
@@ -97,6 +99,8 @@ export class MultiplayerGameScene extends Scene {
             CELL_SIZE,
             this.input,
             this._room,
+            this._boardOriginX,
+            this._boardOriginY,
         );
     }
 

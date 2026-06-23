@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGameRoom, useGameRoomState } from "@/context/colyseus";
 import { Button } from "@/components/ui/Button";
 import { clearGameToken } from "@/lib/multiplayer/reconnect";
 import { MultiplayerGameCanvas } from "@/components/game/MultiplayerGameCanvas";
-import { GameHUD } from "@/components/game/GameHUD";
+import { InGameMenuModal } from "@/components/game/InGameMenuModal";
 import { EndGameStatsScreen } from "@/components/game/EndGameStatsScreen";
 import type { GameState } from "@runebound-tactics/shared";
 
@@ -17,14 +17,20 @@ interface MultiplayerGameProps {
 /**
  * Top-level multiplayer game component.
  *
- * Replaces the previous `GameRoomPlaceholder`. Renders the canvas + HUD
- * once the room has joined and state has arrived. Handles error and
- * loading states inline.
+ * Replaces the previous `GameRoomPlaceholder`. Renders the canvas + in-game
+ * menu modal once the room has joined and state has arrived. Handles error
+ * and loading states inline.
+ *
+ * HUD chrome (tactician card, action column, end-turn button, etc.) lives
+ * inside the canvas via {@link CanvasHUDSystem}. The DOM-side {@link GameHUD}
+ * floating panel is retired — this component only handles the menu modal and
+ * the end-of-match overlay.
  */
 export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const { room, error } = useGameRoom();
     const state = useGameRoomState();
     const router = useRouter();
+    const [menuOpen, setMenuOpen] = useState(false);
 
     const roomMatches = room?.roomId === expectedRoomId;
 
@@ -51,6 +57,27 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
         }
     }, [state?.phase, state?.currentTurnId, state?.turnNumber]);
 
+    const leave = useCallback(async () => {
+        clearGameToken();
+        try {
+            await room?.leave(true);
+        } catch {
+            /* ignore */
+        }
+        router.push("/multiplayer");
+    }, [room, router]);
+
+    const handleHudAction = useCallback(
+        (action: "menu" | "end_turn") => {
+            if (action === "menu") {
+                setMenuOpen(true);
+            } else if (action === "end_turn") {
+                room?.send("end_turn", {});
+            }
+        },
+        [room],
+    );
+
     if (error && (!room || roomMatches)) {
         return (
             <div className="min-h-screen bg-gray-900 flex flex-col gap-3 p-4">
@@ -73,20 +100,6 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
         return <p className="text-white p-4">Connecting…</p>;
     }
 
-    async function leave() {
-        clearGameToken();
-        try {
-            await room?.leave(true);
-        } catch {
-            /* ignore */
-        }
-        router.push("/multiplayer");
-    }
-
-    function endTurn() {
-        room?.send("end_turn", {});
-    }
-
     // `useGameRoomState` returns a deep-readonly snapshot; cast to the
     // schema class for consumer-side typing. Read-only access is safe — we
     // never call schema mutator methods (assign, clone, etc.) on the
@@ -102,14 +115,12 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const winnerName = winnerSlot?.displayName ?? null;
 
     return (
-        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="min-h-screen bg-[var(--ink-900)] flex items-center justify-center">
             <div className="relative inline-block">
-                <MultiplayerGameCanvas room={room} state={gameState} />
-                <GameHUD
+                <MultiplayerGameCanvas
+                    room={room}
                     state={gameState}
-                    sessionId={room.sessionId}
-                    onLeave={leave}
-                    onEndTurn={endTurn}
+                    onHudAction={handleHudAction}
                 />
                 {gameState.phase === "ended" && (
                     <EndGameStatsScreen
@@ -121,6 +132,11 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                     />
                 )}
             </div>
+            <InGameMenuModal
+                isOpen={menuOpen}
+                onClose={() => setMenuOpen(false)}
+                onLeave={leave}
+            />
         </div>
     );
 }

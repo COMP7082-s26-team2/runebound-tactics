@@ -8,15 +8,20 @@ import { type GameState } from "@runebound-tactics/shared";
 import { CanvasHUDSystem } from "@/components/game/CanvasHUDSystem";
 import type { Room } from "@colyseus/sdk";
 
+export type HudAction = "menu" | "end_turn";
+
 interface MultiplayerGameCanvasProps {
     room: Room<GameState>;
     state: GameState;
+    onHudAction?: (action: HudAction) => void;
 }
 
-const CANVAS_WIDTH = 1050;
+const CANVAS_WIDTH = 1300;
 const CANVAS_HEIGHT = 880;
-const BOARD_WIDTH = 800;
-const BOARD_HEIGHT = 800;
+const BOARD_X = 250; // 240 left col + 10 gutter
+const BOARD_Y = 0;
+const BOARD_W = 800;
+const BOARD_H = 800;
 
 type LoadPhase = "loading" | "ready" | "error";
 
@@ -34,16 +39,26 @@ type LoadPhase = "loading" | "ready" | "error";
  * The asset handler is canvas-owned (created inside this effect, discarded on
  * unmount). Scene init is sync, so preload happens above the scene rather
  * than inside it.
+ *
+ * Layout: the scene draws inside a board region offset by (BOARD_X, BOARD_Y)
+ * via `ctx.translate(...)` in `preDraw`. Scene-internal systems (grid, units,
+ * highlights) all draw at logical (0,0) and inherit the offset. The HUD draws
+ * in raw canvas-space after `ctx.restore()` so it sits outside the board clip.
  */
-export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProps) {
+export function MultiplayerGameCanvas({ room, state, onHudAction }: MultiplayerGameCanvasProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const sceneRef = useRef<MultiplayerGameScene | null>(null);
     const latestStateRef = useRef<GameState>(state);
+    const onHudActionRef = useRef<typeof onHudAction>(onHudAction);
     const [phase, setPhase] = useState<LoadPhase>("loading");
 
     useEffect(() => {
         latestStateRef.current = state;
     }, [state]);
+
+    useEffect(() => {
+        onHudActionRef.current = onHudAction;
+    }, [onHudAction]);
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -54,6 +69,7 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
 
         let engine: GameEngine | null = null;
         let cancelled = false;
+        let detachPointer: (() => void) | null = null;
 
         setPhase("loading");
 
@@ -69,7 +85,13 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
                     fixedDelta: 1 / 60,
                 });
 
-                const scene = new MultiplayerGameScene(canvas, room, handler);
+                const scene = new MultiplayerGameScene(
+                    canvas,
+                    room,
+                    handler,
+                    BOARD_X,
+                    BOARD_Y,
+                );
                 sceneRef.current = scene;
                 engine.scenes.register("main", scene);
                 engine.scenes.switch("main");
@@ -78,17 +100,51 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
 
                 engine.preDraw = (ctx) => {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    // Clip scene drawing to the 800×800 board region
+                    // Clip + translate scene drawing into the offset board region.
+                    // Scene systems (grid, units, highlights) draw at logical
+                    // (0,0); the translate shifts them onto the board.
                     ctx.save();
                     ctx.beginPath();
-                    ctx.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+                    ctx.rect(BOARD_X, BOARD_Y, BOARD_W, BOARD_H);
                     ctx.clip();
+                    ctx.translate(BOARD_X, BOARD_Y);
                 };
 
                 engine.postDraw = (ctx) => {
                     // Restore the canvas state so HUD draws outside the clip
                     ctx.restore();
                     hud.draw(ctx, latestStateRef.current, room.sessionId);
+                };
+
+                // Route pointer events to HUD hit-regions before the scene's
+                // InputSystem sees them. If a HUD region claims the click, we
+                // stop propagation so the canvas's own mousedown handler
+                // (registered by InputSystem against the same target) ignores
+                // the event.
+                const handlePointer = (e: PointerEvent) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+                    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+                    const regions = hud.getHitRegions();
+                    for (const r of regions) {
+                        if (
+                            x >= r.x &&
+                            x <= r.x + r.w &&
+                            y >= r.y &&
+                            y <= r.y + r.h
+                        ) {
+                            if (r.id === "menu" || r.id === "end_turn") {
+                                onHudActionRef.current?.(r.id);
+                                e.preventDefault();
+                                e.stopPropagation();
+                                return;
+                            }
+                        }
+                    }
+                };
+                canvas.addEventListener("pointerdown", handlePointer);
+                detachPointer = () => {
+                    canvas.removeEventListener("pointerdown", handlePointer);
                 };
 
                 engine.start();
@@ -102,6 +158,7 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
 
         return () => {
             cancelled = true;
+            detachPointer?.();
             engine?.stop();
             sceneRef.current = null;
         };
