@@ -3,7 +3,11 @@ import {
     WalkStep,
 } from "@/lib/engine/animation";
 import { cellKey } from "@/lib/engine/world/World";
-import { computeShortestPath } from "@runebound-tactics/shared";
+import {
+    computeShortestPath,
+    canEnter,
+    getUnitMovementType,
+} from "@runebound-tactics/shared";
 import { STEP_DURATION_S } from "../constants";
 import type { MoveEvent, SequenceDeps } from "./types";
 
@@ -17,6 +21,9 @@ export function buildMoveSequence(
     ev: MoveEvent,
     deps: SequenceDeps,
 ): AnimationSequence {
+    const unitType = deps.world.unitTypes.get(ev.entityId) ?? "";
+    const movementType = getUnitMovementType(unitType);
+
     const path = computeShortestPath({
         start: ev.from,
         goal: ev.to,
@@ -29,6 +36,8 @@ export function buildMoveSequence(
             return deps.world.occupancyMap.has(key) &&
                 key !== cellKey(ev.to);
         },
+        canEnter: (coord) =>
+            canEnter({ movementType }, deps.terrainLayer.at(coord)),
     });
 
     return new AnimationSequence([

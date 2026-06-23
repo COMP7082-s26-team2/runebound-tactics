@@ -25,6 +25,7 @@ export class World {
     public unitStats = new ComponentStore<UnitStatsData>();
     public unitAppearance = new ComponentStore<AppearanceData>();
     public unitOwnership = new ComponentStore<string>();
+    public unitTypes = new ComponentStore<string>();
 
     // Bidirectional bindings between server-authoritative unit IDs (strings)
     // and local entity IDs (numbers). Optional — only populated for units
@@ -43,6 +44,7 @@ export class World {
         appearance: AppearanceData,
         owner?: string,
         serverId?: string,
+        unitType?: string,
     ): EntityId {
         const entityId = this.entityManager.createEntity();
         this.gridPositions.set(entityId, coord);
@@ -51,6 +53,7 @@ export class World {
         this.occupancyMap.set(cellKey(coord), entityId);
 
         if (owner !== undefined) this.unitOwnership.set(entityId, owner);
+        if (unitType !== undefined) this.unitTypes.set(entityId, unitType);
 
         if (serverId !== undefined) {
             this._serverIdToEntity.set(serverId, entityId);
@@ -77,6 +80,7 @@ export class World {
         this.unitStats.remove(entityId);
         this.unitAppearance.remove(entityId);
         this.unitOwnership.remove(entityId);
+        this.unitTypes.remove(entityId);
 
         const serverId = this._entityToServerId.get(entityId);
         if (serverId !== undefined) {

@@ -98,12 +98,14 @@ export class MultiplayerGameScene extends Scene {
             anim: this._animationController,
             assets: this._assetHandler,
             sequencer: this._sequencer,
+            terrainLayer: this._terrainLayer,
         };
         this._selection = new MultiplayerSelectionSystem(
             this._world,
             CELL_SIZE,
             this.input,
             this._room,
+            this._terrainLayer,
         );
     }
 
@@ -247,6 +249,7 @@ export class MultiplayerGameScene extends Scene {
                     appearance,
                     unit.ownerId,
                     unitId,
+                    unit.unitType,
                 );
                 const sheet = this._assetHandler.getSpriteSheet(
                     appearance.assetKey,

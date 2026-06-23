@@ -10,7 +10,11 @@ import {
     WaitStep,
 } from "@/lib/engine/animation";
 import { cellKey } from "@/lib/engine/world/World";
-import { computeShortestPath } from "@runebound-tactics/shared";
+import {
+    computeShortestPath,
+    canEnter,
+    getUnitMovementType,
+} from "@runebound-tactics/shared";
 import {
     STEP_DURATION_S,
     LUNGE_DURATION_S,
@@ -40,6 +44,9 @@ export function buildAttackSequence(
     const steps: AnimationStep[] = [];
 
     if (ev.attackerPathFrom !== null) {
+        const unitType = deps.world.unitTypes.get(ev.attackerId) ?? "";
+        const movementType = getUnitMovementType(unitType);
+
         const path = computeShortestPath({
             start: ev.attackerPathFrom,
             goal: ev.attackerFinalPos,
@@ -49,6 +56,8 @@ export function buildAttackSequence(
                 if (key === cellKey(ev.attackerFinalPos)) return false;
                 return deps.world.occupancyMap.has(key);
             },
+            canEnter: (coord) =>
+                canEnter({ movementType }, deps.terrainLayer.at(coord)),
         });
         steps.push(
             new WalkStep(
