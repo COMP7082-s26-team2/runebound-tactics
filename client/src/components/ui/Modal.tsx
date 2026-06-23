@@ -13,25 +13,26 @@ interface ModalProps {
 export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     const previousActiveRef = useRef<HTMLElement | null>(null);
     const dialogRef = useRef<HTMLDivElement | null>(null);
+    const onCloseRef = useRef(onClose);
+
+    useEffect(() => {
+        onCloseRef.current = onClose;
+    }, [onClose]);
 
     useEffect(() => {
         if (!isOpen) return;
         previousActiveRef.current = document.activeElement as HTMLElement | null;
-        const dialog = dialogRef.current;
-        const firstFocusable = dialog?.querySelector<HTMLElement>(
-            "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
-        );
-        firstFocusable?.focus();
+        dialogRef.current?.focus();
 
         function handleKey(e: KeyboardEvent) {
-            if (e.key === "Escape") onClose();
+            if (e.key === "Escape") onCloseRef.current();
         }
         document.addEventListener("keydown", handleKey);
         return () => {
             document.removeEventListener("keydown", handleKey);
             previousActiveRef.current?.focus();
         };
-    }, [isOpen, onClose]);
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -44,6 +45,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                 ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
+                tabIndex={-1}
                 className="relative max-w-lg w-full mx-4 [box-shadow:var(--elev-pixel-raised)]"
                 onClick={(e) => e.stopPropagation()}
             >
@@ -57,7 +59,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                         &times;
                     </button>
                     {title && (
-                        <h2 className="text-[var(--text-xl)] font-bold mb-4 text-[var(--ink-mark)]" style={{ fontFamily: "var(--font-display)" }}>
+                        <h2 className="text-[var(--text-xl)] font-bold mb-4 text-[var(--ink-mark)] font-[family-name:var(--font-display)]">
                             {title}
                         </h2>
                     )}
