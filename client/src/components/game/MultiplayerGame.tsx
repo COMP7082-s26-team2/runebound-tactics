@@ -125,8 +125,8 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
         : null;
 
     return (
-        <main className="min-h-screen bg-[var(--ink-900)] text-[var(--ink-300)] flex items-center justify-center p-6">
-            <div className="flex flex-col gap-3 w-[800px]">
+        <main className="min-h-screen bg-[var(--ink-900)] text-[var(--ink-300)] flex flex-col">
+            <header className="sticky top-0 z-20 w-full">
                 <GameTopBar
                     state={gameState}
                     sessionId={room.sessionId}
@@ -137,28 +137,32 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                     onMenu={() => setMenuOpen(true)}
                     onEndTurn={endTurn}
                 />
+            </header>
 
-                <div className="relative">
-                    <MultiplayerGameCanvas room={room} state={gameState} />
-                    {gameState.phase === "ended" && (
-                        <EndGameStatsScreen
-                            winnerId={winnerId}
-                            winnerName={winnerName}
-                            mySessionId={room.sessionId}
-                            turnsPlayed={gameState.turnNumber + 1}
-                            onLeave={leave}
-                        />
-                    )}
+            <div className="flex-1 flex items-center justify-center p-6">
+                <div className="flex flex-col gap-3 w-[800px]">
+                    <div className="relative">
+                        <MultiplayerGameCanvas room={room} state={gameState} />
+                        {gameState.phase === "ended" && (
+                            <EndGameStatsScreen
+                                winnerId={winnerId}
+                                winnerName={winnerName}
+                                mySessionId={room.sessionId}
+                                turnsPlayed={gameState.turnNumber + 1}
+                                onLeave={leave}
+                            />
+                        )}
+                    </div>
+
+                    <ReactionStrip
+                        phase={reactionPhase}
+                        isActiveReactor={isActiveReactor}
+                        waitingForName={reactorName}
+                        secondsRemaining={secondsRemaining}
+                        onPass={passReaction}
+                        onOpenCards={() => setCardModalOpen(true)}
+                    />
                 </div>
-
-                <ReactionStrip
-                    phase={reactionPhase}
-                    isActiveReactor={isActiveReactor}
-                    waitingForName={reactorName}
-                    secondsRemaining={secondsRemaining}
-                    onPass={passReaction}
-                    onOpenCards={() => setCardModalOpen(true)}
-                />
             </div>
 
             <InGameMenuModal
