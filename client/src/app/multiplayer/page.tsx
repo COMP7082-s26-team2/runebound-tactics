@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/Eyebrow";
@@ -10,16 +10,30 @@ import { Panel } from "@/components/ui/Panel";
 import { CreateLobbyModal } from "@/components/lobby/CreateLobbyModal";
 import { getDisplayName, setDisplayName } from "@/lib/multiplayer/identity";
 
+// useSyncExternalStore-based hydration check: returns false on the server
+// snapshot and true on the client snapshot, with no setState-in-effect.
+function subscribeHydration() {
+    return () => {};
+}
+function getServerHydration() {
+    return false;
+}
+function getClientHydration() {
+    return true;
+}
+
 function MultiplayerPage() {
     const router = useRouter();
-    const [name, setName] = useState("");
+    const [name, setName] = useState<string>(() => {
+        if (typeof window === "undefined") return "";
+        return getDisplayName();
+    });
     const [createOpen, setCreateOpen] = useState(false);
-    const [hydrated, setHydrated] = useState(false);
-
-    useEffect(() => {
-        setName(getDisplayName());
-        setHydrated(true);
-    }, []);
+    const hydrated = useSyncExternalStore(
+        subscribeHydration,
+        getClientHydration,
+        getServerHydration,
+    );
 
     function handleNameChange(v: string) {
         setName(v);

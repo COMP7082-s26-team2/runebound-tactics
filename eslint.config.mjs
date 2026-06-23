@@ -28,10 +28,17 @@ const eslintConfig = defineConfig([
       "client/src/components/game/**",
       "client/src/components/scenes/**",
       "client/src/lib/game/**",
+      // Dev-only test pages and the singleplayer demo (gameplay-adjacent):
+      // not user-facing UI, so design-token discipline is not required.
+      "client/src/app/grid-movement-test/**",
+      "client/src/app/input-test/**",
+      "client/src/app/turn-test/**",
+      "client/src/app/colyseus-test/**",
+      "client/src/app/game/page.tsx",
     ],
     rules: {
       "no-restricted-syntax": [
-        "warn",
+        "error",
         {
           selector: `JSXAttribute[name.name='className'] Literal[value=${FORBIDDEN_TAILWIND_COLOR_PATTERN}]`,
           message:

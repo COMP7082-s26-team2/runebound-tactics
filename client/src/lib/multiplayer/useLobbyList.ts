@@ -37,12 +37,16 @@ export function useLobbyList<Metadata = unknown>(roomName: string, intervalMs = 
 
     useEffect(() => {
         let alive = true;
-        refresh();
+        // Initial load: defer to a microtask so setLoading(true) inside refresh()
+        // fires from a callback rather than synchronously in the effect body
+        // (avoids react-hooks/set-state-in-effect while preserving polling behavior).
+        const initial = setTimeout(() => { if (alive) refresh(); }, 0);
         const id = setInterval(() => { if (alive) refresh(); }, intervalMs);
-        const onFocus = () => refresh();
+        const onFocus = () => { if (alive) refresh(); };
         window.addEventListener("focus", onFocus);
         return () => {
             alive = false;
+            clearTimeout(initial);
             clearInterval(id);
             window.removeEventListener("focus", onFocus);
         };
