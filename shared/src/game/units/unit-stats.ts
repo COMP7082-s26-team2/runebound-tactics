@@ -1,4 +1,5 @@
 import type { DamageType } from "../../types/game";
+import { MovementType } from "../terrain";
 
 /**
  * Unit stats lookup — movement, combat, action points, health, and damage types.
@@ -191,4 +192,27 @@ export function computeAttackDamage(
     defender: { baseDefense: number; bonusDefense: number },
 ): number {
     return Math.max(1, getEffectiveAttack(attacker) - getEffectiveDefense(defender));
+}
+
+const UNIT_MOVEMENT_TYPE: Record<string, MovementType> = {
+    "castle:swordsman":        MovementType.Infantry,
+    "castle:archer":           MovementType.Infantry,
+    "castle:paladin":          MovementType.Infantry,
+    "castle:cavalier":         MovementType.Infantry,
+    "castle:griffin":          MovementType.Infantry,
+    "necropolis:skeleton":     MovementType.Infantry,
+    "necropolis:death_knight": MovementType.Infantry,
+    "necropolis:vampire":      MovementType.Infantry,
+    "necropolis:ghost":        MovementType.Infantry,
+    "necropolis:zombie":       MovementType.Infantry,
+};
+
+const DEFAULT_MOVEMENT_TYPE: MovementType = MovementType.Infantry;
+
+/**
+ * Per-unit locomotion category. Drives terrain walkability + (Phase 2) cost.
+ * Mirrors getUnitMovement/getUnitAttack pattern. New unit types added here.
+ */
+export function getUnitMovementType(unitType: UnitTypeId): MovementType {
+    return UNIT_MOVEMENT_TYPE[unitType] ?? DEFAULT_MOVEMENT_TYPE;
 }
