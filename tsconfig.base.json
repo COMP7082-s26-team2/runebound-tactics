@@ -10,6 +10,7 @@
         "declaration": true,
         "declarationMap": true,
         "sourceMap": true,
-        "experimentalDecorators": true
+        "experimentalDecorators": true,
+        "ignoreDeprecations": "6.0"
     }
 }

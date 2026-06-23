@@ -41,35 +41,52 @@ async function runIntegrationTest() {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     try {
-        // 2. Connect a mock client via the client SDK layer
-        const clientRoom = await colyseusServer.sdk.create("card_test_room", { maxClients:4 });
-        console.log("✅ Client securely connected via WebSocket layer.");
+        // 1. Connect User A
+        const userA = await colyseusServer.sdk.create("card_test_room", {});
+        const idA = userA.sessionId;
+        console.log(`✅ User A connected. Session ID: ${idA}`);
 
+        // 2. Connect User B to the exact same room instance
+        // Using .joinOrCreate ensures User B joins the active room User A just made
+        const userB = await colyseusServer.sdk.joinOrCreate("card_test_room", {});
+        const idB = userB.sessionId;
+        console.log(`✅ User B connected. Session ID: ${idB}`);
+        
         await new Promise((resolve) => setTimeout(resolve, 200));
-    
-        // This will now print safely because the initial state arrived with the connection
-        if (clientRoom.state && clientRoom.state.deck && clientRoom.state.deck.cards ) {
-            console.log(`Initial deck size on client: ${clientRoom.state.deck.cards.length} cards.`);
-        } else {
-            console.log("⚠️ Client state data structure is still parsing...");
-        }        // 3. Send a network message to test drawing cards
 
-        console.log("\n--- Dispatching drawCard action ---");
-        clientRoom.send("drawCard");
-        
-        // 2. CRITICAL Bypassing Hang: Give the server loop 250ms to process the 
-        // message handler, splice the array, and broadcast the binary delta down.
-        console.log("Awaiting network loop synchronization tick...");
+        // 3. Verify Initial State Alignment
+        const slotA = userA.state.players.get(idA);
+        const slotB = userB.state.players.get(idB);
+
+    console.log(`\n[Initial Verification]`);
+    if (slotA && slotB) {
+        console.log(`User A Deck Size: ${slotA.deck?.cards?.length} cards.`);
+        console.log(`User B Deck Size: ${slotB.deck?.cards?.length} cards.`);
+    } else {
+        console.log("⚠️ Synchronization incomplete:");
+        console.log(`-> Slot A found on Client A? ${!!slotA}`);
+        console.log(`-> Slot B found on Client B? ${!!slotB}`);
+    }    
+        // 4. User A Executes an Action
+        console.log("\n--- User A dispatches drawCard action ---");
+        userA.send("drawCard");
+
+        // Settle network loop for User A's mutation patch
         await new Promise((resolve) => setTimeout(resolve, 250));
-        
-        // 3. Assert directly against the synchronized client mirror state
-        if (clientRoom.state?.deck?.cards) {
-            const finalCount = clientRoom.state.deck.cards.length;
-            console.log(`✅ Success! Client mirror state synced. New deck size: ${finalCount}`);
-        } else {
-            console.error("❌ Error: Client state tree is inaccessible or empty.");
-        }
 
+        // 5. Assert Independent Mutations
+        const updatedA = userA.state.players.get(idA);
+        const updatedB = userB.state.players.get(idB);
+
+        console.log(`\n[Post-Action Verification]`);
+        console.log(`User A Deck Size: ${updatedA?.deck?.cards?.length} cards. (Should be decremented)`);
+        console.log(`User B Deck Size: ${updatedB?.deck?.cards?.length} cards. (Should remain unchanged)`);
+
+        if (updatedA?.deck?.cards?.length === 1 && updatedB?.deck?.cards?.length === 2) {
+            console.log("\n✅ Success! State tracking is isolated per player map schema.");
+        } else {
+            console.error("\n❌ Error: Cross-contamination or structural synchronization failure.");
+        }
     } catch (error) {
         console.error("Test failed during execution loop:", error);
     } finally {
