@@ -36,7 +36,7 @@ export function EndGameStatsScreen({
                 <div className="text-center flex flex-col gap-2">
                     <Eyebrow className="text-[var(--brass-500)]">Match Concluded</Eyebrow>
                     <h1
-                        className={`text-[var(--text-2xl)] font-bold leading-tight ${
+                        className={`text-[5rem] md:text-[7rem] font-bold leading-[0.9] tracking-tight ${
                             won
                                 ? "text-[var(--brass-300)]"
                                 : "text-[var(--seal-red)] opacity-80"
