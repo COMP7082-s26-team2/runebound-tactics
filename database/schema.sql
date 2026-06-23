@@ -24,6 +24,20 @@ CREATE TABLE "user_presence" (
     CONSTRAINT "user_presence_supabase_session_id_fkey" FOREIGN KEY ("supabase_session_id") REFERENCES "user_sessions"("supabase_session_id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
+CREATE TABLE "user_sessions" (
+    "id" BIGSERIAL NOT NULL,
+    "user_id" BIGINT NOT NULL,
+    "supabase_session_id" TEXT NOT NULL,
+    "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expires_at" TIMESTAMP(6) NOT NULL,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "last_active_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "user_sessions_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "user_sessions_supabase_session_id_key" UNIQUE ("supabase_session_id"),
+    CONSTRAINT "user_sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "player"("player_id") ON DELETE CASCADE ON UPDATE NO ACTION
+);
+
 -- CreateTable
 CREATE TABLE "guild" (
     "guild_id" BIGSERIAL NOT NULL,
