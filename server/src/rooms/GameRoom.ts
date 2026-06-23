@@ -65,6 +65,12 @@ interface PendingAttack {
     damage: number;
     defenderDied: boolean;
     newHp: number;
+    /** Where the attacker should end up. Null = zero-move attack. */
+    moveTo: GridCoord | null;
+    /** Attacker's pos at declare-time (for reachability rebuild on resolve). */
+    posBefore: GridCoord;
+    /** AP to deduct for the move half on resolve (0 for zero-move attack). */
+    moveApCost: number;
 }
 
 export class GameRoom extends Room<{ state: GameState }> {
@@ -474,7 +480,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             moveTo.q === posBefore.q &&
             moveTo.r === posBefore.r;
 
-        // ── Half 1: optional move ─────────────────────────────────────
+        // ── Half 1: validate optional move (no mutation) ──────────────
         if (moveTo && !moveToIsCurrentPos) {
             if (!ActionPointSystem.canAfford(attacker, AP_COST.MOVE)) return;
             const reachable = this._reachabilityCache.get(attacker.unitId);
@@ -482,49 +488,27 @@ export class GameRoom extends Room<{ state: GameState }> {
             const moveKey = cellKey({ q: moveTo.q, r: moveTo.r });
             if (!reachable.has(moveKey)) return;
 
-            // Pre-validate half-2 adjacency BEFORE mutating
+            // Pre-validate half-2 adjacency from post-move position.
             if (manhattan({ q: moveTo.q, r: moveTo.r }, targetPos) !== 1) return;
-
-            attacker.x = moveTo.q;
-            attacker.y = moveTo.r;
-            ActionPointSystem.deduct(attacker, AP_COST.MOVE);
-            console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${attacker.unitId} spent ${AP_COST.MOVE} (move) → ${attacker.actionPoints} remaining`);
-            // hasMoved is set unconditionally below after half-2 success.
         } else {
             // Zero-move attack — validate adjacency from current position.
             if (manhattan(posBefore, targetPos) !== 1) return;
         }
 
-        // ── Half 2: resolve attack ────────────────────────────────────
+        // ── Half 2: pre-compute damage (no mutation) ─────────────────
         const damage = computeAttackDamage(attacker, target);
-        if (damage <= 0) {
-            // Defensive: rollback move-half if applied, then bail.
-            if (moveTo && !moveToIsCurrentPos) {
-                attacker.x = posBefore.q;
-                attacker.y = posBefore.r;
-            }
-            return;
-        }
+        if (damage <= 0) return;
 
         const newHp = Math.max(0, target.hp - damage);
         const defenderDied = newHp <= 0;
 
-        // 1-AP exhaustion: flip on any successful attack.
-        attacker.hasMoved = true;
-        attacker.hasActed = true;
-        ActionPointSystem.deduct(attacker, AP_COST.ATTACK);
-        console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${attacker.unitId} spent ${AP_COST.ATTACK} (attack) → ${attacker.actionPoints} remaining`);
-
-        // Update reachability cache. Move+attack uses surgical update;
-        // zero-move attack just removes the now-exhausted attacker.
-        if (moveTo && !moveToIsCurrentPos) {
-            this._updateReachabilityAfterMove(attacker.unitId, posBefore, {
-                q: moveTo.q,
-                r: moveTo.r,
-            });
-        } else {
-            this._reachabilityCache.delete(attacker.unitId);
-        }
+        // All attacker-side mutations (pos / hasMoved / hasActed / AP /
+        // reachability) are deferred to _resolvePendingAttack so that the
+        // reaction window can run in between without leaking partial state
+        // patches to clients. The client's snapshot-diff classifier needs
+        // the attacker's hasMoved flip and the target's HP drop to land in
+        // the same patch to produce an AttackEvent.
+        const moveCommitted = moveTo !== undefined && !moveToIsCurrentPos;
 
         this._pendingAttack = {
             attackerId: attacker.unitId,
@@ -532,6 +516,9 @@ export class GameRoom extends Room<{ state: GameState }> {
             damage,
             defenderDied,
             newHp,
+            moveTo: moveCommitted ? { q: moveTo.q, r: moveTo.r } : null,
+            posBefore,
+            moveApCost: moveCommitted ? AP_COST.MOVE : 0,
         };
 
         console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: attack declared ${attacker.unitId} → ${target.unitId} (dmg ${damage}${defenderDied ? ", lethal" : ""})`);
@@ -553,6 +540,34 @@ export class GameRoom extends Room<{ state: GameState }> {
         const pa = this._pendingAttack;
         if (!pa) return;
         this._pendingAttack = null;
+
+        // ── Apply deferred attacker mutations ────────────────────────
+        // Order: move attacker → exhaust + AP deduct → reachability refresh.
+        // All four happen in the same Colyseus state patch as the target's
+        // HP / death write below, so the client's diffSnapshots classifier
+        // sees the hasMoved flip and the HP drop together and produces a
+        // single AttackEvent for buildAttackSequence.
+        const attacker = this.state.units.get(pa.attackerId);
+        if (attacker) {
+            if (pa.moveTo) {
+                attacker.x = pa.moveTo.q;
+                attacker.y = pa.moveTo.r;
+                if (pa.moveApCost > 0) {
+                    ActionPointSystem.deduct(attacker, pa.moveApCost);
+                    console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${attacker.unitId} spent ${pa.moveApCost} (move) → ${attacker.actionPoints} remaining`);
+                }
+            }
+            attacker.hasMoved = true;
+            attacker.hasActed = true;
+            ActionPointSystem.deduct(attacker, AP_COST.ATTACK);
+            console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${attacker.unitId} spent ${AP_COST.ATTACK} (attack) → ${attacker.actionPoints} remaining`);
+
+            if (pa.moveTo) {
+                this._updateReachabilityAfterMove(attacker.unitId, pa.posBefore, pa.moveTo);
+            } else {
+                this._reachabilityCache.delete(attacker.unitId);
+            }
+        }
 
         const target = this.state.units.get(pa.targetId);
         if (!target) return;
