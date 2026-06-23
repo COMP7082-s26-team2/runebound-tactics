@@ -15,11 +15,11 @@ interface ButtonProps {
 
 const INTENT_CLASSES: Record<ButtonIntent, string> = {
     primary:
-        "bg-[var(--brass-500)] text-[var(--ink-900)] font-bold hover:bg-[var(--brass-300)] active:translate-y-px disabled:bg-[var(--brass-700)] disabled:text-[var(--ink-faded)] [box-shadow:var(--bevel-vellum)]",
+        "bg-[var(--brass-300)] text-black font-bold border-2 border-[var(--brass-700)] hover:bg-[var(--brass-500)] active:translate-y-px disabled:bg-[var(--ink-700)] disabled:text-[var(--ink-500)] disabled:border-[var(--ink-500)]",
     secondary:
-        "bg-[var(--vellum-200)] text-[var(--ink-mark)] hover:bg-[var(--vellum-050)] active:translate-y-px disabled:opacity-60 [box-shadow:var(--bevel-vellum)]",
+        "bg-transparent text-[var(--brass-300)] font-bold border-2 border-[var(--brass-500)] hover:bg-[var(--brass-500)] hover:text-[var(--ink-900)] active:translate-y-px disabled:opacity-50",
     destructive:
-        "bg-[var(--seal-red)] text-[var(--vellum-050)] hover:opacity-90 active:translate-y-px disabled:opacity-50 [box-shadow:var(--bevel-chamber)]",
+        "bg-[var(--seal-red)] text-[var(--vellum-050)] font-bold hover:brightness-110 active:translate-y-px disabled:opacity-50 [box-shadow:var(--bevel-chamber)]",
 };
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {

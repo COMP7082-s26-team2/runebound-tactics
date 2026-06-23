@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import { BackButton } from "@/components/ui/BackButton";
+import { Eyebrow } from "@/components/ui/Eyebrow";
+import { Field } from "@/components/ui/Field";
+import { Hint } from "@/components/ui/Hint";
+import { Panel } from "@/components/ui/Panel";
 import { CreateLobbyModal } from "@/components/lobby/CreateLobbyModal";
 import { getDisplayName, setDisplayName } from "@/lib/multiplayer/identity";
 
@@ -11,9 +14,11 @@ function MultiplayerPage() {
     const router = useRouter();
     const [name, setName] = useState("");
     const [createOpen, setCreateOpen] = useState(false);
+    const [hydrated, setHydrated] = useState(false);
 
     useEffect(() => {
         setName(getDisplayName());
+        setHydrated(true);
     }, []);
 
     function handleNameChange(v: string) {
@@ -21,26 +26,53 @@ function MultiplayerPage() {
         setDisplayName(v);
     }
 
+    if (!hydrated) {
+        return (
+            <main className="min-h-screen bg-[var(--ink-900)] text-[var(--ink-500)] flex items-center justify-center p-6">
+                Loading…
+            </main>
+        );
+    }
+
     return (
-        <>
-            <div className="min-h-screen bg-gray-900 flex flex-col gap-4 p-4">
-                <h1 className="text-white text-2xl">Multiplayer</h1>
-                <label className="flex flex-col text-white">
-                    Display Name
-                    <input
-                        type="text"
-                        value={name}
-                        onChange={e => handleNameChange(e.target.value)}
-                        maxLength={32}
-                        className="mt-1 px-2 py-1 bg-gray-800 text-white border border-gray-700 rounded"
-                    />
-                </label>
-                <Button onClick={() => setCreateOpen(true)}>Create Lobby</Button>
-                <Button onClick={() => router.push("/lobbies")}>Browse Lobbies</Button>
-                <BackButton router={router}>Back</BackButton>
-            </div>
-            <CreateLobbyModal isOpen={createOpen} onClose={() => setCreateOpen(false)} />
-        </>
+        <main className="min-h-screen bg-[var(--ink-900)] text-[var(--ink-300)] flex items-center justify-center p-6">
+            <Panel skin="chamber" className="w-full max-w-md p-8 flex flex-col gap-6">
+                <div className="text-center flex flex-col gap-2">
+                    <Eyebrow className="text-[var(--brass-500)]">Live Match</Eyebrow>
+                    <h1 className="text-[var(--text-2xl)] font-bold text-[var(--vellum-050)] leading-tight">
+                        Take the field.
+                    </h1>
+                    <Hint>Set your name, then host or join.</Hint>
+                </div>
+
+                <Field
+                    label="Display name"
+                    value={name}
+                    onChange={handleNameChange}
+                    type="text"
+                    placeholder="Tactician"
+                    maxLength={32}
+                    skin="chamber"
+                />
+
+                <div className="flex flex-col gap-2">
+                    <Button intent="primary" size="lg" onClick={() => setCreateOpen(true)}>
+                        Host a Lobby
+                    </Button>
+                    <Button intent="secondary" size="md" onClick={() => router.push("/lobbies")}>
+                        Browse Lobbies
+                    </Button>
+                    <Button intent="secondary" size="md" onClick={() => router.back()}>
+                        Back
+                    </Button>
+                </div>
+            </Panel>
+
+            <CreateLobbyModal
+                isOpen={createOpen}
+                onClose={() => setCreateOpen(false)}
+            />
+        </main>
     );
 }
 

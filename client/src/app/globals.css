@@ -20,6 +20,9 @@
     --brass-300: #d6b072;
     --brass-700: #7a5a23;
 
+    /* Pitch — max-contrast text on light surfaces */
+    --ink-pitch: #000000;
+
     /* Factions */
     --castle-ink: #2b4c87;
     --castle-leaf: #c9a14a;
@@ -107,6 +110,9 @@ body {
     background: var(--ink-900);
     color: var(--ink-300);
     font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: grayscale;
+    font-smooth: never;
 }
 
 @keyframes sigil-stamp {

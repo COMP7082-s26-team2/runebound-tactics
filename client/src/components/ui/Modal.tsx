@@ -49,17 +49,17 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                 className="relative max-w-lg w-full mx-4 [box-shadow:var(--elev-pixel-raised)]"
                 onClick={(e) => e.stopPropagation()}
             >
-                <Panel skin="vellum" className="p-6">
+                <Panel skin="chamber" className="p-6">
                     <button
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="absolute top-1 right-2 text-[var(--ink-faded)] hover:text-[var(--ink-mark)] text-2xl leading-none"
+                        className="absolute top-1 right-2 text-[var(--ink-500)] hover:text-[var(--vellum-050)] text-2xl leading-none"
                     >
                         &times;
                     </button>
                     {title && (
-                        <h2 className="text-[var(--text-xl)] font-bold mb-4 text-[var(--ink-mark)]">
+                        <h2 className="text-[var(--text-xl)] font-bold mb-4 text-[var(--vellum-050)]">
                             {title}
                         </h2>
                     )}
