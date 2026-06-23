@@ -28,7 +28,7 @@ function LobbiesPageInner() {
                 <Button intent="primary" size="lg" onClick={() => setCreateOpen(true)}>
                     Host a Lobby
                 </Button>
-                <Button intent="secondary" size="md" onClick={() => router.back()}>
+                <Button intent="secondary" size="md" onClick={() => router.push("/multiplayer")}>
                     Back
                 </Button>
             </div>

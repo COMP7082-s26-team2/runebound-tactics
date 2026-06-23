@@ -41,7 +41,7 @@ export function GameModeScreen() {
                     <Button
                         intent="secondary"
                         size="md"
-                        onClick={() => router.back()}
+                        onClick={() => router.push("/")}
                     >
                         Back
                     </Button>

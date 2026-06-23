@@ -76,7 +76,7 @@ function MultiplayerPage() {
                     <Button intent="secondary" size="md" onClick={() => router.push("/lobbies")}>
                         Browse Lobbies
                     </Button>
-                    <Button intent="secondary" size="md" onClick={() => router.back()}>
+                    <Button intent="secondary" size="md" onClick={() => router.push("/mode-select")}>
                         Back
                     </Button>
                 </div>
