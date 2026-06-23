@@ -181,7 +181,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     return (
         <section className="flex flex-col gap-3">
             <div className="flex items-baseline gap-3">
-                <h2 className="text-[var(--text-lg)] font-[family-name:var(--font-display)] text-[var(--vellum-050)]">
+                <h2 className="text-[var(--text-lg)] font-bold text-[var(--vellum-050)]">
                     {title}
                 </h2>
                 <Divider tone="chamber" className="flex-1" />

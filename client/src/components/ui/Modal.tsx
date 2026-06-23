@@ -59,7 +59,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                         &times;
                     </button>
                     {title && (
-                        <h2 className="text-[var(--text-xl)] font-bold mb-4 text-[var(--ink-mark)] font-[family-name:var(--font-display)]">
+                        <h2 className="text-[var(--text-xl)] font-bold mb-4 text-[var(--ink-mark)]">
                             {title}
                         </h2>
                     )}
