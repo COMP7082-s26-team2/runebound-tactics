@@ -1,6 +1,5 @@
-import { MapSchema, Schema, type } from "@colyseus/schema";
-import { DeckManager } from "./Card"
 import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
+import { DeckManager } from "./Card"
 
 /**
  * A single unit on the game grid.
