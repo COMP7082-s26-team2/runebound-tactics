@@ -33,12 +33,12 @@ export function MainMenu({ onInviteFriend }: MainMenuProps) {
                 <div className="text-center flex flex-col gap-3">
                     <Eyebrow className="text-[var(--brass-500)]">A Tactics Game</Eyebrow>
                     <h1
-                        className="text-[var(--text-3xl)] text-[var(--vellum-050)] leading-none"
+                        className="text-[7rem] md:text-[9rem] text-[var(--vellum-050)] leading-[0.9] tracking-tight"
                         style={{ fontFamily: "var(--font-display)" }}
                     >
                         Runebound Tactics
                     </h1>
-                    <span className="block w-32 h-px mx-auto bg-[var(--brass-500)]" />
+                    <span className="block w-48 h-px mx-auto bg-[var(--brass-500)]" />
                 </div>
 
                 <nav className="flex flex-col gap-3 w-64">
