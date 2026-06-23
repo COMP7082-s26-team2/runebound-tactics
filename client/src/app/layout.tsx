@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Jacquard_12, Tiny5 } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -10,6 +10,20 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
     variable: "--font-geist-mono",
     subsets: ["latin"],
+});
+
+const jacquard = Jacquard_12({
+    variable: "--font-jacquard",
+    subsets: ["latin"],
+    weight: "400",
+    display: "swap",
+});
+
+const tiny5 = Tiny5({
+    variable: "--font-tiny5",
+    subsets: ["latin"],
+    weight: "400",
+    display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -25,7 +39,7 @@ export default function RootLayout({
     return (
         <html
             lang="en"
-            className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+            className={`${geistSans.variable} ${geistMono.variable} ${jacquard.variable} ${tiny5.variable} h-full antialiased`}
             suppressHydrationWarning
         >
             <body className="min-h-full flex flex-col">{children}</body>
