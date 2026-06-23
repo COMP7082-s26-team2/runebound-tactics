@@ -94,11 +94,11 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const gameState = state as unknown as GameState;
 
     const winnerId = gameState.phase === "ended" ? gameState.winnerId : "";
-    const playersMap = gameState.players as unknown as Map<
+    const players = gameState.players as unknown as Record<
         string,
         { sessionId: string; displayName: string }
     >;
-    const winnerSlot = winnerId ? playersMap.get(winnerId) : undefined;
+    const winnerSlot = winnerId ? players[winnerId] : undefined;
     const winnerName = winnerSlot?.displayName ?? null;
 
     return (
