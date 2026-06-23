@@ -1,9 +1,5 @@
-"use client";
+import { MainMenu } from "@/components/MainMenu";
 
-export default function App() {
-    return (
-        <div>
-
-        </div>
-    );
+export default function Home() {
+    return <MainMenu />;
 }
