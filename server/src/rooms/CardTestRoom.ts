@@ -14,29 +14,52 @@ export class CardTestRoom extends Room<{state: GameState}> {
         const initialState = new GameState();
         this.setState(initialState);
 
-        this.onMessage("drawCard", (client) => {
-            const player = this.state.players.get(client.sessionId);
-            
-            if (player && player.deck.cards.length > 0) {
-                const targetIndex = player.deck.cards.length - 1;
-                const targetCard = player.deck.cards.splice(targetIndex, 1)[0];
-                
-                // If you have a hand array schema configured on the player:
-                // player.hand.push(targetCard);
-                
-                (player.deck as any).$changed = true;
-                (this.state as any).$changed = true;
-                console.log(`[CardGameRoom] ${client.sessionId} drew card: ${targetCard.name}`);
-            } 
+        this.onMessage("drawAndPlay", (client) => {
+            const playerSlot = this.state.players.get(client.sessionId);
+
+
+            if (!playerSlot || playerSlot.isEliminated ) return;
+
+            const deckContainer = playerSlot.deck;
+
+            if (!deckContainer.cards || deckContainer.cards.length === 0) {
+                console.log(`[GameRoom] ${client.sessionId} failed to draw: Deck is empty.`);
+                return;
+            }
+        
+            // 2. STAGE 1: Draw the top card (using safe index splicing)
+            const targetIndex = deckContainer.cards.length - 1;
+            const targetCard = deckContainer.cards[targetIndex];
+        
+            if (!targetCard) return;
+        
+            // 3. STAGE 2: Enforce Gold Rules
+            if (playerSlot.gold < targetCard.gold_cost) {
+                console.log(`[GameRoom] DrawAndPlay rejected: ${client.sessionId} needs ${targetCard.gold_cost} gold but only has ${playerSlot.gold}.`);
+                client.send("error", { message: `Insufficient gold to execute ${targetCard.name}!` });
+                return;
+            }
+        
+            // 4. MUTATION: Deduct resource and splice the card out of the deck
+            playerSlot.gold -= targetCard.gold_cost;
+            deckContainer.cards.splice(targetIndex, 1);
+        
+            console.log(`[GameRoom] SUCCESS! ${client.sessionId} drew and instantly cast ${targetCard.name}. Remaining Gold: ${playerSlot.gold}`);
+        
+            console.log(`[CardGameRoom] ${client.sessionId} drew card: ${targetCard.name}`);
         });
     }
 
-    onJoin(client: Client): void{
+    onJoin(client: Client, options: any ): void{
       console.log(`[CardGameRoom] Player ${client.sessionId} joined. Initializing personal deck.`);
       
       const newPlayer = new GamePlayerSlot();
       newPlayer.sessionId = client.sessionId;
       newPlayer.deck = new DeckManager(); // Pristine, isolated deck instance
+      newPlayer.displayName = typeof options.dis
+
+      // DEBUG PURPOSES
+      newPlayer.gold = typeof options.gold == "number" ? options.gold : 0;
 
       newPlayer.deck.initializeDeck(INITIAL_CARD_LIST);
     
@@ -46,7 +69,7 @@ export class CardTestRoom extends Room<{state: GameState}> {
 
     onUncaughtException (err: Error, methodName: string) {
         if (err instanceof OnCreateException) {
-          console.log(methodName + " threw ${err.message} : Caused by ${err.message}");
+          console.log(methodName + `threw ${err.message} : Caused by ${err.message}`);
         }
     }
 }

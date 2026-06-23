@@ -42,13 +42,13 @@ async function runIntegrationTest() {
 
     try {
         // 1. Connect User A
-        const userA = await colyseusServer.sdk.create("card_test_room", {});
+        const userA = await colyseusServer.sdk.create("card_test_room", { gold: 10 });
         const idA = userA.sessionId;
         console.log(`✅ User A connected. Session ID: ${idA}`);
 
         // 2. Connect User B to the exact same room instance
         // Using .joinOrCreate ensures User B joins the active room User A just made
-        const userB = await colyseusServer.sdk.joinOrCreate("card_test_room", {});
+        const userB = await colyseusServer.sdk.joinOrCreate("card_test_room", { gold: 1});
         const idB = userB.sessionId;
         console.log(`✅ User B connected. Session ID: ${idB}`);
         
@@ -61,7 +61,9 @@ async function runIntegrationTest() {
     console.log(`\n[Initial Verification]`);
     if (slotA && slotB) {
         console.log(`User A Deck Size: ${slotA.deck?.cards?.length} cards.`);
+        console.log(`User A Gold: ${slotA.gold}`);
         console.log(`User B Deck Size: ${slotB.deck?.cards?.length} cards.`);
+        console.log(`User B Gold: ${slotB.gold}`);
     } else {
         console.log("⚠️ Synchronization incomplete:");
         console.log(`-> Slot A found on Client A? ${!!slotA}`);
@@ -69,7 +71,14 @@ async function runIntegrationTest() {
     }    
         // 4. User A Executes an Action
         console.log("\n--- User A dispatches drawCard action ---");
-        userA.send("drawCard");
+        userA.send("drawAndPlay");
+
+        // Settle network loop for User A's mutation patch
+        await new Promise((resolve) => setTimeout(resolve, 250));
+
+        // 4. User A Executes an Action
+        console.log("\n--- User B dispatches drawCard action ---");
+        userB.send("drawAndPlay");
 
         // Settle network loop for User A's mutation patch
         await new Promise((resolve) => setTimeout(resolve, 250));
@@ -79,7 +88,7 @@ async function runIntegrationTest() {
         const updatedB = userB.state.players.get(idB);
 
         console.log(`\n[Post-Action Verification]`);
-        console.log(`User A Deck Size: ${updatedA?.deck?.cards?.length} cards. (Should be decremented)`);
+        console.log(`User A Deck Size: ${updatedA?.deck?.cards?.length} cards. (Should be decremented) ${updatedA?.gold}`);
         console.log(`User B Deck Size: ${updatedB?.deck?.cards?.length} cards. (Should remain unchanged)`);
 
         if (updatedA?.deck?.cards?.length === 1 && updatedB?.deck?.cards?.length === 2) {
