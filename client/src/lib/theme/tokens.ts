@@ -5,7 +5,8 @@ const TOKEN_NAMES = [
     "vellum-050", "vellum-200", "vellum-400", "ink-mark", "ink-faded",
     "brass-500", "brass-300", "brass-700",
     "castle-ink", "castle-leaf", "necro-ink", "necro-bone",
-    "seal-red", "seal-blue", "seal-amber",
+    "seal-red", "seal-blue", "seal-amber", "seal-warning",
+    "ink-pitch",
 ] as const;
 
 let cached: TokenMap | null = null;
@@ -24,4 +25,13 @@ export function getTokens(): TokenMap {
 
 export function token(name: (typeof TOKEN_NAMES)[number]): string {
     return getTokens()[name] ?? "";
+}
+
+// Resolve a CSS font variable to its computed family name string usable in
+// ctx.font. Falls back to monospace SSR-side.
+export function getFontFamily(varName: "font-pixelify" | "font-jacquard" | "font-tiny5"): string {
+    if (typeof document === "undefined") return "monospace";
+    return getComputedStyle(document.documentElement)
+        .getPropertyValue(`--${varName}`)
+        .trim() || "monospace";
 }

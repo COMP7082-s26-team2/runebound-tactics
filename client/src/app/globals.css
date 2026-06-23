@@ -33,6 +33,8 @@
     --seal-red: #9b2a2a;
     --seal-blue: #2f5d8a;
     --seal-amber: #b8893d;
+    /* HP-bar mid-range — between brass-500 and seal-red */
+    --seal-warning: #c2742a;
 
     /* Type scale */
     --text-2xs: 0.75rem;

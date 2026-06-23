@@ -4,12 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { GameEngine, AssetHandler } from "@/lib/engine";
 import { MultiplayerGameScene } from "@/lib/game/scenes/MultiplayerGameScene";
 import { ASSET_MANIFEST } from "@/lib/game/assets";
-import {
-    CELL_SIZE,
-    GRID_COLS,
-    GRID_ROWS,
-    type GameState,
-} from "@runebound-tactics/shared";
+import { type GameState } from "@runebound-tactics/shared";
+import { CanvasHUDSystem } from "@/components/game/CanvasHUDSystem";
 import type { Room } from "@colyseus/sdk";
 
 interface MultiplayerGameCanvasProps {
@@ -17,8 +13,10 @@ interface MultiplayerGameCanvasProps {
     state: GameState;
 }
 
-const CANVAS_WIDTH = CELL_SIZE * GRID_COLS;
-const CANVAS_HEIGHT = CELL_SIZE * GRID_ROWS;
+const CANVAS_WIDTH = 1050;
+const CANVAS_HEIGHT = 880;
+const BOARD_WIDTH = 800;
+const BOARD_HEIGHT = 800;
 
 type LoadPhase = "loading" | "ready" | "error";
 
@@ -40,7 +38,12 @@ type LoadPhase = "loading" | "ready" | "error";
 export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const sceneRef = useRef<MultiplayerGameScene | null>(null);
+    const latestStateRef = useRef<GameState>(state);
     const [phase, setPhase] = useState<LoadPhase>("loading");
+
+    useEffect(() => {
+        latestStateRef.current = state;
+    }, [state]);
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -71,8 +74,21 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
                 engine.scenes.register("main", scene);
                 engine.scenes.switch("main");
 
+                const hud = new CanvasHUDSystem();
+
                 engine.preDraw = (ctx) => {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    // Clip scene drawing to the 800×800 board region
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+                    ctx.clip();
+                };
+
+                engine.postDraw = (ctx) => {
+                    // Restore the canvas state so HUD draws outside the clip
+                    ctx.restore();
+                    hud.draw(ctx, latestStateRef.current, room.sessionId);
                 };
 
                 engine.start();
