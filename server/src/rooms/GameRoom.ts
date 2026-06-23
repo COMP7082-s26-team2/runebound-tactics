@@ -528,50 +528,29 @@ export class GameRoom extends Room<{ state: GameState }> {
      */
     private _updateReachabilityAfterMove(
         movedUnitId: string,
-        prevPos: GridCoord,
-        newPos: GridCoord,
+        _prevPos: GridCoord,
+        _newPos: GridCoord,
     ): void {
+        // Full rebuild of the active player's reachability cache.
+        //
+        // Why not a surgical update keyed on the moved unit's prev/new tile:
+        // the old "surgical" pass recomputed only units whose oldReachable
+        // set already contained prevKey or newKey. But the moved unit was
+        // BLOCKING prevKey before this call — so prevKey was never in any
+        // other unit's reachable set. The condition collapsed to
+        // "recompute only if newKey was previously reachable," missing the
+        // common case where vacating prevKey opens new paths for a teammate
+        // standing on the other side. A second friendly couldn't move into
+        // the just-vacated tile because their cached BFS still treated it
+        // as occupied.
+        //
+        // _rebuildReachabilityCache iterates the player's units, skips ones
+        // with hasMoved=true (the moved unit just had that flag set), and
+        // recomputes the rest. O(units × cells) per move with N=4 units —
+        // sub-millisecond, no perf concern.
         const movedUnit = this.state.units.get(movedUnitId);
         if (!movedUnit) return;
-        const playerId = movedUnit.ownerId;
-        const prevKey = cellKey(prevPos);
-        const newKey = cellKey(newPos);
-        const occupied = this._buildOccupiedSet();
-
-        const recompute = (unitId: string) => {
-            const u = this.state.units.get(unitId);
-            if (!u) return;
-            const movementType = getUnitMovementType(u.unitType);
-            this._reachabilityCache.set(
-                unitId,
-                computeReachableTiles({
-                    getNeighbors: squareGridNeighbors,
-                    isOccupied: (k) => occupied.has(k),
-                    canEnter: (coord) =>
-                        canEnter({ movementType }, terrainAt(CHOKEPOINT_MAP, coord.r, coord.q)),
-                    movement: getUnitMovement(u.unitType),
-                    start: { q: u.x, r: u.y },
-                }),
-            );
-        };
-
-        for (const [unitId, oldReachable] of [
-            ...this._reachabilityCache.entries(),
-        ]) {
-            const unit = this.state.units.get(unitId);
-            if (!unit || unit.ownerId !== playerId) continue;
-            if (unitId === movedUnitId) {
-                if (unit.hasMoved) {
-                    this._reachabilityCache.delete(unitId);
-                } else {
-                    recompute(unitId);
-                }
-                continue;
-            }
-            if (oldReachable.has(prevKey) || oldReachable.has(newKey)) {
-                recompute(unitId);
-            }
-        }
+        this._rebuildReachabilityCache(movedUnit.ownerId);
     }
 
     private _buildOccupiedSet(): Set<string> {
