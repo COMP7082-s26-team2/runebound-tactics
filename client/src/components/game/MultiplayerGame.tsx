@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { clearGameToken } from "@/lib/multiplayer/reconnect";
 import { MultiplayerGameCanvas } from "@/components/game/MultiplayerGameCanvas";
 import { GameHUD } from "@/components/game/GameHUD";
+import { EndGameStatsScreen } from "@/components/game/EndGameStatsScreen";
 import type { GameState } from "@runebound-tactics/shared";
 
 interface MultiplayerGameProps {
@@ -92,6 +93,14 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     // snapshot.
     const gameState = state as unknown as GameState;
 
+    const winnerId = gameState.phase === "ended" ? gameState.winnerId : "";
+    const playersMap = gameState.players as unknown as Map<
+        string,
+        { sessionId: string; displayName: string }
+    >;
+    const winnerSlot = winnerId ? playersMap.get(winnerId) : undefined;
+    const winnerName = winnerSlot?.displayName ?? null;
+
     return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center">
             <div className="relative inline-block">
@@ -102,6 +111,15 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                     onLeave={leave}
                     onEndTurn={endTurn}
                 />
+                {gameState.phase === "ended" && (
+                    <EndGameStatsScreen
+                        winnerId={winnerId}
+                        winnerName={winnerName}
+                        mySessionId={room.sessionId}
+                        turnsPlayed={gameState.turnNumber + 1}
+                        onLeave={leave}
+                    />
+                )}
             </div>
         </div>
     );
