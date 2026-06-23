@@ -125,8 +125,8 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
         : null;
 
     return (
-        <main className="min-h-screen bg-[var(--ink-900)] text-[var(--ink-300)] flex flex-col">
-            <header className="sticky top-0 z-20 w-full">
+        <main className="h-dvh bg-[var(--ink-900)] text-[var(--ink-300)] flex flex-col overflow-hidden">
+            <header className="shrink-0 w-full">
                 <GameTopBar
                     state={gameState}
                     sessionId={room.sessionId}
@@ -139,9 +139,9 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                 />
             </header>
 
-            <div className="flex-1 flex items-center justify-center p-6">
-                <div className="flex flex-col gap-3 w-[800px]">
-                    <div className="relative">
+            <div className="flex-1 min-h-0 flex items-center justify-center p-3">
+                <div className="flex flex-col gap-2 h-full max-h-full items-center">
+                    <div className="relative flex-1 min-h-0 aspect-square">
                         <MultiplayerGameCanvas room={room} state={gameState} />
                         {gameState.phase === "ended" && (
                             <EndGameStatsScreen
@@ -154,14 +154,16 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                         )}
                     </div>
 
-                    <ReactionStrip
-                        phase={reactionPhase}
-                        isActiveReactor={isActiveReactor}
-                        waitingForName={reactorName}
-                        secondsRemaining={secondsRemaining}
-                        onPass={passReaction}
-                        onOpenCards={() => setCardModalOpen(true)}
-                    />
+                    <div className="w-full max-w-[800px] shrink-0">
+                        <ReactionStrip
+                            phase={reactionPhase}
+                            isActiveReactor={isActiveReactor}
+                            waitingForName={reactorName}
+                            secondsRemaining={secondsRemaining}
+                            onPass={passReaction}
+                            onOpenCards={() => setCardModalOpen(true)}
+                        />
+                    </div>
                 </div>
             </div>
 
