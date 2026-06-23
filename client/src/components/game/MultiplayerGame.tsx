@@ -120,7 +120,6 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                 <MultiplayerGameCanvas
                     room={room}
                     state={gameState}
-                    onHudAction={handleHudAction}
                 />
                 {gameState.phase === "ended" && (
                     <EndGameStatsScreen

@@ -48,8 +48,6 @@ export class MultiplayerSelectionSystem implements GameComponent {
         private _cellSize: number,
         private _input: InputSystem,
         private _room: Room<GameState>,
-        private _boardOriginX: number = 0,
-        private _boardOriginY: number = 0,
     ) {}
 
     get selectionState() {
@@ -85,8 +83,8 @@ export class MultiplayerSelectionSystem implements GameComponent {
         if (!this._input.isMouseButtonJustPressed(0)) return;
 
         const coord: GridCoord = {
-            q: Math.floor((this._input.mouseX - this._boardOriginX) / this._cellSize),
-            r: Math.floor((this._input.mouseY - this._boardOriginY) / this._cellSize),
+            q: Math.floor(this._input.mouseX / this._cellSize),
+            r: Math.floor(this._input.mouseY / this._cellSize),
         };
         const key = cellKey(coord);
 
