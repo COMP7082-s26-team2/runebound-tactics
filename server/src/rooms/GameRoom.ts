@@ -1,5 +1,7 @@
 import { Room, Client } from "colyseus";
 import {
+    ActionPointSystem,
+    AP_COST,
     GamePlayerSlot,
     GameState,
     GameUnit,
@@ -8,6 +10,13 @@ import {
     cellKey,
     computeReachableTiles,
     computeAttackDamage,
+    getEffectiveMaxHealth,
+    getUnitAttack,
+    getUnitBaseAp,
+    getUnitBaseHealth,
+    getUnitDefaultWeakness,
+    getUnitDefense,
+    getUnitDamageType,
     getUnitMovement,
     squareGridNeighbors,
     unitIsExhausted,
@@ -96,7 +105,7 @@ export class GameRoom extends Room<{ state: GameState }> {
 
             const unit = this.state.units.get(payload?.unitId);
             if (!unit || unit.ownerId !== client.sessionId) return;
-            if (unit.hasMoved) return;
+            if (!ActionPointSystem.canAfford(unit, AP_COST.MOVE)) return;
 
             const destKey = cellKey({ q: payload.x, r: payload.y });
             const reachable = this._reachabilityCache.get(unit.unitId);
@@ -106,8 +115,10 @@ export class GameRoom extends Room<{ state: GameState }> {
             unit.x = payload.x;
             unit.y = payload.y;
             unit.hasMoved = true;
+            ActionPointSystem.deduct(unit, AP_COST.MOVE);
 
             console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: move ${unit.unitId} (${prevPos.q},${prevPos.r}) → (${payload.x},${payload.y})`);
+            console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${unit.unitId} spent ${AP_COST.MOVE} (move) → ${unit.actionPoints} remaining`);
 
             this._updateReachabilityAfterMove(unit.unitId, prevPos, {
                 q: payload.x,
@@ -269,15 +280,29 @@ export class GameRoom extends Room<{ state: GameState }> {
 
             for (let j = 0; j < unitTypes.length; j++) {
                 const unit = new GameUnit();
-                unit.unitId = `${sessionId}:u${j + 1}`;
+                unit.unitId  = `${sessionId}:u${j + 1}`;
                 unit.ownerId = sessionId;
                 unit.unitType = unitTypes[j]!;
                 unit.x = 2 + j * 2;
                 unit.y = row;
-                unit.hp = 30;
-                unit.maxHp = 30;
+
+                unit.baseMaxHealth    = getUnitBaseHealth(unit.unitType);
+                unit.baseAttackDamage = getUnitAttack(unit.unitType);
+                unit.baseDefense      = getUnitDefense(unit.unitType);
+                unit.baseMovement     = getUnitMovement(unit.unitType);
+                unit.baseAp           = getUnitBaseAp(unit.unitType);
+
+                unit.hp = getEffectiveMaxHealth(unit);
+
+                const dt = getUnitDamageType(unit.unitType);
+                unit.damageType = dt ?? "";
+                for (const w of getUnitDefaultWeakness(unit.unitType)) {
+                    unit.weakness.push(w);
+                }
+
                 unit.hasMoved = false;
                 unit.hasActed = false;
+                ActionPointSystem.restore(unit);
                 this.state.units.set(unit.unitId, unit);
             }
         }
@@ -337,7 +362,7 @@ export class GameRoom extends Room<{ state: GameState }> {
 
         // ── Half 1: optional move ─────────────────────────────────────
         if (moveTo && !moveToIsCurrentPos) {
-            if (attacker.hasMoved) return;                   // already moved this turn
+            if (!ActionPointSystem.canAfford(attacker, AP_COST.MOVE)) return;
             const reachable = this._reachabilityCache.get(attacker.unitId);
             if (!reachable) return;
             const moveKey = cellKey({ q: moveTo.q, r: moveTo.r });
@@ -348,6 +373,8 @@ export class GameRoom extends Room<{ state: GameState }> {
 
             attacker.x = moveTo.q;
             attacker.y = moveTo.r;
+            ActionPointSystem.deduct(attacker, AP_COST.MOVE);
+            console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${attacker.unitId} spent ${AP_COST.MOVE} (move) → ${attacker.actionPoints} remaining`);
             // hasMoved is set unconditionally below after half-2 success.
         } else {
             // Zero-move attack — validate adjacency from current position.
@@ -355,7 +382,7 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
 
         // ── Half 2: resolve attack ────────────────────────────────────
-        const damage = computeAttackDamage(attacker.unitType, target.unitType);
+        const damage = computeAttackDamage(attacker, target);
         if (damage <= 0) {
             // Defensive: rollback move-half if applied, then bail.
             if (moveTo && !moveToIsCurrentPos) {
@@ -371,6 +398,8 @@ export class GameRoom extends Room<{ state: GameState }> {
         // 1-AP exhaustion: flip on any successful attack.
         attacker.hasMoved = true;
         attacker.hasActed = true;
+        ActionPointSystem.deduct(attacker, AP_COST.ATTACK);
+        console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${attacker.unitId} spent ${AP_COST.ATTACK} (attack) → ${attacker.actionPoints} remaining`);
 
         // Update reachability cache. Move+attack uses surgical update;
         // zero-move attack just removes the now-exhausted attacker.
@@ -434,6 +463,8 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (unit.ownerId === this.state.currentTurnId) {
                 unit.hasMoved = false;
                 unit.hasActed = false;
+                ActionPointSystem.restore(unit);
+                console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${unit.unitId} restored → ${unit.actionPoints}`);
             }
         }
 

@@ -2,10 +2,11 @@
     "name": "runebound-tactics-root",
     "version": "1.0.0",
     "private": true,
+    "packageManager": "yarn@1.22.22",
     "workspaces": [
         "client",
-        "shared",
-        "server"
+        "server",
+        "shared"
     ],
     "scripts": {
         "dev": "concurrently -n client,server -c cyan,magenta \"yarn workspace @runebound-tactics/client dev\" \"yarn workspace @runebound-tactics/server dev\"",
@@ -15,7 +16,13 @@
         "typecheck": "yarn workspaces run typecheck"
     },
     "devDependencies": {
-        "concurrently": "^9.1.2",
+        "@types/node": "^20",
+        "concurrently": "^9.2.1",
         "typescript": "^5.8.3"
+    },
+    "dependencies": {},
+    "optionalDependencies": {
+        "@tailwindcss/oxide-linux-x64-gnu": "^4.3.0",
+        "lightningcss-linux-x64-gnu": "^1.32.0"
     }
 }

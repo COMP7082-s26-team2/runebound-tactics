@@ -83,4 +83,5 @@ export interface LiteUnit {
     y: number;
     hp: number;
     hasMoved: boolean;
+    actionPoints: number;
 }
