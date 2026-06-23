@@ -577,7 +577,7 @@ export class GameRoom extends Room<{ state: GameState }> {
                 `[${new Date().toISOString()}] [GameRoom] combat: ${pa.attackerId} → ${pa.targetId} | dmg ${pa.damage} | hp ${target.hp} → 0 (died)`,
             );
             this.state.units.delete(pa.targetId);
-            this._checkWinCondition();
+            this._checkUnitElimination();
         } else {
             console.log(
                 `[${new Date().toISOString()}] [GameRoom] combat: ${pa.attackerId} → ${pa.targetId} | dmg ${pa.damage} | hp ${target.hp} → ${pa.newHp}`,
@@ -699,6 +699,28 @@ export class GameRoom extends Room<{ state: GameState }> {
             occupied.add(cellKey({ q: unit.x, r: unit.y }));
         }
         return occupied;
+    }
+
+    /**
+     * Scan unit ownership and mark players with 0 remaining units as
+     * eliminated. Called after a unit dies in combat. Falls through to
+     * `_checkWinCondition()` so the standard last-player-standing path
+     * still ends the game.
+     */
+    private _checkUnitElimination(): void {
+        const unitsByOwner = new Map<string, number>();
+        for (const unit of this.state.units.values()) {
+            unitsByOwner.set(unit.ownerId, (unitsByOwner.get(unit.ownerId) ?? 0) + 1);
+        }
+        for (const player of this.state.players.values()) {
+            if (player.isEliminated) continue;
+            const count = unitsByOwner.get(player.sessionId) ?? 0;
+            if (count === 0) {
+                player.isEliminated = true;
+                console.log(`[${new Date().toISOString()}] [GameRoom] ${player.displayName} has no units remaining — eliminated`);
+            }
+        }
+        this._checkWinCondition();
     }
 
     private _checkWinCondition(): void {

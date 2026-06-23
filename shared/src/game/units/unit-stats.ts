@@ -38,19 +38,19 @@ export function getUnitMovement(unitType: UnitTypeId): number {
  * UnitStats object.
  */
 const UNIT_ATTACK: Record<string, number> = {
-    "castle:swordsman": 6,
-    "castle:archer": 5,
-    "castle:paladin": 7,
-    "castle:cavalier": 6,
-    "castle:griffin": 5,
+    "castle:swordsman": 5,
+    "castle:archer": 4,
+    "castle:paladin": 5,
+    "castle:cavalier": 5,
+    "castle:griffin": 4,
     "necropolis:skeleton": 4,
-    "necropolis:death_knight": 7,
-    "necropolis:vampire": 6,
-    "necropolis:ghost": 5,
+    "necropolis:death_knight": 5,
+    "necropolis:vampire": 5,
+    "necropolis:ghost": 4,
     "necropolis:zombie": 3,
 };
 
-const DEFAULT_ATTACK = 5;
+const DEFAULT_ATTACK = 4;
 
 export function getUnitAttack(unitType: UnitTypeId): number {
     return UNIT_ATTACK[unitType] ?? DEFAULT_ATTACK;
@@ -61,38 +61,38 @@ export function getUnitAttack(unitType: UnitTypeId): number {
  * formula; minimum damage is 1 (a hit always does something).
  */
 const UNIT_DEFENSE: Record<string, number> = {
-    "castle:swordsman": 3,
-    "castle:archer": 2,
-    "castle:paladin": 5,
-    "castle:cavalier": 3,
-    "castle:griffin": 2,
-    "necropolis:skeleton": 2,
-    "necropolis:death_knight": 4,
-    "necropolis:vampire": 3,
-    "necropolis:ghost": 2,
-    "necropolis:zombie": 4,
+    "castle:swordsman": 2,
+    "castle:archer": 1,
+    "castle:paladin": 3,
+    "castle:cavalier": 2,
+    "castle:griffin": 1,
+    "necropolis:skeleton": 1,
+    "necropolis:death_knight": 3,
+    "necropolis:vampire": 2,
+    "necropolis:ghost": 1,
+    "necropolis:zombie": 2,
 };
 
-const DEFAULT_DEFENSE = 3;
+const DEFAULT_DEFENSE = 2;
 
 export function getUnitDefense(unitType: UnitTypeId): number {
     return UNIT_DEFENSE[unitType] ?? DEFAULT_DEFENSE;
 }
 
 const UNIT_BASE_HEALTH: Record<string, number> = {
-    "castle:swordsman":        30,
-    "castle:archer":           20,
-    "castle:paladin":          40,
-    "castle:cavalier":         30,
-    "castle:griffin":          25,
-    "necropolis:skeleton":     20,
-    "necropolis:death_knight": 40,
-    "necropolis:vampire":      30,
-    "necropolis:ghost":        20,
-    "necropolis:zombie":       35,
+    "castle:swordsman":        10,
+    "castle:archer":           8,
+    "castle:paladin":          14,
+    "castle:cavalier":         10,
+    "castle:griffin":          9,
+    "necropolis:skeleton":     7,
+    "necropolis:death_knight": 14,
+    "necropolis:vampire":      10,
+    "necropolis:ghost":        8,
+    "necropolis:zombie":       12,
 };
 
-const DEFAULT_BASE_HEALTH = 25;
+const DEFAULT_BASE_HEALTH = 10;
 
 export function getUnitBaseHealth(unitType: UnitTypeId): number {
     return UNIT_BASE_HEALTH[unitType] ?? DEFAULT_BASE_HEALTH;
