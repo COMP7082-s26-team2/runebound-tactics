@@ -76,9 +76,10 @@ export function LobbyWaitingRoom({
         );
     }
 
-    const me = state.players[room.sessionId];
+    const playersMap = state.players as unknown as Map<string, { isReady: boolean }>;
+    const me = playersMap.get(room.sessionId);
     const isReady = !!me?.isReady;
-    const playerCount = Object.keys(state.players).length;
+    const playerCount = playersMap.size;
 
     function toggleReady() {
         room?.send("set_ready", { isReady: !isReady });
