@@ -14,7 +14,11 @@ export class CardTestRoom extends Room<{state: GameState}> {
         const initialState = new GameState();
         this.setState(initialState);
 
-        this.onMessage("drawAndPlay", (client) => {
+        this.onMessage("drawAndPlay", (client, message) => {
+            // 1. Extract the requested position index from the client message
+            console.log(message);
+            
+            const { position } = message;
             const playerSlot = this.state.players.get(client.sessionId);
 
 
@@ -26,12 +30,16 @@ export class CardTestRoom extends Room<{state: GameState}> {
                 console.log(`[GameRoom] ${client.sessionId} failed to draw: Deck is empty.`);
                 return;
             }
-        
-            // 2. STAGE 1: Draw the top card (using safe index splicing)
-            const targetIndex = deckContainer.cards.length - 1;
-            const targetCard = deckContainer.cards[targetIndex];
-        
-            if (!targetCard) return;
+            
+            // 2. Validate that the requested position index is within bounds
+    if (typeof position !== "number" || position < 0 || position >= deckContainer.cards.length) {
+        console.warn(`[GameRoom] ${client.sessionId} requested invalid position: ${position}`);
+        client.send("error", { message: "Invalid card selection position!" });
+        return;
+    }
+
+    // 3. Extract the card at that specific position index
+    const targetCard = deckContainer.cards[position];
         
             // 3. STAGE 2: Enforce Gold Rules
             if (playerSlot.gold < targetCard.gold_cost) {
@@ -42,12 +50,9 @@ export class CardTestRoom extends Room<{state: GameState}> {
         
             // 4. MUTATION: Deduct resource and splice the card out of the deck
             playerSlot.gold -= targetCard.gold_cost;
-            deckContainer.cards.splice(targetIndex, 1);
-        
-            console.log(`[GameRoom] SUCCESS! ${client.sessionId} drew and instantly cast ${targetCard.name}. Remaining Gold: ${playerSlot.gold}`);
-        
-            console.log(`[CardGameRoom] ${client.sessionId} drew card: ${targetCard.name}`);
-        });
+deckContainer.cards.splice(position, 1); // Automatically flags the array as changed!
+
+    console.log(`[GameRoom] SUCCESS! ${client.sessionId} drew card at position [${position}]: ${targetCard.name}`);        });
     }
 
     onJoin(client: Client, options: any ): void{

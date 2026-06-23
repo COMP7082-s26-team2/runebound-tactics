@@ -71,14 +71,14 @@ async function runIntegrationTest() {
     }    
         // 4. User A Executes an Action
         console.log("\n--- User A dispatches drawCard action ---");
-        userA.send("drawAndPlay");
+        userA.send("drawAndPlay", { position: 0});
 
         // Settle network loop for User A's mutation patch
         await new Promise((resolve) => setTimeout(resolve, 250));
 
         // 4. User A Executes an Action
         console.log("\n--- User B dispatches drawCard action ---");
-        userB.send("drawAndPlay");
+        userB.send("drawAndPlay", { position: 1});
 
         // Settle network loop for User A's mutation patch
         await new Promise((resolve) => setTimeout(resolve, 250));
