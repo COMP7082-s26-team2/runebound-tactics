@@ -14,38 +14,16 @@ interface SlotInfo {
 }
 
 interface Props {
-    players: Readonly<Record<string, SlotInfo>> | Map<string, SlotInfo>;
+    players: Readonly<Record<string, SlotInfo>>;
     maxPlayers: number;
     mySessionId: string;
     onInvite?: (slot: number) => void;
 }
 
-function collectPlayers(
-    players: Readonly<Record<string, SlotInfo>> | Map<string, SlotInfo>,
-): SlotInfo[] {
-    if (players instanceof Map) {
-        return [...players.values()];
-    }
-    const out: SlotInfo[] = [];
-    const maybeMap = players as unknown as {
-        forEach?: (cb: (v: SlotInfo) => void) => void;
-        values?: () => Iterable<SlotInfo>;
-    };
-    if (typeof maybeMap.forEach === "function") {
-        maybeMap.forEach((v) => out.push(v));
-        if (out.length > 0) return out;
-    }
-    if (typeof maybeMap.values === "function") {
-        for (const v of maybeMap.values()) out.push(v);
-        if (out.length > 0) return out;
-    }
-    return Object.values(players as Record<string, SlotInfo>);
-}
-
 export function SlotList({ players, maxPlayers, mySessionId, onInvite }: Props) {
     const slots = Array.from({ length: maxPlayers }, (_, i) => i + 1);
     const bySlot = new Map<number, SlotInfo>();
-    for (const p of collectPlayers(players)) {
+    for (const p of Object.values(players)) {
         bySlot.set(p.slot, p);
     }
 
