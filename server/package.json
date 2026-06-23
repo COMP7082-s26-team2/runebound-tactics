@@ -7,7 +7,7 @@
         "clean": "tsc --build --clean",
         "build": "tsc --build",
         "start": "node dist/index.js",
-        "test:cards": "ts-node ./src/test-integration/test-cards.ts",
+        "test:cards": "yarn ts-node --transpile-only ./src/test-integration/test-cards.ts",
         "typecheck": "tsc --noEmit",
         "lint": "eslint src"
     },

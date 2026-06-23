@@ -11,6 +11,7 @@
         "declarationMap": true,
         "sourceMap": true,
         "experimentalDecorators": true,
+        // TODO: Clean up later; moduleResolution error, should utilize a bundler.
         "ignoreDeprecations": "6.0"
     }
 }

@@ -1,10 +1,17 @@
 import { Schema, type, ArraySchema } from "@colyseus/schema";
 
+/** Enum to define Category of Cards to Play*/
 export enum CardType {
   CARD_STATUS_EFFECT = "status",
   CARD_SPELL_EFFECT = "spell"
+  // TODO: Add Spawn Minion, Spawn Hero
 }
 
+/** 
+ *  Data Class compatible with Colyseus.
+ *  Holds MetaData on the card.
+ *  TODO: Will need to determine where the logic for the Effects are stored then executed.
+ */
 export class Card extends Schema {
     @type("string") name: string;
     @type("string") card_type: CardType;
@@ -20,11 +27,20 @@ export class Card extends Schema {
     }
 }
 
+/**
+ *  Data Class that stores Array of Cards.
+ *  card ArraySchema holds available cards for player
+ *  discardPile hold the used cards players have already activated
+ */
 export class DeckState extends Schema {
     @type([ Card ]) cards = new ArraySchema<Card>();
     @type([ Card ]) discardPile = new ArraySchema<Card>;
 }
 
+/**
+ *  Card Manipulate Class
+ *  Logic that manipulates a set of cards
+ */
 export class DeckManager extends DeckState {
 
     /**
