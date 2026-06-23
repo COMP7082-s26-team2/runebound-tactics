@@ -36,7 +36,7 @@ export default function LoginForm() {
             return;
         }
         if (result?.success) {
-            window.location.href = "/dashboard";
+            window.location.href = "/";
         }
     }
 
