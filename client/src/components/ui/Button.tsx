@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 export type ButtonIntent = "primary" | "secondary" | "destructive";
-export type ButtonSize = "sm" | "md";
+export type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps {
     intent?: ButtonIntent;
@@ -15,7 +15,7 @@ interface ButtonProps {
 
 const INTENT_CLASSES: Record<ButtonIntent, string> = {
     primary:
-        "bg-[var(--brass-500)] text-[var(--ink-mark)] hover:bg-[var(--brass-300)] active:translate-y-px disabled:bg-[var(--brass-700)] disabled:text-[var(--ink-faded)] [box-shadow:var(--bevel-chamber)]",
+        "bg-[var(--brass-500)] text-[var(--ink-900)] font-bold hover:bg-[var(--brass-300)] active:translate-y-px disabled:bg-[var(--brass-700)] disabled:text-[var(--ink-faded)] [box-shadow:var(--bevel-vellum)]",
     secondary:
         "bg-[var(--vellum-200)] text-[var(--ink-mark)] hover:bg-[var(--vellum-050)] active:translate-y-px disabled:opacity-60 [box-shadow:var(--bevel-vellum)]",
     destructive:
@@ -25,6 +25,7 @@ const INTENT_CLASSES: Record<ButtonIntent, string> = {
 const SIZE_CLASSES: Record<ButtonSize, string> = {
     sm: "px-3 py-1 text-[var(--text-xs)]",
     md: "px-4 py-2 text-[var(--text-sm)]",
+    lg: "px-6 py-3 text-[var(--text-md)]",
 };
 
 const BASE =

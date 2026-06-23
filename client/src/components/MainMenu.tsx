@@ -1,15 +1,23 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { signOut } from "@/app/auth/actions";
 import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/Eyebrow";
+import { Panel } from "@/components/ui/Panel";
+
+export interface MainMenuUser {
+    displayName: string;
+}
 
 interface MainMenuProps {
+    user: MainMenuUser | null;
     onInviteFriend?: () => void;
 }
 
-export function MainMenu({ onInviteFriend }: MainMenuProps) {
+export function MainMenu({ user, onInviteFriend }: MainMenuProps) {
     const router = useRouter();
+    const loggedIn = user !== null;
 
     return (
         <main className="relative min-h-screen bg-[var(--ink-900)] text-[var(--ink-300)] flex items-center justify-center overflow-hidden">
@@ -18,16 +26,16 @@ export function MainMenu({ onInviteFriend }: MainMenuProps) {
             <CartoucheCorner pos="bl" />
             <CartoucheCorner pos="br" />
 
-            <div className="absolute top-6 right-6">
-                <Button
-                    intent="secondary"
-                    size="sm"
-                    onClick={onInviteFriend}
-                    disabled={!onInviteFriend}
-                >
-                    Invite a Friend
-                </Button>
-            </div>
+            {loggedIn && (
+                <div className="absolute top-14 right-14">
+                    <Panel skin="chamber" className="px-4 py-2 flex flex-col items-end">
+                        <Eyebrow className="text-[var(--ink-500)]">Tactician</Eyebrow>
+                        <span className="text-[var(--text-sm)] font-bold text-[var(--vellum-050)]">
+                            {user.displayName}
+                        </span>
+                    </Panel>
+                </div>
+            )}
 
             <div className="relative z-10 flex flex-col items-center gap-12 px-8">
                 <div className="text-center flex flex-col gap-3">
@@ -42,23 +50,59 @@ export function MainMenu({ onInviteFriend }: MainMenuProps) {
                 </div>
 
                 <nav className="flex flex-col gap-3 w-64">
-                    <Button intent="primary" onClick={() => router.push("/mode-select")}>
-                        Start Game
-                    </Button>
-                    <Button intent="secondary" onClick={() => router.push("/auth/login")}>
-                        Log In
-                    </Button>
-                    <Button
-                        intent="destructive"
-                        onClick={() => {
-                            if (typeof window !== "undefined") {
-                                window.close();
-                            }
-                        }}
-                    >
-                        Quit
-                    </Button>
+                    {loggedIn ? (
+                        <>
+                            <Button
+                                intent="primary"
+                                size="lg"
+                                onClick={() => router.push("/mode-select")}
+                            >
+                                Play
+                            </Button>
+                            <Button
+                                intent="secondary"
+                                onClick={() => router.push("/profile")}
+                                disabled
+                            >
+                                Profile
+                            </Button>
+                            <Button
+                                intent="secondary"
+                                onClick={onInviteFriend}
+                                disabled={!onInviteFriend}
+                            >
+                                Friends
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button
+                                intent="primary"
+                                size="lg"
+                                onClick={() => router.push("/auth/login")}
+                            >
+                                Log In
+                            </Button>
+                            <Button
+                                intent="secondary"
+                                onClick={() => router.push("/auth/signup")}
+                            >
+                                Sign Up
+                            </Button>
+                        </>
+                    )}
                 </nav>
+
+                {loggedIn && (
+                    <form action={signOut}>
+                        <button
+                            type="submit"
+                            className="text-[var(--text-xs)] uppercase tracking-[0.16em] font-[family-name:var(--font-pxcap)] text-[var(--ink-500)] hover:text-[var(--vellum-050)] transition-colors"
+                        >
+                            Sign Out
+                        </button>
+                    </form>
+                )}
             </div>
         </main>
     );
