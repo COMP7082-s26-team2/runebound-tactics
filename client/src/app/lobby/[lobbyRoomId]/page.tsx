@@ -15,7 +15,13 @@ export default function LobbyPage({ params }: { params: Promise<{ lobbyRoomId: s
     const router = useRouter();
 
     return (
-        <ClientOnly fallback={<p className="text-white p-4">Connecting…</p>}>
+        <ClientOnly
+            fallback={
+                <main className="min-h-screen bg-[var(--ink-900)] text-[var(--ink-500)] flex items-center justify-center p-6">
+                    Connecting…
+                </main>
+            }
+        >
             <LobbyRoomProvider
                 connect={() => {
                     const handed = peekHandoff<LobbyState>(lobbyRoomId);
