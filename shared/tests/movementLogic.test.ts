@@ -101,3 +101,40 @@ describe("computeReachableTiles", () => {
         expect(openTiles.has("2,0")).toBe(true);
     });
 });
+
+describe("computeReachableTiles with canEnter", () => {
+    const start = { q: 5, r: 5 };
+    const noOccupants = () => false;
+
+    it("respects canEnter veto", () => {
+        const tiles = computeReachableTiles({
+            getNeighbors: squareGridNeighbors,
+            isOccupied: noOccupants,
+            canEnter: (c) => c.q !== 6, // block column 6
+            movement: 3,
+            start,
+        });
+        // Cells in column 6 must NOT appear
+        for (const key of tiles) {
+            const [q] = key.split(",").map(Number);
+            expect(q).not.toBe(6);
+        }
+    });
+
+    it("absent canEnter = enter-everywhere (backward compat)", () => {
+        const without = computeReachableTiles({
+            getNeighbors: squareGridNeighbors,
+            isOccupied: noOccupants,
+            movement: 3,
+            start,
+        });
+        const withPermissive = computeReachableTiles({
+            getNeighbors: squareGridNeighbors,
+            isOccupied: noOccupants,
+            canEnter: () => true,
+            movement: 3,
+            start,
+        });
+        expect(without).toEqual(withPermissive);
+    });
+});
