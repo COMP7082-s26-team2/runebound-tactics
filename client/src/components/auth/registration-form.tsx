@@ -2,243 +2,157 @@
 
 import { useState } from "react";
 import { signUp, verifyOtp } from "@/app/auth/actions";
+import { Field } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
+import { Hint } from "@/components/ui/Hint";
+import { Eyebrow } from "@/components/ui/Eyebrow";
+
+const PASSWORD_REGEX =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
 
 export default function RegistrationForm() {
-    const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
     const [step, setStep] = useState<"signup" | "verify">("signup");
-    const [regData, setRegData] = useState({ email: "", username: "" });
-
-    const [formData, setFormData] = useState({
-        username: "",
-        email: "",
-        password: "",
-    });
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [email, setEmail] = useState("");
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [otp, setOtp] = useState("");
 
     async function handleSignup(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setLoading(true);
         setError(null);
-        setSuccess(null);
 
-        const { username, email, password } = formData;
-
-        // Client-side Password Validation
-        const passwordRegex =
-            /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
-        if (!passwordRegex.test(password)) {
+        if (!PASSWORD_REGEX.test(password)) {
             setError(
-                "Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a symbol.",
+                "Password must be 8+ characters and include an uppercase letter, lowercase letter, digit, and one of @ $ ! % * ? & #.",
             );
             setLoading(false);
             return;
         }
 
-        const signupData = new FormData();
-        signupData.append("email", email);
-        signupData.append("username", username);
-        signupData.append("password", password);
+        const data = new FormData();
+        data.append("email", email);
+        data.append("username", username);
+        data.append("password", password);
 
-        const result = await signUp(signupData);
-
+        const result = await signUp(data);
         setLoading(false);
 
         if (result?.error) {
             setError(result.error);
-        } else if (result?.success) {
-            setRegData({ email, username });
+            return;
+        }
+        if (result?.success) {
             setStep("verify");
-            setSuccess(result.message);
         }
     }
-
-    const [otpCode, setOtpCode] = useState("");
 
     async function handleVerify(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setLoading(true);
         setError(null);
-        setSuccess(null);
 
-        const result = await verifyOtp(
-            regData.email,
-            otpCode,
-            regData.username,
-        );
-
+        const result = await verifyOtp(email, otp, username);
         setLoading(false);
 
         if (result?.error) {
             setError(result.error);
-        } else if (result?.success) {
-            setSuccess("Verification successful! Entering the realm...");
+            return;
+        }
+        if (result?.success) {
             window.location.href = "/dashboard";
         }
     }
 
     if (step === "verify") {
         return (
-            <form
-                key="verify-form"
-                onSubmit={handleVerify}
-                className="space-y-5"
-            >
-                <div className="space-y-1.5 text-center mb-6">
-                    <p className="text-[10px] uppercase tracking-widest text-[#999999]">
-                        Enter the 8-digit code sent to
-                    </p>
-                    <p className="text-xs font-bold text-[#66ff66]">
-                        {regData.email}
-                    </p>
+            <form onSubmit={handleVerify} className="flex flex-col gap-4">
+                <div className="text-center flex flex-col gap-1">
+                    <Eyebrow className="text-[var(--ink-500)]">Step 2 of 2 — Verify</Eyebrow>
+                    <Hint>
+                        We sent an 8-digit code to <span className="text-[var(--vellum-050)] font-bold">{email}</span>.
+                    </Hint>
                 </div>
 
-                <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase tracking-[0.2em] text-[#666666] font-bold">
-                        Verification Code
-                    </label>
-                    <input
-                        key="otp-input"
-                        name="code"
-                        type="text"
-                        required
-                        maxLength={8}
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value)}
-                        autoComplete="off"
-                        className="w-full bg-[#1a1a1a] border border-[#333333] px-4 py-3 text-center text-xl tracking-[0.3em] font-mono focus:outline-none focus:border-[#555555] transition-colors"
-                        placeholder="00000000"
-                    />
-                </div>
+                <Field
+                    label="Verification code"
+                    type="text"
+                    value={otp}
+                    onChange={setOtp}
+                    placeholder="00000000"
+                    maxLength={8}
+                    autoComplete="one-time-code"
+                    skin="chamber"
+                />
 
-                {error && (
-                    <div className="p-3 bg-[#2d1111] border border-[#4d2222] text-[#ff6666] text-[10px] font-medium uppercase tracking-tight leading-normal">
-                        Error: {error}
-                    </div>
-                )}
+                {error && <Hint tone="error">{error}</Hint>}
 
-                {success && (
-                    <div className="p-4 bg-[#112d11] border border-[#224d22] text-[#66ff66] text-xs font-bold uppercase tracking-tight leading-relaxed">
-                        {success}
-                    </div>
-                )}
-
-                <button
-                    disabled={loading}
-                    className="w-full h-12 bg-[#333333] hover:bg-[#444444] text-white font-bold uppercase tracking-widest text-xs transition-colors disabled:opacity-50"
-                >
-                    {loading ? "Verifying..." : "VERIFY CODE"}
-                </button>
+                <Button type="submit" intent="primary" disabled={loading} className="w-full">
+                    {loading ? "Verifying…" : "Verify code"}
+                </Button>
 
                 <button
                     type="button"
                     onClick={() => {
                         setStep("signup");
-                        setOtpCode("");
+                        setOtp("");
+                        setError(null);
                     }}
-                    className="w-full text-[9px] uppercase tracking-[0.1em] text-[#555555] hover:text-[#777777] transition-colors"
+                    className="text-center text-[var(--text-xs)] uppercase tracking-[0.16em] font-[family-name:var(--font-pxcap)] text-[var(--ink-500)] hover:text-[var(--vellum-050)] transition-colors"
                 >
-                    Wrong email? Go back
+                    Wrong email? Go back.
                 </button>
             </form>
         );
     }
 
     return (
-        <form key="signup-form" onSubmit={handleSignup} className="space-y-5">
-            <div className="space-y-1.5">
-                <label className="text-[10px] uppercase tracking-[0.2em] text-[#666666] font-bold">
-                    Username
-                </label>
-                <input
-                    key="username-input"
-                    name="username"
-                    type="text"
-                    required
-                    value={formData.username}
-                    onChange={(e) =>
-                        setFormData((prev) => ({
-                            ...prev,
-                            username: e.target.value,
-                        }))
-                    }
-                    className="w-full bg-[#1a1a1a] border border-[#333333] px-4 py-3 text-sm focus:outline-none focus:border-[#555555] transition-colors"
-                    placeholder="your username"
-                />
-            </div>
+        <form onSubmit={handleSignup} className="flex flex-col gap-4">
+            <Field
+                label="Username"
+                type="text"
+                value={username}
+                onChange={setUsername}
+                placeholder="your username"
+                autoComplete="username"
+                skin="chamber"
+            />
+            <Field
+                label="Email"
+                type="email"
+                value={email}
+                onChange={setEmail}
+                placeholder="you@example.com"
+                autoComplete="email"
+                skin="chamber"
+            />
+            <Field
+                label="Password"
+                type="password"
+                value={password}
+                onChange={setPassword}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                skin="chamber"
+            />
+            <Hint>
+                8+ characters with uppercase, lowercase, digit, and one of @ $ ! % * ? &amp; #.
+            </Hint>
 
-            <div className="space-y-1.5">
-                <label className="text-[10px] uppercase tracking-[0.2em] text-[#666666] font-bold">
-                    Email
-                </label>
-                <input
-                    key="email-input"
-                    name="email"
-                    type="email"
-                    required
-                    value={formData.email}
-                    onChange={(e) =>
-                        setFormData((prev) => ({
-                            ...prev,
-                            email: e.target.value,
-                        }))
-                    }
-                    className="w-full bg-[#1a1a1a] border border-[#333333] px-4 py-3 text-sm focus:outline-none focus:border-[#555555] transition-colors"
-                    placeholder="youremail@email.com"
-                />
-            </div>
+            {error && <Hint tone="error">{error}</Hint>}
 
-            <div className="space-y-1.5">
-                <label className="text-[10px] uppercase tracking-[0.2em] text-[#666666] font-bold">
-                    Password
-                </label>
-                <input
-                    key="password-input"
-                    name="password"
-                    type="password"
-                    required
-                    value={formData.password}
-                    onChange={(e) =>
-                        setFormData((prev) => ({
-                            ...prev,
-                            password: e.target.value,
-                        }))
-                    }
-                    className="w-full bg-[#1a1a1a] border border-[#333333] px-4 py-3 text-sm focus:outline-none focus:border-[#555555] transition-colors"
-                    placeholder="••••••••"
-                />
-                <p className="text-[9px] text-[#444444] leading-tight">
-                    Must be 8+ chars with uppercase, lowercase, digit, and
-                    symbol (@$!%*?&#)
-                </p>
-            </div>
-            {error && (
-                <div className="p-3 bg-[#2d1111] border border-[#4d2222] text-[#ff6666] text-[10px] font-medium uppercase tracking-tight leading-normal">
-                    Error: {error}
-                </div>
-            )}
+            <Button type="submit" intent="primary" disabled={loading} className="w-full">
+                {loading ? "Initializing…" : "Join the binding"}
+            </Button>
 
-            {success && (
-                <div className="p-4 bg-[#112d11] border border-[#224d22] text-[#66ff66] text-xs font-bold uppercase tracking-tight leading-relaxed">
-                    SUCCESS: {success}
-                </div>
-            )}
-
-            <button
-                disabled={loading}
-                className="w-full h-12 bg-[#333333] hover:bg-[#444444] text-white font-bold uppercase tracking-widest text-xs transition-colors disabled:opacity-50"
+            <a
+                href="/auth/login"
+                className="text-center text-[var(--text-xs)] uppercase tracking-[0.16em] font-[family-name:var(--font-pxcap)] text-[var(--ink-500)] hover:text-[var(--vellum-050)] transition-colors"
             >
-                {loading ? "Initializing..." : "JOIN"}
-            </button>
-
-            <div className="text-center mt-4">
-                <a
-                    href="/auth/login"
-                    className="text-[9px] uppercase tracking-[0.1em] text-[#555555] hover:text-[#777777] transition-colors"
-                >
-                    Already have an account? Log in
-                </a>
-            </div>
+                Already bound? Log in.
+            </a>
         </form>
     );
 }

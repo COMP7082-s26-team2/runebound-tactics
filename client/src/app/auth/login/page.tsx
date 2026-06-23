@@ -2,6 +2,10 @@ import LoginForm from "@/components/auth/login-form";
 import { createServerSideClient } from "@/lib/supabase";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Panel } from "@/components/ui/Panel";
+import { Eyebrow } from "@/components/ui/Eyebrow";
+import { Hint } from "@/components/ui/Hint";
+import { Sigil } from "@/components/ui/Sigil";
 
 export default async function LoginPage() {
     const supabase = await createServerSideClient();
@@ -14,29 +18,28 @@ export default async function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-6 font-sans">
-            <div className="w-full max-w-md bg-[#111111] border border-[#222222] p-8 shadow-2xl">
-                <div className="mb-10 text-center">
-                    <h1 className="text-3xl font-bold tracking-tighter uppercase mb-2">
-                        Player Login
+        <main className="min-h-screen bg-[var(--ink-900)] text-[var(--ink-300)] flex flex-col items-center justify-center p-6">
+            <Panel skin="chamber" className="w-full max-w-md p-8 flex flex-col gap-6">
+                <div className="text-center flex flex-col gap-2">
+                    <Eyebrow className="text-[var(--ink-500)]">Runebinders&apos; Hall</Eyebrow>
+                    <h1 className="text-[var(--text-xl)] font-bold text-[var(--vellum-050)]">
+                        Bind your seal.
                     </h1>
-                    <p className="text-[#666666] text-sm">
-                        Enter the Runebound Tactics Realm
-                    </p>
+                    <Hint>Enter the realm of Runebound Tactics.</Hint>
                 </div>
-
-                {/* Login Form */}
                 <LoginForm />
+            </Panel>
 
-                <div className="mb-4"></div>
+            <div className="mt-6 flex items-center gap-3 text-[var(--ink-500)]">
+                <Sigil faction="castle" size={12} />
+                <Link
+                    href="/"
+                    className="text-[var(--text-xs)] uppercase tracking-[0.16em] font-[family-name:var(--font-pxcap)] hover:text-[var(--vellum-050)] transition-colors"
+                >
+                    Return to home
+                </Link>
+                <Sigil faction="necropolis" size={12} />
             </div>
-
-            <Link
-                href="/"
-                className="mt-8 text-[#444444] hover:text-[#888888] text-xs uppercase tracking-widest transition-colors"
-            >
-                Return to Home
-            </Link>
-        </div>
+        </main>
     );
 }
