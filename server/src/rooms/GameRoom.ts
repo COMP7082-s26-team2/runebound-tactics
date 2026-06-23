@@ -2,11 +2,13 @@ import { Room, Client } from "colyseus";
 import {
     ActionPointSystem,
     AP_COST,
+    CHOKEPOINT_MAP,
     GamePlayerSlot,
     GameState,
     GameUnit,
     createTurnMachine,
     type TurnMachine,
+    canEnter,
     cellKey,
     computeReachableTiles,
     computeAttackDamage,
@@ -18,7 +20,9 @@ import {
     getUnitDefense,
     getUnitDamageType,
     getUnitMovement,
+    getUnitMovementType,
     squareGridNeighbors,
+    terrainAt,
     unitIsExhausted,
     GRID_ROWS,
 } from "@runebound-tactics/shared";
@@ -502,11 +506,14 @@ export class GameRoom extends Room<{ state: GameState }> {
         for (const unit of this.state.units.values()) {
             if (unit.ownerId !== playerId) continue;
             if (unit.hasMoved) continue;
+            const movementType = getUnitMovementType(unit.unitType);
             this._reachabilityCache.set(
                 unit.unitId,
                 computeReachableTiles({
                     getNeighbors: squareGridNeighbors,
                     isOccupied: (k) => occupied.has(k),
+                    canEnter: (coord) =>
+                        canEnter({ movementType }, terrainAt(CHOKEPOINT_MAP, coord.r, coord.q)),
                     movement: getUnitMovement(unit.unitType),
                     start: { q: unit.x, r: unit.y },
                 }),
@@ -534,11 +541,14 @@ export class GameRoom extends Room<{ state: GameState }> {
         const recompute = (unitId: string) => {
             const u = this.state.units.get(unitId);
             if (!u) return;
+            const movementType = getUnitMovementType(u.unitType);
             this._reachabilityCache.set(
                 unitId,
                 computeReachableTiles({
                     getNeighbors: squareGridNeighbors,
                     isOccupied: (k) => occupied.has(k),
+                    canEnter: (coord) =>
+                        canEnter({ movementType }, terrainAt(CHOKEPOINT_MAP, coord.r, coord.q)),
                     movement: getUnitMovement(u.unitType),
                     start: { q: u.x, r: u.y },
                 }),
