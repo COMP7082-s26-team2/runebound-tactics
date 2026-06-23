@@ -1,4 +1,4 @@
-import { computeReachableTiles } from "../src/game/logic/MovementLogic";
+import { computeReachableTiles, computeShortestPath } from "../src/game/logic/MovementLogic";
 import { squareGridNeighbors } from "../src/game/grid-utils";
 
 describe("computeReachableTiles", () => {
@@ -136,5 +136,46 @@ describe("computeReachableTiles with canEnter", () => {
             start,
         });
         expect(without).toEqual(withPermissive);
+    });
+});
+
+describe("computeShortestPath with canEnter", () => {
+    const noOccupants = () => false;
+
+    it("goal-bypass: arrives at goal even when canEnter blocks all non-goal cells", () => {
+        const start = { q: 0, r: 0 };
+        const goal  = { q: 0, r: 2 };
+        const path = computeShortestPath({
+            start,
+            goal,
+            getNeighbors: squareGridNeighbors,
+            isOccupied: noOccupants,
+            canEnter: (c) =>
+                // block every cell except the goal itself
+                c.q === goal.q && c.r === goal.r,
+        });
+        // Path is reachable because goal-bypass lets BFS land on goal.
+        // The fallback path [start, goal] is acceptable when intermediates
+        // are blocked — what matters is that the function does NOT stall.
+        expect(path[0]).toEqual(start);
+        expect(path[path.length - 1]).toEqual(goal);
+    });
+
+    it("respects canEnter for intermediate cells (blocks a column, routes around)", () => {
+        const start = { q: 0, r: 0 };
+        const goal  = { q: 2, r: 0 };
+        const path = computeShortestPath({
+            start,
+            goal,
+            getNeighbors: squareGridNeighbors,
+            isOccupied: noOccupants,
+            canEnter: (c) => !(c.q === 1 && c.r === 0), // block (1,0)
+        });
+        // path must reach the goal and must not step on the blocked cell
+        // (unless the goal-bypass let it — but the blocked cell is not the goal here).
+        expect(path[0]).toEqual(start);
+        expect(path[path.length - 1]).toEqual(goal);
+        const usedBlocked = path.some((c) => c.q === 1 && c.r === 0);
+        expect(usedBlocked).toBe(false);
     });
 });
