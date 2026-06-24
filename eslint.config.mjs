@@ -21,6 +21,8 @@ const eslintConfig = defineConfig([
     "client/out/**",
     "client/next-env.d.ts",
     "server/dist/**",
+    // Vendored library — see client/src/lib/autotile-core/VENDOR.md.
+    "client/src/lib/autotile-core/**",
   ]),
   {
     files: ["client/src/**/*.{ts,tsx}"],
