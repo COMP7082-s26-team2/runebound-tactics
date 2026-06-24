@@ -1,0 +1,5 @@
+[
+  { "id": "water",     "priority": 0  },
+  { "id": "flatgrass", "priority": 10 },
+  { "id": "grass",     "priority": 20 }
+]

@@ -1,12 +1,11 @@
+import type { DamageType } from "../../types/game";
+
 /**
- * Minimal unit stats lookup — movement + combat (v1).
+ * Unit stats lookup — movement, combat, action points, health, and damage types.
  *
- * Used by server (for reachability cache + move validation + damage formula)
- * and client (when displaying movement highlights + computed attack stats).
+ * Used by server (reachability cache, move validation, damage formula, unit spawn)
+ * and client (movement highlights, computed attack stats).
  * Keep in sync across both sides via this single shared module.
- *
- * When the full UnitStats system lands, this file is the seed for the
- * canonical table — extend the record types and add any new helpers here.
  */
 
 export type UnitTypeId = string;
@@ -39,19 +38,19 @@ export function getUnitMovement(unitType: UnitTypeId): number {
  * UnitStats object.
  */
 const UNIT_ATTACK: Record<string, number> = {
-    "castle:swordsman": 6,
-    "castle:archer": 5,
-    "castle:paladin": 7,
-    "castle:cavalier": 6,
-    "castle:griffin": 5,
+    "castle:swordsman": 5,
+    "castle:archer": 4,
+    "castle:paladin": 5,
+    "castle:cavalier": 5,
+    "castle:griffin": 4,
     "necropolis:skeleton": 4,
-    "necropolis:death_knight": 7,
-    "necropolis:vampire": 6,
-    "necropolis:ghost": 5,
+    "necropolis:death_knight": 5,
+    "necropolis:vampire": 5,
+    "necropolis:ghost": 4,
     "necropolis:zombie": 3,
 };
 
-const DEFAULT_ATTACK = 5;
+const DEFAULT_ATTACK = 4;
 
 export function getUnitAttack(unitType: UnitTypeId): number {
     return UNIT_ATTACK[unitType] ?? DEFAULT_ATTACK;
@@ -62,22 +61,124 @@ export function getUnitAttack(unitType: UnitTypeId): number {
  * formula; minimum damage is 1 (a hit always does something).
  */
 const UNIT_DEFENSE: Record<string, number> = {
-    "castle:swordsman": 3,
-    "castle:archer": 2,
-    "castle:paladin": 5,
-    "castle:cavalier": 3,
-    "castle:griffin": 2,
-    "necropolis:skeleton": 2,
-    "necropolis:death_knight": 4,
-    "necropolis:vampire": 3,
-    "necropolis:ghost": 2,
-    "necropolis:zombie": 4,
+    "castle:swordsman": 2,
+    "castle:archer": 1,
+    "castle:paladin": 3,
+    "castle:cavalier": 2,
+    "castle:griffin": 1,
+    "necropolis:skeleton": 1,
+    "necropolis:death_knight": 3,
+    "necropolis:vampire": 2,
+    "necropolis:ghost": 1,
+    "necropolis:zombie": 2,
 };
 
-const DEFAULT_DEFENSE = 3;
+const DEFAULT_DEFENSE = 2;
 
 export function getUnitDefense(unitType: UnitTypeId): number {
     return UNIT_DEFENSE[unitType] ?? DEFAULT_DEFENSE;
+}
+
+const UNIT_BASE_HEALTH: Record<string, number> = {
+    "castle:swordsman":        10,
+    "castle:archer":           8,
+    "castle:paladin":          14,
+    "castle:cavalier":         10,
+    "castle:griffin":          9,
+    "necropolis:skeleton":     7,
+    "necropolis:death_knight": 14,
+    "necropolis:vampire":      10,
+    "necropolis:ghost":        8,
+    "necropolis:zombie":       12,
+};
+
+const DEFAULT_BASE_HEALTH = 10;
+
+export function getUnitBaseHealth(unitType: UnitTypeId): number {
+    return UNIT_BASE_HEALTH[unitType] ?? DEFAULT_BASE_HEALTH;
+}
+
+const UNIT_BASE_AP: Record<string, number> = {
+    "castle:swordsman":        2,
+    "castle:archer":           2,
+    "castle:paladin":          2,
+    "castle:cavalier":         2,
+    "castle:griffin":          2,
+    "necropolis:skeleton":     2,
+    "necropolis:death_knight": 2,
+    "necropolis:vampire":      2,
+    "necropolis:ghost":        2,
+    "necropolis:zombie":       2,
+};
+
+const DEFAULT_BASE_AP = 2;
+
+export function getUnitBaseAp(unitType: UnitTypeId): number {
+    return UNIT_BASE_AP[unitType] ?? DEFAULT_BASE_AP;
+}
+
+const UNIT_DAMAGE_TYPE: Record<string, DamageType> = {
+    "castle:swordsman":        "melee",
+    "castle:archer":           "range",
+    "castle:paladin":          "melee",
+    "castle:cavalier":         "cavalry",
+    "castle:griffin":          "range",
+    "necropolis:skeleton":     "melee",
+    "necropolis:death_knight": "melee",
+    "necropolis:vampire":      "melee",
+    "necropolis:ghost":        "pure",
+    "necropolis:zombie":       "melee",
+};
+
+const DEFAULT_WEAKNESS: Record<DamageType, DamageType[]> = {
+    melee:   ["cavalry"],
+    cavalry: ["range"],
+    range:   ["melee"],
+    pure:    [],
+};
+
+export function getUnitDamageType(unitType: UnitTypeId): DamageType | null {
+    return UNIT_DAMAGE_TYPE[unitType] ?? null;
+}
+
+export function getUnitDefaultWeakness(unitType: UnitTypeId): DamageType[] {
+    const dt = getUnitDamageType(unitType);
+    return dt !== null ? DEFAULT_WEAKNESS[dt] : [];
+}
+
+export function getEffectiveMaxHealth(u: {
+    baseMaxHealth: number;
+    bonusMaxHealth: number;
+}): number {
+    return Math.max(0, u.baseMaxHealth + u.bonusMaxHealth);
+}
+
+export function getEffectiveAttack(u: {
+    baseAttackDamage: number;
+    bonusAttackDamage: number;
+}): number {
+    return Math.max(0, u.baseAttackDamage + u.bonusAttackDamage);
+}
+
+export function getEffectiveDefense(u: {
+    baseDefense: number;
+    bonusDefense: number;
+}): number {
+    return Math.max(0, u.baseDefense + u.bonusDefense);
+}
+
+export function getEffectiveMovement(u: {
+    baseMovement: number;
+    bonusMovement: number;
+}): number {
+    return Math.max(0, u.baseMovement + u.bonusMovement);
+}
+
+export function getEffectiveAp(u: {
+    baseAp: number;
+    bonusAp: number;
+}): number {
+    return Math.max(0, u.baseAp + u.bonusAp);
 }
 
 /**
@@ -86,10 +187,8 @@ export function getUnitDefense(unitType: UnitTypeId): number {
  * have some effect; balancing of "0-damage" cases is a future design).
  */
 export function computeAttackDamage(
-    attackerType: UnitTypeId,
-    defenderType: UnitTypeId,
+    attacker: { baseAttackDamage: number; bonusAttackDamage: number },
+    defender: { baseDefense: number; bonusDefense: number },
 ): number {
-    const atk = getUnitAttack(attackerType);
-    const def = getUnitDefense(defenderType);
-    return Math.max(1, atk - def);
+    return Math.max(1, getEffectiveAttack(attacker) - getEffectiveDefense(defender));
 }

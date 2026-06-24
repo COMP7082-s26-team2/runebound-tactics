@@ -58,6 +58,10 @@ export class GameEngine {
     }: GameEngineOptions) {
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Failed to get 2D context");
+        // Pixel-art default: prevent neighbor-tile bleed and crisp up nearest-neighbor
+        // scaling. Re-asserted every frame in the render loop too (StrictMode double-
+        // mount / browser quirks can revert this in dev).
+        ctx.imageSmoothingEnabled = false;
 
         this._canvas = canvas;
         this._ctx = ctx;
@@ -135,7 +139,8 @@ export class GameEngine {
 
         const alpha = this._accumulator / this._fixedDelta;
 
-        // render
+        // render — re-assert pixel-art default each frame
+        this._ctx.imageSmoothingEnabled = false;
         this.preDraw(this._ctx);
         this.draw(this._ctx, alpha);
         this.components.draw(this._ctx, alpha);
