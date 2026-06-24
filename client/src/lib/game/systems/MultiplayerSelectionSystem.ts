@@ -45,6 +45,7 @@ import type { Room } from "@colyseus/sdk";
  */
 export class MultiplayerSelectionSystem implements GameComponent {
     private _selection: SelectionMachine = createSelectionMachine();
+    onSelectionChange: ((unitId: string | null) => void) | null = null;
 
     constructor(
         private _world: World,
@@ -53,6 +54,10 @@ export class MultiplayerSelectionSystem implements GameComponent {
         private _room: Room<GameState>,
         private _terrainLayer: TerrainLayer,
     ) {}
+
+    private _notifySelectionChange(): void {
+        this.onSelectionChange?.(this._selection.context.selectedUnitId);
+    }
 
     get selectionState() {
         return this._selection.state;
@@ -151,6 +156,7 @@ export class MultiplayerSelectionSystem implements GameComponent {
             attackable,
             attackFromPositions,
         });
+        this._notifySelectionChange();
     }
 
     private _handleSelectedClick(coord: GridCoord, key: string): void {
@@ -158,6 +164,7 @@ export class MultiplayerSelectionSystem implements GameComponent {
         const serverId = ctx.selectedUnitId;
         if (!serverId) {
             this._selection.send("DESELECT");
+            this._notifySelectionChange();
             return;
         }
 
@@ -187,10 +194,12 @@ export class MultiplayerSelectionSystem implements GameComponent {
                 unitId: serverId,
                 to: coord,
             });
+            this._notifySelectionChange();
             return;
         }
 
         this._selection.send("DESELECT");
+        this._notifySelectionChange();
     }
 
     private _handleAwaitingAttackTargetClick(
@@ -202,6 +211,7 @@ export class MultiplayerSelectionSystem implements GameComponent {
         const pendingFrom = ctx.pendingAttackFrom;
         if (!attackerServerId || !pendingFrom) {
             this._selection.send("DESELECT");
+            this._notifySelectionChange();
             return;
         }
 
@@ -223,6 +233,7 @@ export class MultiplayerSelectionSystem implements GameComponent {
                     targetId: occServerId,
                     from: pendingFrom,
                 });
+                this._notifySelectionChange();
                 return;
             }
         }
@@ -245,6 +256,7 @@ export class MultiplayerSelectionSystem implements GameComponent {
                     unitId: attackerServerId,
                     to: coord,
                 });
+                this._notifySelectionChange();
             } else {
                 this._selection.send("CANCEL_ATTACK");
             }
@@ -267,6 +279,7 @@ export class MultiplayerSelectionSystem implements GameComponent {
 
         // Anything else → cancel back to selected.
         this._selection.send("CANCEL_ATTACK");
+        this._notifySelectionChange();
     }
 
     private _adjacentEnemyServerIdsAt(

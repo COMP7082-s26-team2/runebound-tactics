@@ -132,9 +132,9 @@ const UNIT_DAMAGE_TYPE: Record<string, DamageType> = {
 };
 
 const DEFAULT_WEAKNESS: Record<DamageType, DamageType[]> = {
-    melee:   ["cavalry"],
-    cavalry: ["range"],
-    range:   ["melee"],
+    melee:   ["range"],
+    cavalry: ["melee"],
+    range:   ["cavalry"],
     pure:    [],
 };
 

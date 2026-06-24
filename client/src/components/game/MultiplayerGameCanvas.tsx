@@ -16,6 +16,7 @@ import { loadTilemap, TerrainLayer } from "@/lib/game/tilemap";
 interface MultiplayerGameCanvasProps {
     room: Room<GameState>;
     state: GameState;
+    onSelectionChange?: (unitId: string | null) => void;
 }
 
 const CANVAS_WIDTH = CELL_SIZE * GRID_COLS;
@@ -38,10 +39,15 @@ type LoadPhase = "loading" | "ready" | "error";
  * unmount). Scene init is sync, so preload happens above the scene rather
  * than inside it.
  */
-export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProps) {
+export function MultiplayerGameCanvas({ room, state, onSelectionChange }: MultiplayerGameCanvasProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const sceneRef = useRef<MultiplayerGameScene | null>(null);
+    const onSelectionChangeRef = useRef(onSelectionChange);
     const [phase, setPhase] = useState<LoadPhase>("loading");
+
+    useEffect(() => {
+        onSelectionChangeRef.current = onSelectionChange;
+    }, [onSelectionChange]);
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -68,6 +74,8 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
 
                 const terrainLayer = new TerrainLayer(bundle.terrainGrid, bundle.sets, bundle.terrains);
                 const scene = new MultiplayerGameScene(canvas, room, handler, terrainLayer, bundle.sheet);
+                scene.onSelectionChange = (unitId) =>
+                    onSelectionChangeRef.current?.(unitId);
                 sceneRef.current = scene;
                 engine.scenes.register("main", scene);
                 engine.scenes.switch("main");

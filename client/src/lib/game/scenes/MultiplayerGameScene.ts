@@ -77,6 +77,7 @@ export class MultiplayerGameScene extends Scene {
     private _prevSnapshot = new Map<string, LiteUnit>();
     private _hasAuthoritativeSnapshot = false;
     public input: InputSystem;
+    public onSelectionChange: ((unitId: string | null) => void) | null = null;
     private _terrainLayer: TerrainLayer;
     private _tilemapSheet: HTMLImageElement;
 
@@ -138,6 +139,8 @@ export class MultiplayerGameScene extends Scene {
         //     within the same tick.
         //   - `this.input` is added LAST so its clear-just-pressed runs after
         //     `_selection` reads input.
+        this._selection.onSelectionChange = (unitId) =>
+            this.onSelectionChange?.(unitId);
         this.components.add(this._selection);
         this.components.add(this._sequencer);
         this.components.add(this._tweens);

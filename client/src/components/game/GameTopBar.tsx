@@ -27,6 +27,7 @@ interface GameTopBarProps {
     deckCount: number;
     discardCount: number;
     actionsRemaining: number | null;
+    gold: number;
     onMenu: () => void;
     onEndTurn: () => void;
 }
@@ -44,6 +45,7 @@ export function GameTopBar({
     deckCount,
     discardCount,
     actionsRemaining,
+    gold,
     onMenu,
     onEndTurn,
 }: GameTopBarProps) {
@@ -121,6 +123,7 @@ export function GameTopBar({
                     <Chip glyph="◆" label="Deck" count={deckCount} />
                     <Chip glyph="✦" label="Discard" count={discardCount} />
                     <Chip glyph="⚡" label="AP" count={actionsRemaining} />
+                    <Chip glyph="◎" label="Gold" count={gold} />
                 </div>
             </div>
 
