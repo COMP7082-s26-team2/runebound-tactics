@@ -233,6 +233,10 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (index === -1) return;
 
             const card = slot.deck.cards[index];
+
+            if (card.role === "attacker" && client.sessionId !== ctx.attackerOwnerId) return;
+            if (card.role === "defender" && client.sessionId !== ctx.defenderOwnerId) return;
+
             if (slot.gold < card.gold_cost) return;
 
             slot.gold -= card.gold_cost;
@@ -579,7 +583,12 @@ export class GameRoom extends Room<{ state: GameState }> {
             ctx?.attackerOwnerId,
             ctx?.defenderOwnerId,
         );
-        this.broadcast("reaction_phase", { phase, activePlayer });
+        this.broadcast("reaction_phase", {
+            phase,
+            activePlayer,
+            attackerOwnerId: ctx?.attackerOwnerId ?? "",
+            defenderOwnerId: ctx?.defenderOwnerId ?? "",
+        });
 
         switch (phase) {
             case "defender":

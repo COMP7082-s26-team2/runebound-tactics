@@ -3,7 +3,10 @@ import {
     CARD_EFFECT_REGISTRY,
     BATTLE_CRY,
     SHIELD_WALL,
+    STARTER_DECK_BLUEPRINTS,
+    type CardBlueprint,
 } from "../src/game/cards/reaction-cards";
+import { CardType } from "../src/schemas/Card";
 import { computeAttackDamage } from "../src/game/units/unit-stats";
 import { createReactionWindowMachine } from "../src/fsm/reaction/ReactionWindowMachine";
 
@@ -123,5 +126,41 @@ describe("full FSM sequence with card play", () => {
             defender,
         );
         expect(damage).toBe(Math.max(1, baseline - 2));
+    });
+});
+
+describe("CardBlueprint role field", () => {
+    it("BATTLE_CRY has role 'attacker'", () => {
+        expect(BATTLE_CRY.role).toBe("attacker");
+    });
+
+    it("SHIELD_WALL has role 'defender'", () => {
+        expect(SHIELD_WALL.role).toBe("defender");
+    });
+
+    it("role filter: attacker sees only Battle Cry", () => {
+        const result = STARTER_DECK_BLUEPRINTS.filter(
+            (c) => !c.role || c.role === "attacker",
+        );
+        expect(result.map((c) => c.name)).toEqual(["Battle Cry"]);
+    });
+
+    it("role filter: defender sees Shield Wall and Iron Will", () => {
+        const result = STARTER_DECK_BLUEPRINTS.filter(
+            (c) => !c.role || c.role === "defender",
+        );
+        expect(result.map((c) => c.name)).toEqual(["Shield Wall", "Iron Will"]);
+    });
+
+    it("neutral card (no role) is visible to both roles", () => {
+        const neutral: CardBlueprint = {
+            name: "Neutral Test",
+            card_type: CardType.CARD_STATUS_EFFECT,
+            gold_cost: 0,
+            is_reaction: true,
+            effect: {},
+        };
+        expect([neutral].filter((c) => !c.role || c.role === "attacker")).toHaveLength(1);
+        expect([neutral].filter((c) => !c.role || c.role === "defender")).toHaveLength(1);
     });
 });
