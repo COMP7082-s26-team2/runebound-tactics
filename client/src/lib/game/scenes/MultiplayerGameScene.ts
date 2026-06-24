@@ -180,6 +180,7 @@ export class MultiplayerGameScene extends Scene {
                 this._lastSeenHp,
                 (ownerId) => this._room.state.players.get(ownerId)?.faction ?? "",
                 CELL_SIZE,
+                this._tweens,
             ),
         );
         this.components.add(

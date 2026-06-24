@@ -2,6 +2,7 @@ import type { GameComponent } from "@/lib/engine/core/GameComponent";
 import type { World } from "@/lib/engine/world/World";
 import type { InputSystem } from "@/lib/game/systems/InputSystem";
 import type EventBus from "@/lib/engine/EventBus";
+import { TweenManager, Vector2D } from "@/lib/engine";
 import { token } from "@/lib/theme/tokens";
 
 const HOLD_MS = 1500;
@@ -49,6 +50,7 @@ export class HealthBarRenderSystem implements GameComponent {
         private _lastSeenHp: ReadonlyMap<string, number>,
         private _getFaction: (ownerId: string) => string,
         private _cellSize: number,
+        private _tweens: TweenManager,
     ) {
         this._reducedMotion =
             typeof window !== "undefined" &&
@@ -154,8 +156,13 @@ export class HealthBarRenderSystem implements GameComponent {
 
             const opacity = this._opacity(entry);
             const barW = this._cellSize - 4;
-            const barX = coord.q * this._cellSize + 2;
-            const barY = coord.r * this._cellSize - BAR_Y_OFFSET;
+            const fallback = Vector2D.of(
+                coord.q * this._cellSize,
+                coord.r * this._cellSize,
+            );
+            const { x: px, y: py } = this._tweens.getPosition(entityId, fallback);
+            const barX = px + 2;
+            const barY = py - BAR_Y_OFFSET;
             const fillW =
                 entry.maxHp > 0
                     ? Math.max(
