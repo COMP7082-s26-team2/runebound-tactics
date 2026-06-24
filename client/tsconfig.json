@@ -1,5 +1,7 @@
 {
     "compilerOptions": {
+      // This is to work with base.json config.  Should turn to a bundler later...
+      "ignoreDeprecations": "6.0",
       "useDefineForClassFields": false,
         "experimentalDecorators": true,
         "strict": true,
