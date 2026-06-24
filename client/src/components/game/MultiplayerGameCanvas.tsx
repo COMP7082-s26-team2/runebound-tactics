@@ -11,6 +11,7 @@ import {
     type GameState,
 } from "@runebound-tactics/shared";
 import type { Room } from "@colyseus/sdk";
+import { loadTilemap, TerrainLayer } from "@/lib/game/tilemap";
 
 interface MultiplayerGameCanvasProps {
     room: Room<GameState>;
@@ -23,12 +24,12 @@ const CANVAS_HEIGHT = CELL_SIZE * GRID_ROWS;
 type LoadPhase = "loading" | "ready" | "error";
 
 /**
- * Canvas wrapper: preloads sprite assets, then spins up GameEngine +
+ * Canvas wrapper: preloads sprite assets and tilemap, then spins up GameEngine +
  * MultiplayerGameScene, then reconciles state on every Colyseus snapshot.
  *
  * Three lifecycle phases:
- *   1. `loading`  — AssetHandler.preload in flight; canvas hidden behind
- *                   overlay. Engine has not started.
+ *   1. `loading`  — AssetHandler.preload + loadTilemap in flight; canvas hidden
+ *                   behind overlay. Engine has not started.
  *   2. `ready`    — preload resolved; engine running; reconciles flow into
  *                   the scene on each state patch.
  *   3. `error`    — preload rejected (network / 404). Engine never starts.
@@ -54,9 +55,8 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
 
         setPhase("loading");
 
-        handler
-            .preload(keys)
-            .then(() => {
+        Promise.all([handler.preload(keys), loadTilemap()])
+            .then(([, bundle]) => {
                 if (cancelled) return;
 
                 engine = new GameEngine({
@@ -66,11 +66,8 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
                     fixedDelta: 1 / 60,
                 });
 
-                const scene = new MultiplayerGameScene(
-                    canvas,
-                    room,
-                    handler,
-                );
+                const terrainLayer = new TerrainLayer(bundle.terrainGrid, bundle.sets, bundle.terrains);
+                const scene = new MultiplayerGameScene(canvas, room, handler, terrainLayer, bundle.sheet);
                 sceneRef.current = scene;
                 engine.scenes.register("main", scene);
                 engine.scenes.switch("main");

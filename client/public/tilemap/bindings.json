@@ -1,0 +1,98 @@
+[
+  {
+    "id": "overlay-water",
+    "kind": "edge-overlay",
+    "terrainIds": ["water"],
+    "bindings": [
+      { "role": "base", "sheetId": "gb-land", "tileIds": [128] }
+    ]
+  },
+  {
+    "id": "overlay-flatgrass",
+    "kind": "edge-overlay",
+    "terrainIds": ["flatgrass"],
+    "bindings": [
+      { "role": "base", "sheetId": "gb-land", "tileIds": [1] },
+      { "role": "overlay", "mask": 1,  "sheetId": "gb-land", "tileIds": [51] },
+      { "role": "overlay", "mask": 2,  "sheetId": "gb-land", "tileIds": [50] },
+      { "role": "overlay", "mask": 3,  "sheetId": "gb-land", "tileIds": [39] },
+      { "role": "overlay", "mask": 4,  "sheetId": "gb-land", "tileIds": [34] },
+      { "role": "overlay", "mask": 5,  "sheetId": "gb-land", "tileIds": [64] },
+      { "role": "overlay", "mask": 6,  "sheetId": "gb-land", "tileIds": [56] },
+      { "role": "overlay", "mask": 7,  "sheetId": "gb-land", "tileIds": [40] },
+      { "role": "overlay", "mask": 8,  "sheetId": "gb-land", "tileIds": [35] },
+      { "role": "overlay", "mask": 9,  "sheetId": "gb-land", "tileIds": [54] },
+      { "role": "overlay", "mask": 10, "sheetId": "gb-land", "tileIds": [65] },
+      { "role": "overlay", "mask": 11, "sheetId": "gb-land", "tileIds": [38] },
+      { "role": "overlay", "mask": 12, "sheetId": "gb-land", "tileIds": [71] },
+      { "role": "overlay", "mask": 13, "sheetId": "gb-land", "tileIds": [70] },
+      { "role": "overlay", "mask": 14, "sheetId": "gb-land", "tileIds": [72] }
+    ]
+  },
+  {
+    "id": "overlay-grass",
+    "kind": "edge-overlay",
+    "terrainIds": ["grass"],
+    "bindings": [
+      { "role": "base", "sheetId": "gb-land", "tileIds": [17] },
+      { "role": "overlay", "mask": 1,  "sheetId": "gb-land", "tileIds": [99] },
+      { "role": "overlay", "mask": 2,  "sheetId": "gb-land", "tileIds": [98] },
+      { "role": "overlay", "mask": 3,  "sheetId": "gb-land", "tileIds": [87] },
+      { "role": "overlay", "mask": 4,  "sheetId": "gb-land", "tileIds": [82] },
+      { "role": "overlay", "mask": 5,  "sheetId": "gb-land", "tileIds": [112] },
+      { "role": "overlay", "mask": 6,  "sheetId": "gb-land", "tileIds": [104] },
+      { "role": "overlay", "mask": 7,  "sheetId": "gb-land", "tileIds": [88] },
+      { "role": "overlay", "mask": 8,  "sheetId": "gb-land", "tileIds": [83] },
+      { "role": "overlay", "mask": 9,  "sheetId": "gb-land", "tileIds": [102] },
+      { "role": "overlay", "mask": 10, "sheetId": "gb-land", "tileIds": [113] },
+      { "role": "overlay", "mask": 11, "sheetId": "gb-land", "tileIds": [86] },
+      { "role": "overlay", "mask": 12, "sheetId": "gb-land", "tileIds": [119] },
+      { "role": "overlay", "mask": 13, "sheetId": "gb-land", "tileIds": [118] },
+      { "role": "overlay", "mask": 14, "sheetId": "gb-land", "tileIds": [120] }
+    ]
+  },
+  {
+    "id": "pair-grass-into-flatgrass",
+    "kind": "edge-overlay-pair",
+    "terrainIds": ["grass", "flatgrass"],
+    "bindings": [
+      { "role": "overlay", "mask": 1,  "sheetId": "gb-land", "tileIds": [260] },
+      { "role": "overlay", "mask": 2,  "sheetId": "gb-land", "tileIds": [258] },
+      { "role": "overlay", "mask": 3,  "sheetId": "gb-land", "tileIds": [259] },
+      { "role": "overlay", "mask": 4,  "sheetId": "gb-land", "tileIds": [226] },
+      { "role": "overlay", "mask": 5,  "sheetId": "gb-land", "tileIds": [241] },
+      { "role": "overlay", "mask": 6,  "sheetId": "gb-land", "tileIds": [242] },
+      { "role": "overlay", "mask": 7,  "sheetId": "gb-land", "tileIds": [231] },
+      { "role": "overlay", "mask": 8,  "sheetId": "gb-land", "tileIds": [228] },
+      { "role": "overlay", "mask": 9,  "sheetId": "gb-land", "tileIds": [245] },
+      { "role": "overlay", "mask": 10, "sheetId": "gb-land", "tileIds": [240] },
+      { "role": "overlay", "mask": 11, "sheetId": "gb-land", "tileIds": [229] },
+      { "role": "overlay", "mask": 12, "sheetId": "gb-land", "tileIds": [262] },
+      { "role": "overlay", "mask": 13, "sheetId": "gb-land", "tileIds": [261] },
+      { "role": "overlay", "mask": 14, "sheetId": "gb-land", "tileIds": [263] },
+      { "role": "overlay", "mask": 15, "sheetId": "gb-land", "tileIds": [193] }
+    ]
+  },
+  {
+    "id": "pair-grass-into-water",
+    "kind": "edge-overlay-pair",
+    "terrainIds": ["grass", "water"],
+    "bindings": [
+      { "role": "overlay", "mask": 1,  "sheetId": "gb-land", "tileIds": [99] },
+      { "role": "overlay", "mask": 2,  "sheetId": "gb-land", "tileIds": [98] },
+      { "role": "overlay", "mask": 3,  "sheetId": "gb-land", "tileIds": [87] },
+      { "role": "overlay", "mask": 4,  "sheetId": "gb-land", "tileIds": [82] },
+      { "role": "overlay", "mask": 5,  "sheetId": "gb-land", "tileIds": [112] },
+      { "role": "overlay", "mask": 6,  "sheetId": "gb-land", "tileIds": [104] },
+      { "role": "overlay", "mask": 7,  "sheetId": "gb-land", "tileIds": [88] },
+      { "role": "overlay", "mask": 8,  "sheetId": "gb-land", "tileIds": [83] },
+      { "role": "overlay", "mask": 9,  "sheetId": "gb-land", "tileIds": [102] },
+      { "role": "overlay", "mask": 10, "sheetId": "gb-land", "tileIds": [113] },
+      { "role": "overlay", "mask": 11, "sheetId": "gb-land", "tileIds": [86] },
+      { "role": "overlay", "mask": 12, "sheetId": "gb-land", "tileIds": [119] },
+      { "role": "overlay", "mask": 13, "sheetId": "gb-land", "tileIds": [118] },
+      { "role": "overlay", "mask": 14, "sheetId": "gb-land", "tileIds": [120] },
+      { "role": "overlay", "mask": 15, "sheetId": "gb-land", "tileIds": [87] }
+    ]
+  }
+]

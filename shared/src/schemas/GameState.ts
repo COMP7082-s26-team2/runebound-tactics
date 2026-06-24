@@ -1,4 +1,5 @@
 import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
+import { DeckManager } from "./Card"
 
 /**
  * A single unit on the game grid.
@@ -68,6 +69,9 @@ export class GamePlayerSlot extends Schema {
 
     /** Current gold. Increased by city income at the start of each player's turn. */
     @type("int32") gold: number = 0;
+
+    /** Card Deck Manager. See the Card Schema for more details */
+    @type(DeckManager) deck = new DeckManager();
 
     /**
      * Whether this player has been eliminated.
