@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { logIn } from "@/app/auth/actions";
+// import { logIn } from "@/app/auth/actions";
 import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Hint } from "@/components/ui/Hint";
+import { logIn } from "@/lib/auth/actions";
 
 export default function LoginForm() {
     const [error, setError] = useState<string | null>(null);
@@ -36,7 +37,8 @@ export default function LoginForm() {
             return;
         }
         if (result?.success) {
-            window.location.href = "/";
+            setSuccess('Authentication successful! Entering the realm...');
+            window.location.href = '/';
         }
     }
 

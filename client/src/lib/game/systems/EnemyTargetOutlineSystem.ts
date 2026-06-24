@@ -31,7 +31,7 @@ export class EnemyTargetOutlineSystem implements GameComponent {
             this._outlineEnemies(
                 ctx,
                 this._selection.attackableEnemies,
-                "rgba(255, 140, 0, 0.95)",
+                "rgba(255, 60, 60, 0.95)",
                 3,
             );
             return;
@@ -41,7 +41,7 @@ export class EnemyTargetOutlineSystem implements GameComponent {
             this._outlineEnemies(
                 ctx,
                 this._selection.pendingTargetCandidates,
-                "rgba(255, 215, 50, 1.0)",
+                "rgba(255, 80, 80, 1.0)",
                 4,
             );
         }

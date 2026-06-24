@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signUp, verifyOtp } from "@/app/auth/actions";
+// import { signUp, verifyOtp } from "@/app/auth/actions";
 import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Hint } from "@/components/ui/Hint";
@@ -9,6 +9,7 @@ import { Eyebrow } from "@/components/ui/Eyebrow";
 
 const PASSWORD_REGEX =
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+import { signUp, verifyOtp } from "@/lib/auth/actions";
 
 export default function RegistrationForm() {
     const [step, setStep] = useState<"signup" | "verify">("signup");

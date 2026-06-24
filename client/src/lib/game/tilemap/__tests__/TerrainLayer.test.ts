@@ -26,8 +26,8 @@ describe("TerrainLayer", () => {
     it("reports rows and cols from the input grid", () => {
         const layer = new TerrainLayer(
             [
-                ["water", "grass"],
-                ["grass", "water"],
+                [{ terrain_id: "water", solid: false }, { terrain_id: "grass", solid: false }],
+                [{ terrain_id: "grass", solid: false }, { terrain_id: "water", solid: false }],
             ],
             SETS,
             TERRAINS,
@@ -38,7 +38,7 @@ describe("TerrainLayer", () => {
 
     it("returns the base-tile DrawOp for a water cell", () => {
         const layer = new TerrainLayer(
-            [["water"]],
+            [[{ terrain_id: "water", solid: false }]],
             SETS,
             TERRAINS,
         );
@@ -49,7 +49,7 @@ describe("TerrainLayer", () => {
 
     it("returns an empty array for out-of-bounds coordinates", () => {
         const layer = new TerrainLayer(
-            [["water"]],
+            [[{ terrain_id: "water", solid: false }]],
             SETS,
             TERRAINS,
         );
@@ -90,9 +90,9 @@ describe("TerrainLayer", () => {
         // least one overlay DrawOp (tileId=99) somewhere in the cache.
         const layer = new TerrainLayer(
             [
-                ["water", "water", "water"],
-                ["water", "grass", "water"],
-                ["water", "water", "water"],
+                [{ terrain_id: "water", solid: false }, { terrain_id: "water", solid: false }, { terrain_id: "water", solid: false }],
+                [{ terrain_id: "water", solid: false }, { terrain_id: "grass", solid: false }, { terrain_id: "water", solid: false }],
+                [{ terrain_id: "water", solid: false }, { terrain_id: "water", solid: false }, { terrain_id: "water", solid: false }],
             ],
             setsWithOverlay,
             TERRAINS,
@@ -106,5 +106,28 @@ describe("TerrainLayer", () => {
         // At least one base water tile and at least one base grass tile must appear.
         expect(allOps).toContain(1);
         expect(allOps).toContain(2);
+    });
+});
+
+describe("TerrainLayer.at", () => {
+    it("returns the structured cell for valid coords", () => {
+        const layer = new TerrainLayer(
+            [
+                [{ terrain_id: "water", solid: false }, { terrain_id: "grass", solid: false }],
+            ],
+            SETS, TERRAINS,
+        );
+        expect(layer.at({ q: 1, r: 0 }).terrain_id).toBe("grass");
+        expect(layer.at({ q: 0, r: 0 }).terrain_id).toBe("water");
+    });
+
+    it("OOB returns solid-water sentinel", () => {
+        const layer = new TerrainLayer(
+            [[{ terrain_id: "grass", solid: false }]],
+            SETS, TERRAINS,
+        );
+        const cell = layer.at({ q: 5, r: 5 });
+        expect(cell.solid).toBe(true);
+        expect(cell.terrain_id).toBe("water");
     });
 });

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Pixelify_Sans, Jacquard_12, Tiny5 } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
+import { GameConnectionProvider } from "@/context/colyseus";
 import "./globals.css";
 
 const pixelify = Pixelify_Sans({
@@ -39,7 +41,11 @@ export default function RootLayout({
             className={`${pixelify.variable} ${jacquard.variable} ${tiny5.variable} h-full`}
             suppressHydrationWarning
         >
-            <body className="min-h-full flex flex-col">{children}</body>
+            <body className="min-h-full flex flex-col">
+                <GameConnectionProvider>
+                    {children}
+                </GameConnectionProvider>
+            </body>
         </html>
     );
 }

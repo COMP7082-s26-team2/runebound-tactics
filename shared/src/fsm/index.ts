@@ -30,6 +30,15 @@ export { QuickPlayState } from "./turn/states/QuickPlayState";
 export { CombatState } from "./turn/states/CombatState";
 export { PostCombatState } from "./turn/states/PostCombatState";
 
+// Reaction window machine
+export { createReactionWindowMachine } from "./reaction/ReactionWindowMachine";
+export type { ReactionWindowMachine } from "./reaction/ReactionWindowMachine";
+export type {
+    ReactionWindowState,
+    ReactionWindowEvent,
+    ReactionWindowContext,
+} from "./reaction/events";
+
 // Deprecated — legacy config-object primitive. Kept for back-compat during
 // migration; removed in a follow-up sprint once no consumers remain.
 // @deprecated Use `Machine` + `StateBase` from this module instead.

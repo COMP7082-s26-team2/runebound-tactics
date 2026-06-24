@@ -15,6 +15,7 @@ import { Hint } from "@/components/ui/Hint";
 import { Numeric } from "@/components/ui/Numeric";
 import { Panel } from "@/components/ui/Panel";
 import { clearLobbyToken } from "@/lib/multiplayer/reconnect";
+import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 
 export function LobbyWaitingRoom({
     expectedRoomId,
@@ -24,6 +25,7 @@ export function LobbyWaitingRoom({
     const { room, error } = useLobbyRoom();
     const state = useLobbyRoomState();
     const router = useRouter();
+    const { clearLobbyToken } = useRoomConnect();
     const [countdown, setCountdown] = useState<number | null>(null);
     const [inviteSlot, setInviteSlot] = useState<number | null>(null);
 
@@ -49,7 +51,7 @@ export function LobbyWaitingRoom({
             clearLobbyToken();
             router.push(`/game/${gameRoomId}`);
         }
-    }, [gameRoomId, router]);
+    }, [clearLobbyToken, gameRoomId, router]);
 
     if (error) {
         return (

@@ -8,11 +8,14 @@ import {
     createSelectionMachine,
     squareGridNeighbors,
     unitIsExhausted,
+    canEnter,
+    getUnitMovementType,
     type AttackTargetingContext,
     type SelectionMachine,
     type GridCoord,
     type GameState,
 } from "@runebound-tactics/shared";
+import type { TerrainLayer } from "@/lib/game/tilemap";
 import type { Room } from "@colyseus/sdk";
 
 /**
@@ -48,6 +51,7 @@ export class MultiplayerSelectionSystem implements GameComponent {
         private _cellSize: number,
         private _input: InputSystem,
         private _room: Room<GameState>,
+        private _terrainLayer: TerrainLayer,
     ) {}
 
     get selectionState() {
@@ -116,9 +120,14 @@ export class MultiplayerSelectionSystem implements GameComponent {
         const start = this._world.gridPositions.get(occupant);
         if (!stats || !start) return;
 
+        const unitType = this._world.unitTypes.get(occupant) ?? "";
+        const movementType = getUnitMovementType(unitType);
+
         const reachable = computeReachableTiles({
             getNeighbors: squareGridNeighbors,
             isOccupied: (k) => this._world.occupancyMap.has(k),
+            canEnter: (coord) =>
+                canEnter({ movementType }, this._terrainLayer.at(coord)),
             movement: stats.movement,
             start,
         });

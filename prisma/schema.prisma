@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
 }
 
 model player {
@@ -11,17 +11,53 @@ model player {
   auth_id                String?        @unique @db.Uuid
   username               String?        @unique @db.VarChar(255)
   email                  String?        @unique @db.VarChar(255)
+  avatar_url             String?
   actions                game_action[]
-  matches_turn           game_match[]   @relation("CurrentTurn")
-  matches_won            game_match[]   @relation("Winner")
-  guild_invites_sent     guild_invite[] @relation("SentInvites")
-  guild_invites_received guild_invite[] @relation("ReceivedInvites")
+  matches_turn           game_match[]    @relation("CurrentTurn")
+  matches_won            game_match[]    @relation("Winner")
+  guild_invites_sent     guild_invite[]  @relation("SentInvites")
+  guild_invites_received guild_invite[]  @relation("ReceivedInvites")
   guild_members          guild_member[]
   match_players          match_player[]
   decks                  player_deck[]
   resources              resource[]
+  sessions               user_sessions[]
   turns                  turn[]
   units                  unit[]
+  presence               user_presence?
+  sessions               user_sessions[]
+}
+
+model user_presence {
+  user_id             BigInt         @id
+  current_lobby_id    String?
+  current_room_id     String?
+  supabase_session_id String?
+  last_seen_at        DateTime       @default(now()) @db.Timestamp(6)
+  connection_status   String         @default("offline") @db.VarChar(20)
+  player              player         @relation(fields: [user_id], references: [player_id], onDelete: Cascade, onUpdate: NoAction)
+  session             user_sessions? @relation(fields: [supabase_session_id], references: [supabase_session_id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([current_lobby_id])
+  @@index([current_room_id])
+  @@index([supabase_session_id])
+  @@index([connection_status])
+}
+
+model user_sessions {
+  id                  BigInt          @id @default(autoincrement())
+  user_id             BigInt
+  supabase_session_id String          @unique
+  created_at          DateTime        @default(now()) @db.Timestamp(6)
+  expires_at          DateTime        @db.Timestamp(6)
+  is_active           Boolean         @default(true)
+  last_active_at      DateTime        @default(now()) @db.Timestamp(6)
+  player              player          @relation(fields: [user_id], references: [player_id], onDelete: Cascade, onUpdate: NoAction)
+  userPresences       user_presence[]
+
+  @@index([user_id])
+  @@index([is_active])
+  @@index([expires_at])
 }
 
 model guild {
