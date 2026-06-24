@@ -11,6 +11,7 @@ export interface CardBlueprint {
     card_type: CardType;
     gold_cost: number;
     is_reaction: boolean;
+    role?: "attacker" | "defender";
     effect: CardEffect;
 }
 
@@ -19,6 +20,7 @@ export const BATTLE_CRY: CardBlueprint = {
     card_type: CardType.CARD_STATUS_EFFECT,
     gold_cost: 0,
     is_reaction: true,
+    role: "attacker",
     effect: { attackBonus: 2 },
 };
 
@@ -27,6 +29,7 @@ export const SHIELD_WALL: CardBlueprint = {
     card_type: CardType.CARD_STATUS_EFFECT,
     gold_cost: 0,
     is_reaction: true,
+    role: "defender",
     effect: { defenseBonus: 2 },
 };
 
