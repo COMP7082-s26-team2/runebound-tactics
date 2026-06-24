@@ -390,10 +390,6 @@ export class GameRoom extends Room<{ state: GameState }> {
         );
     }
 
-    private _isVerifiedClientSession(client: Client): boolean {
-        return this._getVerifiedPlayer(client) !== null;
-    }
-
     private _getVerifiedUserId(client: Client): string | null {
         const auth = client.auth as VerifiedClientAuth | undefined;
         return auth?.userId ?? null;
