@@ -1,3 +1,4 @@
+import { computeAttackDamage } from "@runebound-tactics/shared";
 import { EntityId, World } from "@/lib/engine";
 
 type AttackResult = {
@@ -24,7 +25,10 @@ class CombatSystem {
             throw new Error(`[CombatSystem.resolveAttack] Target unit ${targetId} does not exist in world`)
         }
         
-        const damage = Math.max(0, attacker.attack - defender.defense)
+        const damage = computeAttackDamage(
+            { baseAttackDamage: attacker.attack, bonusAttackDamage: 0, damageType: attacker.damageType },
+            { baseDefense: defender.defense, bonusDefense: 0, weakness: defender.weakness },
+        );
         
         return {
             damage,
