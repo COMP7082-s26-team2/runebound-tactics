@@ -12,6 +12,6 @@ services:
     name: rune-frontend
     env: node
     plan: free
-    buildCommand: yarn install && yarn prisma generate --schema=./prisma/schema.prisma && yarn workspace @runebound-tactics/client build
+    buildCommand: yarn install && yarn workspace @runebound-tactics/client build
     startCommand: yarn workspace @runebound-tactics/client start
     autoDeploy: false
