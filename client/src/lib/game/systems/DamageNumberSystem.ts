@@ -109,7 +109,7 @@ export class DamageNumberSystem implements GameComponent {
                     coord.q * this._cellSize +
                     this._cellSize / 2 +
                     staggerX,
-                spawnCy: coord.r * this._cellSize + this._cellSize / 2,
+                spawnCy: coord.r * this._cellSize - 8, // aligns with health bar top (BAR_Y_OFFSET)
                 stackSlot: slot,
             });
         });
