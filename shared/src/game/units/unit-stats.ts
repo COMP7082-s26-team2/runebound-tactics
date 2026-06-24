@@ -81,19 +81,19 @@ export function getUnitDefense(unitType: UnitTypeId): number {
 }
 
 const UNIT_BASE_HEALTH: Record<string, number> = {
-    "castle:swordsman":        1,
-    "castle:archer":           1,
-    "castle:paladin":          1,
-    "castle:cavalier":         1,
-    "castle:griffin":          1,
-    "necropolis:skeleton":     1,
-    "necropolis:death_knight": 1,
-    "necropolis:vampire":      1,
-    "necropolis:ghost":        1,
-    "necropolis:zombie":       1,
+    "castle:swordsman":        10,
+    "castle:archer":           8,
+    "castle:paladin":          14,
+    "castle:cavalier":         10,
+    "castle:griffin":          9,
+    "necropolis:skeleton":     7,
+    "necropolis:death_knight": 14,
+    "necropolis:vampire":      10,
+    "necropolis:ghost":        8,
+    "necropolis:zombie":       12,
 };
 
-const DEFAULT_BASE_HEALTH = 1;
+const DEFAULT_BASE_HEALTH = 10;
 
 export function getUnitBaseHealth(unitType: UnitTypeId): number {
     return UNIT_BASE_HEALTH[unitType] ?? DEFAULT_BASE_HEALTH;
