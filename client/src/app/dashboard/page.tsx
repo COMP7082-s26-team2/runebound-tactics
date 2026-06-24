@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { refreshAuthSessionRecord, signOut } from "@/lib/auth/actions";
 
 export default function DashboardPage() {
     const router = useRouter();
@@ -32,6 +33,18 @@ export default function DashboardPage() {
                 return;
             }
 
+            // Refresh the DB-backed session record from a server action after
+            // Supabase confirms this browser still has a valid session.
+            // The client never sends or stores the derived session identifier.
+            const refreshedSession = await refreshAuthSessionRecord();
+            if ("error" in refreshedSession) {
+                // If the server cannot persist/read the DB-backed session, do
+                // not let the Supabase browser cookie alone keep the user in.
+                await supabase.auth.signOut();
+                router.replace("/auth/login");
+                return;
+            }
+
             if (!mounted) return;
 
             setUsername(
@@ -48,11 +61,6 @@ export default function DashboardPage() {
             mounted = false;
         };
     }, [router, supabase]);
-
-    async function handleSignOut() {
-        await supabase.auth.signOut();
-        router.replace("/");
-    }
 
     if (loading) return null;
 
@@ -96,10 +104,11 @@ export default function DashboardPage() {
                     </Link>
                 </div>
 
-                <form>
+                {/* Submit through the server action so logout can mark the DB
+                session inactive before Supabase clears the auth cookies. */}
+                <form action={signOut}>
                     <button
-                        type="button"
-                        onClick={handleSignOut}
+                        type="submit"
                         className="text-[9px] uppercase tracking-[0.2em] text-[#555555] hover:text-[#ff6666] transition-colors font-bold"
                     >
                         Disconnect Session

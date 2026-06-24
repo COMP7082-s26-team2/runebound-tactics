@@ -8,7 +8,10 @@ export class LobbyPlayerSlot extends Schema {
     /** Colyseus session ID — set by server on join. */
     @type("string") sessionId: string = "";
 
-    /** Display name chosen by the player. */
+    /** Verified app player ID from player.player_id. */
+    @type("string") userId: string = "";
+
+    /** Display name from the verified player profile. */
     @type("string") displayName: string = "";
 
     /** Whether the player has clicked Ready. */

@@ -9,6 +9,8 @@ import {
     createTurnMachine,
     type TurnMachine,
     canEnter,
+    createReactionWindowMachine,
+    type ReactionWindowMachine,
     cellKey,
     computeReachableTiles,
     computeAttackDamage,
@@ -27,19 +29,19 @@ import {
     GRID_ROWS,
 } from "@runebound-tactics/shared";
 import type { Faction, GridCoord } from "@runebound-tactics/shared";
+import { AuthJoinError, verifySupabaseJoinAuth } from "../auth/supabaseAuth";
+import type { AuthenticatedJoinOptions, VerifiedClientAuth } from "../auth/types";
+import { markUserInGame, markUserLeftGame, markUserOffline } from "../presence/userPresence";
 import { pendingGames } from "./pendingGames";
 
 interface PendingPlayer {
+    userId: string;
     displayName: string;
     faction: string;
 }
 
 interface GameRoomOptions {
     lobbyRoomId: string;
-}
-
-interface JoinOptions {
-    displayName?: string;
 }
 
 interface MoveUnitPayload {
@@ -59,16 +61,24 @@ interface AttackUnitPayload {
     moveTo?: { q: number; r: number };
 }
 
+const REACTION_TIMEOUT_MS = 10_000;
+
 interface PendingAttack {
     attackerId: string;
     targetId: string;
     damage: number;
     defenderDied: boolean;
     newHp: number;
+    /** Where the attacker should end up. Null = zero-move attack. */
+    moveTo: GridCoord | null;
+    /** Attacker's pos at declare-time (for reachability rebuild on resolve). */
+    posBefore: GridCoord;
+    /** AP to deduct for the move half on resolve (0 for zero-move attack). */
+    moveApCost: number;
 }
 
 export class GameRoom extends Room<{ state: GameState }> {
-    /** Players expected to join, keyed by displayName. Set in onCreate. */
+    /** Players expected to join, keyed by verified player.user_id. Set in onCreate. */
     private _pendingPlayers = new Map<string, PendingPlayer>();
     /** Ordered turn list — session IDs in the order players joined. */
     private _turnOrder: string[] = [];
@@ -87,6 +97,8 @@ export class GameRoom extends Room<{ state: GameState }> {
      * "combat" subscriber. Null outside of the quick-play → combat window.
      */
     private _pendingAttack: PendingAttack | null = null;
+    private _reactionMachine: ReactionWindowMachine | null = null;
+    private _reactionTimer: ReturnType<typeof setTimeout> | null = null;
 
     onCreate(options: GameRoomOptions): void {
         const pending = pendingGames.get(options.lobbyRoomId);
@@ -100,12 +112,23 @@ export class GameRoom extends Room<{ state: GameState }> {
         this.setState(new GameState());
         this.maxClients = pending.players.length;
 
+        // LobbyRoom already verified the users that started this match and
+        // wrote their app player IDs into pendingGames. GameRoom keys this
+        // waiting list by userId so a client cannot claim a slot by spoofing a
+        // display name in join options.
         for (const p of pending.players) {
-            this._pendingPlayers.set(p.displayName, p);
+            this._pendingPlayers.set(p.userId, p);
         }
 
         this.onMessage<MoveUnitPayload>("move_unit", (client, payload) => {
-            if (!this._isCurrentTurn(client)) return;
+            // Resolve the verified player first. The action is attributed to
+            // player.userId, then bridged to the current sessionId-based game
+            // model for unit ownership and turn checks.
+            const player = this._getVerifiedPlayer(client);
+            if (!player) return;
+
+            const playerSessionId = player.sessionId;
+            if (!this._isCurrentTurn(player)) return;
 
             const unit = this.state.units.get(payload?.unitId);
             if (!unit || unit.ownerId !== client.sessionId) return;
@@ -131,55 +154,163 @@ export class GameRoom extends Room<{ state: GameState }> {
         });
 
         this.onMessage<AttackUnitPayload>("attack_unit", (client, payload) => {
-            this._handleAttack(client.sessionId, payload);
+            // Pass the whole Client so _handleAttack can verify client.auth
+            // before it uses client.sessionId for current gameplay ownership.
+            this._handleAttack(client, payload);
         });
 
         this.onMessage("end_turn", (client) => {
-            if (!this._isCurrentTurn(client)) return;
+            // End-turn also starts from the verified player slot. The
+            // sessionId comparison below is derived from that slot, not trusted
+            // directly from the raw Colyseus client.
+            const player = this._getVerifiedPlayer(client);
+            if (!player) return;
+
+            if (!this._isCurrentTurn(player)) return;
             console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: end_turn from ${client.sessionId}`);
             this._turnMachine.send("END_TURN");
         });
+
+        this.onMessage("pass_reaction", (client) => {
+            if (!this._reactionMachine) return;
+            const phase = this._reactionMachine.state;
+            const ctx = this._reactionMachine.context;
+            const expected =
+                phase === "defender" ? ctx.defenderOwnerId :
+                phase === "attacker-ally" ? ctx.attackerOwnerId :
+                null;
+            if (expected === null || client.sessionId !== expected) return;
+            this._clearReactionTimer();
+            this._reactionMachine.send("REACTION_PASS");
+        });
+
+        this.onMessage<{ cardId: string }>("play_reaction_card", (client, payload) => {
+            // Card system pending — reject all cards until is_reaction validation is wired.
+            console.log(`[${new Date().toISOString()}] [GameRoom] play_reaction_card: rejected (card system pending) from ${client.sessionId}`);
+            void client;
+            void payload;
+        });
     }
 
-    onJoin(client: Client, options?: JoinOptions): void {
-        const displayName = String(options?.displayName ?? "Player").slice(0, 32);
-        const pending = this._pendingPlayers.get(displayName);
+    async onAuth(
+        _client: Client,
+        options?: AuthenticatedJoinOptions,
+    ): Promise<VerifiedClientAuth> {
+        try {
+            // onAuth is the gate before onJoin. The returned payload becomes
+            // client.auth, which lets the room connect this Colyseus session to
+            // a verified app player instead of trusting join options.
+            return await verifySupabaseJoinAuth(options);
+        } catch (error) {
+            // Never log the raw access token or join options here.
+            if (error instanceof AuthJoinError) {
+                console.warn(`[GameRoom] Rejected unauthenticated join: ${error.message}`);
+            } else {
+                console.error("[GameRoom] Auth verification failed:", error);
+            }
+            throw error;
+        }
+    }
+
+    async onJoin(client: Client): Promise<void> {
+        // Colyseus sets client.auth from the value returned by onAuth. If it is
+        // missing here, the room should fail closed rather than creating an
+        // anonymous GamePlayerSlot.
+        const userId = this._getVerifiedUserId(client);
+        if (!userId) {
+            throw new Error("Missing verified game auth");
+        }
+
+        // Only players transferred from the lobby can claim game slots. The
+        // lookup is by verified app userId, not displayName, because displayName
+        // is client-controlled in older flows.
+        const pending = this._pendingPlayers.get(userId);
+        if (!pending) {
+            throw new Error("Authenticated user is not expected in this game");
+        }
+
+        const displayName = pending.displayName.slice(0, 32);
 
         const slot = new GamePlayerSlot();
+        // sessionId is still used by the current GameRoom maps, turn order, and
+        // unit owner IDs. userId is the durable identity that future reconnect
+        // and enforcement tickets can use when sessionId changes.
         slot.sessionId = client.sessionId;
+        slot.userId = userId;
         slot.displayName = displayName;
-        slot.faction = (pending?.faction ?? "") as Faction;
+        slot.faction = pending.faction as Faction;
         this.state.players.set(client.sessionId, slot);
 
-        this._pendingPlayers.delete(displayName);
+        // Game presence is written only after the verified user has claimed a
+        // real game slot. markUserInGame also clears any lobby id left over
+        // from the lobby-to-game transfer.
+        await this._markPlayerInGame(userId);
+
+        // Remove the verified user from the pending list after they claim their
+        // seat; _allPlayersJoined() uses this to decide when the match can start.
+        this._pendingPlayers.delete(userId);
         this._turnOrder.push(client.sessionId);
 
-        console.log(`[${new Date().toISOString()}] [GameRoom] ${displayName} joined (${client.sessionId})`);
+        console.log(
+            `[${new Date().toISOString()}] [GameRoom] ${displayName} joined as user ${userId} (${client.sessionId})`,
+        );
 
         if (this._allPlayersJoined()) {
             this._startGame();
         }
     }
 
+    async onReconnect(client: Client): Promise<void> {
+        // This installed Colyseus version calls onReconnect with only the
+        // reconnected client, not (client, previousClient). During
+        // allowReconnection, Colyseus reserves the original sessionId and copies
+        // previousClient.auth onto the reconnected client, so the correct guard
+        // here is: does this client.auth.userId still match the player slot
+        // stored under this sessionId?
+        if (!this._getVerifiedPlayer(client)) {
+            throw new Error("Reconnect user does not match player slot");
+        }
+
+        // No sessionId replacement is needed in this Colyseus reconnect path:
+        // the reconnected client reclaims the same sessionId that owns the
+        // GamePlayerSlot, turn order, and unit owner IDs.
+        const userId = this._getVerifiedUserId(client);
+        if (userId) {
+            // A successful reconnect means the same verified player is back in
+            // the active game room, so restore their DB presence to in_game.
+            await this._markPlayerInGame(userId);
+        }
+    }
+
     async onDrop(client: Client, code?: number): Promise<void> {
+        const player = this._getVerifiedPlayer(client);
+        if (player?.userId) {
+            // Temporary disconnects must keep current_room_id for reconnection
+            // lookup. markUserOffline only updates status/last_seen_at.
+            await this._markPlayerOffline(player.userId);
+        }
+
         try {
             await this.allowReconnection(client, 30);
             console.log(`[${new Date().toISOString()}] [GameRoom] ${client.sessionId} reconnected`);
         } catch {
             console.log(`[${new Date().toISOString()}] [GameRoom] ${client.sessionId} reconnect window expired (code ${code})`);
-            this._eliminatePlayer(client.sessionId);
+            await this._eliminatePlayer(client.sessionId);
         }
     }
 
-    onLeave(client: Client): void {
-        this._eliminatePlayer(client.sessionId);
+    async onLeave(client: Client): Promise<void> {
+        await this._eliminatePlayer(client.sessionId);
     }
 
-    private _eliminatePlayer(sessionId: string): void {
+    private async _eliminatePlayer(sessionId: string): Promise<void> {
         const player = this.state.players.get(sessionId);
         if (player) {
             player.isEliminated = true;
             console.log(`[${new Date().toISOString()}] [GameRoom] ${player.displayName} eliminated`);
+            // Explicit leave or reconnect timeout means this player no longer
+            // has a claim to this active game room for presence lookup.
+            await this._markPlayerLeftGame(player.userId);
         }
         if (this.state.currentTurnId === sessionId) {
             // Only fire END_TURN if the machine is in action-phase. If
@@ -241,8 +372,7 @@ export class GameRoom extends Room<{ state: GameState }> {
                 break;
 
             case "quick-play":
-                console.log(`[${new Date().toISOString()}] [GameRoom] quick-play: no opponent responses`);
-                this._turnMachine.send("QUICK_PLAY_RESOLVED");
+                this._openReactionWindow();
                 break;
 
             case "combat":
@@ -256,6 +386,95 @@ export class GameRoom extends Room<{ state: GameState }> {
                 console.log(`[${new Date().toISOString()}] [GameRoom] post-combat: gold distribution pending`);
                 this._turnMachine.send("POST_COMBAT_RESOLVED");
                 break;
+        }
+    }
+
+    private _openReactionWindow(): void {
+        const pa = this._pendingAttack;
+        if (!pa) {
+            this._turnMachine.send("QUICK_PLAY_RESOLVED");
+            return;
+        }
+
+        const attackerUnit = this.state.units.get(pa.attackerId);
+        const defenderUnit = this.state.units.get(pa.targetId);
+        if (!attackerUnit || !defenderUnit) {
+            this._turnMachine.send("QUICK_PLAY_RESOLVED");
+            return;
+        }
+
+        this._reactionMachine = createReactionWindowMachine(
+            attackerUnit.ownerId,
+            defenderUnit.ownerId,
+        );
+        this._reactionMachine.subscribe((phase) => this._onReactionPhase(phase));
+    }
+
+    private _onReactionPhase(phase: string): void {
+        console.log(`[${new Date().toISOString()}] [GameRoom] reactionPhase: ${phase}`);
+        this.state.reactionPhase = phase === "closed" ? "" : phase;
+
+        const ctx = this._reactionMachine?.context;
+        const activePlayer = this._activeReactionPlayer(
+            phase,
+            ctx?.attackerOwnerId,
+            ctx?.defenderOwnerId,
+        );
+        this.broadcast("reaction_phase", { phase, activePlayer });
+
+        switch (phase) {
+            case "defender":
+                this._startReactionTimer();
+                break;
+
+            case "defender-ally":
+                this._clearReactionTimer();
+                this._startReactionTimer();
+                this._reactionMachine?.send("REACTION_PASS");  // placeholder: auto-pass
+                break;
+
+            case "attacker-ally":
+                this._clearReactionTimer();
+                this._startReactionTimer();
+                this._reactionMachine?.send("REACTION_PASS");  // placeholder: auto-pass
+                break;
+
+            case "resolve":
+                this._clearReactionTimer();
+                this._reactionMachine?.send("REACTION_PASS");
+                break;
+
+            case "closed":
+                this._clearReactionTimer();
+                this._reactionMachine = null;
+                this._turnMachine.send("QUICK_PLAY_RESOLVED");
+                break;
+        }
+    }
+
+    private _activeReactionPlayer(
+        phase: string,
+        attackerOwnerId?: string,
+        defenderOwnerId?: string,
+    ): string {
+        if (phase === "defender") return defenderOwnerId ?? "";
+        if (phase === "attacker-ally") return attackerOwnerId ?? "";
+        return "";
+    }
+
+    private _startReactionTimer(): void {
+        this._clearReactionTimer();
+        this._reactionTimer = setTimeout(() => {
+            if (!this._reactionMachine) return;
+            this._clearReactionTimer();
+            this._reactionMachine.send("REACTION_TIMEOUT");
+        }, REACTION_TIMEOUT_MS);
+    }
+
+    private _clearReactionTimer(): void {
+        if (this._reactionTimer !== null) {
+            clearTimeout(this._reactionTimer);
+            this._reactionTimer = null;
         }
     }
 
@@ -312,12 +531,91 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
     }
 
-    private _isCurrentTurn(client: Client): boolean {
+    private _isCurrentTurn(player: GamePlayerSlot): boolean {
         return (
             this.state.phase === "active" &&
-            this.state.currentTurnId === client.sessionId &&
+            this.state.currentTurnId === player.sessionId &&
             this._turnMachine.state === "action-phase"
         );
+    }
+
+    private _getVerifiedUserId(client: Client): string | null {
+        const auth = client.auth as VerifiedClientAuth | undefined;
+        return auth?.userId ?? null;
+    }
+
+    private _getVerifiedPlayer(client: Client): GamePlayerSlot | null {
+        const userId = this._getVerifiedUserId(client);
+        const player = this.state.players.get(client.sessionId);
+
+        // sessionId is still the current connection key, but the connected
+        // client must also match the verified userId stored when they joined.
+        if (!userId || !player || player.userId !== userId) {
+            return null;
+        }
+
+        return player;
+    }
+
+    private _canReclaimPlayerSlot(client: Client, previousClient: Client): boolean {
+        const userId = this._getVerifiedUserId(client);
+        const previousPlayer = this.state.players.get(previousClient.sessionId);
+
+        // When a player reconnects, Colyseus gives us a new/current client and
+        // the previous disconnected client. The reconnect should only succeed
+        // when the current client's verified app userId matches the userId that
+        // was stored on the previous player slot.
+        //
+        // This prevents another authenticated player from reclaiming someone
+        // else's game slot even if they somehow reach the same room/reconnect
+        // path. The durable userId is the authority here, not the Colyseus
+        // sessionId, which can change across reconnect flows.
+        //
+        // Reconnect ownership is based on the durable app userId stored in the
+        // previous player slot, not on either Colyseus sessionId by itself.
+        return !!userId && !!previousPlayer && previousPlayer.userId === userId;
+    }
+
+    private async _markPlayerInGame(userId: string): Promise<void> {
+        try {
+            await markUserInGame(userId, this.roomId);
+        } catch (error) {
+            console.error(
+                `[GameRoom] Failed to mark user ${userId} in game ${this.roomId}:`,
+                error,
+            );
+        }
+    }
+
+    private async _markPlayerLeftGame(userId: string): Promise<void> {
+        try {
+            await markUserLeftGame(userId, this.roomId);
+        } catch (error) {
+            console.error(
+                `[GameRoom] Failed to clear game presence for user ${userId} in game ${this.roomId}:`,
+                error,
+            );
+        }
+    }
+
+    private async _markPlayerOffline(userId: string): Promise<void> {
+        try {
+            await markUserOffline(userId);
+        } catch (error) {
+            console.error(
+                `[GameRoom] Failed to mark user ${userId} offline for game ${this.roomId}:`,
+                error,
+            );
+        }
+    }
+
+    private _clearGamePresenceForAllPlayers(): void {
+        // Game-over cleanup is best-effort presence maintenance. We do not
+        // await each write here because _checkWinCondition is called from sync
+        // combat resolution, but each helper logs its own DB failure.
+        for (const player of this.state.players.values()) {
+            void this._markPlayerLeftGame(player.userId);
+        }
     }
 
     /**
@@ -344,15 +642,24 @@ export class GameRoom extends Room<{ state: GameState }> {
      * mutation. Caller (the message handler) does not need to act on the
      * outcome.
      */
-    private _handleAttack(sessionId: string, payload: AttackUnitPayload | undefined): void {
+    private _handleAttack(client: Client, payload: AttackUnitPayload | undefined): void {
         if (!this._turnMachine || this._turnMachine.state !== "action-phase") return;
         if (this.state.phase !== "active") return;
-        if (this.state.currentTurnId !== sessionId) return;
+        // Attack has its own guard because it enters through a helper instead
+        // of _isCurrentTurn directly.
+        const player = this._getVerifiedPlayer(client);
+        if (!player) return;
+
+        // Keep the current gameplay model sessionId-based for now. BCOMP-175's
+        // first step is to prove that this session belongs to the authenticated
+        // user before allowing sessionId-based ownership checks.
+        const playerSessionId = player.sessionId;
+        if (this.state.currentTurnId !== playerSessionId) return;
 
         const attacker = this.state.units.get(payload?.attackerId ?? "");
         const target = this.state.units.get(payload?.targetId ?? "");
         if (!attacker || !target) return;
-        if (attacker.ownerId !== sessionId) return;
+        if (attacker.ownerId !== playerSessionId) return;
         if (attacker.ownerId === target.ownerId) return;     // friendly-fire blocked
         if (unitIsExhausted(attacker)) return;               // 1-AP exhaustion
 
@@ -364,7 +671,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             moveTo.q === posBefore.q &&
             moveTo.r === posBefore.r;
 
-        // ── Half 1: optional move ─────────────────────────────────────
+        // ── Half 1: validate optional move (no mutation) ──────────────
         if (moveTo && !moveToIsCurrentPos) {
             if (!ActionPointSystem.canAfford(attacker, AP_COST.MOVE)) return;
             const reachable = this._reachabilityCache.get(attacker.unitId);
@@ -372,49 +679,27 @@ export class GameRoom extends Room<{ state: GameState }> {
             const moveKey = cellKey({ q: moveTo.q, r: moveTo.r });
             if (!reachable.has(moveKey)) return;
 
-            // Pre-validate half-2 adjacency BEFORE mutating
+            // Pre-validate half-2 adjacency from post-move position.
             if (manhattan({ q: moveTo.q, r: moveTo.r }, targetPos) !== 1) return;
-
-            attacker.x = moveTo.q;
-            attacker.y = moveTo.r;
-            ActionPointSystem.deduct(attacker, AP_COST.MOVE);
-            console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${attacker.unitId} spent ${AP_COST.MOVE} (move) → ${attacker.actionPoints} remaining`);
-            // hasMoved is set unconditionally below after half-2 success.
         } else {
             // Zero-move attack — validate adjacency from current position.
             if (manhattan(posBefore, targetPos) !== 1) return;
         }
 
-        // ── Half 2: resolve attack ────────────────────────────────────
+        // ── Half 2: pre-compute damage (no mutation) ─────────────────
         const damage = computeAttackDamage(attacker, target);
-        if (damage <= 0) {
-            // Defensive: rollback move-half if applied, then bail.
-            if (moveTo && !moveToIsCurrentPos) {
-                attacker.x = posBefore.q;
-                attacker.y = posBefore.r;
-            }
-            return;
-        }
+        if (damage <= 0) return;
 
         const newHp = Math.max(0, target.hp - damage);
         const defenderDied = newHp <= 0;
 
-        // 1-AP exhaustion: flip on any successful attack.
-        attacker.hasMoved = true;
-        attacker.hasActed = true;
-        ActionPointSystem.deduct(attacker, AP_COST.ATTACK);
-        console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${attacker.unitId} spent ${AP_COST.ATTACK} (attack) → ${attacker.actionPoints} remaining`);
-
-        // Update reachability cache. Move+attack uses surgical update;
-        // zero-move attack just removes the now-exhausted attacker.
-        if (moveTo && !moveToIsCurrentPos) {
-            this._updateReachabilityAfterMove(attacker.unitId, posBefore, {
-                q: moveTo.q,
-                r: moveTo.r,
-            });
-        } else {
-            this._reachabilityCache.delete(attacker.unitId);
-        }
+        // All attacker-side mutations (pos / hasMoved / hasActed / AP /
+        // reachability) are deferred to _resolvePendingAttack so that the
+        // reaction window can run in between without leaking partial state
+        // patches to clients. The client's snapshot-diff classifier needs
+        // the attacker's hasMoved flip and the target's HP drop to land in
+        // the same patch to produce an AttackEvent.
+        const moveCommitted = moveTo !== undefined && !moveToIsCurrentPos;
 
         this._pendingAttack = {
             attackerId: attacker.unitId,
@@ -422,6 +707,9 @@ export class GameRoom extends Room<{ state: GameState }> {
             damage,
             defenderDied,
             newHp,
+            moveTo: moveCommitted ? { q: moveTo.q, r: moveTo.r } : null,
+            posBefore,
+            moveApCost: moveCommitted ? AP_COST.MOVE : 0,
         };
 
         console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: attack declared ${attacker.unitId} → ${target.unitId} (dmg ${damage}${defenderDied ? ", lethal" : ""})`);
@@ -444,6 +732,34 @@ export class GameRoom extends Room<{ state: GameState }> {
         if (!pa) return;
         this._pendingAttack = null;
 
+        // ── Apply deferred attacker mutations ────────────────────────
+        // Order: move attacker → exhaust + AP deduct → reachability refresh.
+        // All four happen in the same Colyseus state patch as the target's
+        // HP / death write below, so the client's diffSnapshots classifier
+        // sees the hasMoved flip and the HP drop together and produces a
+        // single AttackEvent for buildAttackSequence.
+        const attacker = this.state.units.get(pa.attackerId);
+        if (attacker) {
+            if (pa.moveTo) {
+                attacker.x = pa.moveTo.q;
+                attacker.y = pa.moveTo.r;
+                if (pa.moveApCost > 0) {
+                    ActionPointSystem.deduct(attacker, pa.moveApCost);
+                    console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${attacker.unitId} spent ${pa.moveApCost} (move) → ${attacker.actionPoints} remaining`);
+                }
+            }
+            attacker.hasMoved = true;
+            attacker.hasActed = true;
+            ActionPointSystem.deduct(attacker, AP_COST.ATTACK);
+            console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${attacker.unitId} spent ${AP_COST.ATTACK} (attack) → ${attacker.actionPoints} remaining`);
+
+            if (pa.moveTo) {
+                this._updateReachabilityAfterMove(attacker.unitId, pa.posBefore, pa.moveTo);
+            } else {
+                this._reachabilityCache.delete(attacker.unitId);
+            }
+        }
+
         const target = this.state.units.get(pa.targetId);
         if (!target) return;
 
@@ -452,7 +768,7 @@ export class GameRoom extends Room<{ state: GameState }> {
                 `[${new Date().toISOString()}] [GameRoom] combat: ${pa.attackerId} → ${pa.targetId} | dmg ${pa.damage} | hp ${target.hp} → 0 (died)`,
             );
             this.state.units.delete(pa.targetId);
-            this._checkWinCondition();
+            this._checkUnitElimination();
         } else {
             console.log(
                 `[${new Date().toISOString()}] [GameRoom] combat: ${pa.attackerId} → ${pa.targetId} | dmg ${pa.damage} | hp ${target.hp} → ${pa.newHp}`,
@@ -561,6 +877,28 @@ export class GameRoom extends Room<{ state: GameState }> {
         return occupied;
     }
 
+    /**
+     * Scan unit ownership and mark players with 0 remaining units as
+     * eliminated. Called after a unit dies in combat. Falls through to
+     * `_checkWinCondition()` so the standard last-player-standing path
+     * still ends the game.
+     */
+    private _checkUnitElimination(): void {
+        const unitsByOwner = new Map<string, number>();
+        for (const unit of this.state.units.values()) {
+            unitsByOwner.set(unit.ownerId, (unitsByOwner.get(unit.ownerId) ?? 0) + 1);
+        }
+        for (const player of this.state.players.values()) {
+            if (player.isEliminated) continue;
+            const count = unitsByOwner.get(player.sessionId) ?? 0;
+            if (count === 0) {
+                player.isEliminated = true;
+                console.log(`[${new Date().toISOString()}] [GameRoom] ${player.displayName} has no units remaining — eliminated`);
+            }
+        }
+        this._checkWinCondition();
+    }
+
     private _checkWinCondition(): void {
         const activePlayers = [...this.state.players.values()].filter(
             p => !p.isEliminated,
@@ -571,6 +909,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             console.log(`[${new Date().toISOString()}] [GameRoom] phase: active → ended`);
             this.state.phase = "ended";
             this.state.winnerId = winner.sessionId;
+            this._clearGamePresenceForAllPlayers();
             this.broadcast("game_over", { winnerId: winner.sessionId, displayName: winner.displayName });
             console.log(`[${new Date().toISOString()}] [GameRoom] Game over. Winner: ${winner.displayName}`);
         }
