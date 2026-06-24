@@ -33,14 +33,24 @@ export const SHIELD_WALL: CardBlueprint = {
     effect: { defenseBonus: 2 },
 };
 
+export const IRON_WILL: CardBlueprint = {
+    name: "Iron Will",
+    card_type: CardType.CARD_STATUS_EFFECT,
+    gold_cost: 2,
+    is_reaction: true,
+    effect: { defenseBonus: 4 },
+};
+
 export const STARTER_DECK_BLUEPRINTS: CardBlueprint[] = [
     BATTLE_CRY,
     SHIELD_WALL,
+    IRON_WILL,
 ];
 
 export const CARD_EFFECT_REGISTRY = new Map<string, CardEffect>([
     [BATTLE_CRY.name, BATTLE_CRY.effect],
     [SHIELD_WALL.name, SHIELD_WALL.effect],
+    [IRON_WILL.name, IRON_WILL.effect],
 ]);
 
 /**
@@ -55,8 +65,8 @@ export function applyReactionEffects(
     cardsPlayed: Array<{ playerId: string; cardId: string }>,
     attackerOwnerId: string,
     defenderOwnerId: string,
-    attacker: { baseAttackDamage: number; bonusAttackDamage: number },
-    defender: { baseDefense: number; bonusDefense: number },
+    attacker: { baseAttackDamage: number; bonusAttackDamage: number; damageType: string },
+    defender: { baseDefense: number; bonusDefense: number; weakness: readonly string[] },
 ): { damage: number; attackBonus: number; defenseBonus: number } {
     let attackBonus = 0;
     let defenseBonus = 0;
@@ -74,10 +84,12 @@ export function applyReactionEffects(
     const effectiveAttacker = {
         baseAttackDamage: attacker.baseAttackDamage,
         bonusAttackDamage: attacker.bonusAttackDamage + attackBonus,
+        damageType: attacker.damageType,
     };
     const effectiveDefender = {
         baseDefense: defender.baseDefense,
         bonusDefense: defender.bonusDefense + defenseBonus,
+        weakness: defender.weakness,
     };
 
     const damage = computeAttackDamage(effectiveAttacker, effectiveDefender);

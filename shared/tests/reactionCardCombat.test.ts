@@ -7,8 +7,8 @@ import {
 import { computeAttackDamage } from "../src/game/units/unit-stats";
 import { createReactionWindowMachine } from "../src/fsm/reaction/ReactionWindowMachine";
 
-const attacker = { baseAttackDamage: 5, bonusAttackDamage: 0 };
-const defender = { baseDefense: 2, bonusDefense: 0 };
+const attacker = { baseAttackDamage: 5, bonusAttackDamage: 0, damageType: "melee" };
+const defender = { baseDefense: 2, bonusDefense: 0, weakness: [] as string[] };
 const baseline = computeAttackDamage(attacker, defender); // max(1, 5 - 2) = 3
 
 describe("CARD_EFFECT_REGISTRY", () => {
@@ -77,8 +77,8 @@ describe("applyReactionEffects", () => {
     });
 
     it("damage is always at least 1 even when defenseBonus fully absorbs attack", () => {
-        const weakAttacker = { baseAttackDamage: 2, bonusAttackDamage: 0 };
-        const strongDefender = { baseDefense: 5, bonusDefense: 0 };
+        const weakAttacker = { baseAttackDamage: 2, bonusAttackDamage: 0, damageType: "melee" };
+        const strongDefender = { baseDefense: 5, bonusDefense: 0, weakness: [] as string[] };
         const { damage } = applyReactionEffects(
             [{ playerId: "defender", cardId: SHIELD_WALL.name }],
             "attacker", "defender", weakAttacker, strongDefender,
