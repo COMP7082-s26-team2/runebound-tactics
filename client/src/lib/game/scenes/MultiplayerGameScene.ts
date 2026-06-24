@@ -16,6 +16,9 @@ import {
 import { MultiplayerSelectionSystem } from "@/lib/game/systems/MultiplayerSelectionSystem";
 import { MovementRangeRenderSystem } from "@/lib/game/systems/MovementRangeRenderSystem";
 import { EnemyTargetOutlineSystem } from "@/lib/game/systems/EnemyTargetOutlineSystem";
+import { TileFlashSystem } from "@/lib/game/systems/TileFlashSystem";
+import { HealthBarRenderSystem } from "@/lib/game/systems/HealthBarRenderSystem";
+import { DamageNumberSystem } from "@/lib/game/systems/DamageNumberSystem";
 import {
     unitTypeToStats,
     unitTypeToAppearance,
@@ -69,6 +72,7 @@ export class MultiplayerGameScene extends Scene {
     private _seqDeps: SequenceDeps;
     private _eventBus = new EventBus();
     private _lastSeenHp = new Map<string, number>();
+    private _unitFactionMap = new Map<string, string>();
     private _prevSnapshot = new Map<string, LiteUnit>();
     private _hasAuthoritativeSnapshot = false;
     public input: InputSystem;
@@ -165,7 +169,41 @@ export class MultiplayerGameScene extends Scene {
                 this._selection,
             ),
         );
+        this.components.add(
+            new TileFlashSystem(this._world, this._eventBus, CELL_SIZE),
+        );
+        this.components.add(
+            new HealthBarRenderSystem(
+                this._world,
+                this.input,
+                this._eventBus,
+                this._lastSeenHp,
+                (ownerId) => this._room.state.players.get(ownerId)?.faction ?? "",
+                CELL_SIZE,
+            ),
+        );
+        this.components.add(
+            new DamageNumberSystem(this._world, this._eventBus, CELL_SIZE),
+        );
         this.components.add(this.input);
+
+        this._room.onMessage(
+            "combat_result",
+            (msg: {
+                attackerId: string;
+                defenderId: string;
+                damage: number;
+                effective: boolean;
+                newDefenderHp: number;
+            }) => {
+                this._eventBus.emit("combat:damage", {
+                    unitId: msg.defenderId,
+                    amount: msg.damage,
+                    newHp: msg.newDefenderHp,
+                    effective: msg.effective,
+                });
+            },
+        );
     }
 
     destroy(): void {
@@ -306,13 +344,20 @@ export class MultiplayerGameScene extends Scene {
         for (const [unitId, unit] of incoming) {
             const prevHp = this._lastSeenHp.get(unitId);
             if (prevHp !== undefined && unit.hp < prevHp) {
+                // Fallback emission when combat_result message was lost.
+                // effective is unknown here so defaults to false.
                 this._eventBus.emit("combat:damage", {
                     unitId,
                     amount: prevHp - unit.hp,
                     newHp: unit.hp,
+                    effective: false,
                 });
             }
             this._lastSeenHp.set(unitId, unit.hp);
+
+            const faction =
+                this._room.state.players.get(unit.ownerId)?.faction ?? "";
+            this._unitFactionMap.set(unitId, faction);
         }
 
         // ── 3 + 4. Update exhausted + spawn new units ───────────

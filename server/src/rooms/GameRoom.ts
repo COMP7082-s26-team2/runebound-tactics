@@ -75,6 +75,8 @@ interface PendingAttack {
     damage: number;
     defenderDied: boolean;
     newHp: number;
+    /** True when WEAKNESS_MULTIPLIER (1.5×) was applied — attacker type in defender.weakness. */
+    effective: boolean;
     /** Where the attacker should end up. Null = zero-move attack. */
     moveTo: GridCoord | null;
     /** Attacker's pos at declare-time (for reachability rebuild on resolve). */
@@ -895,6 +897,10 @@ export class GameRoom extends Room<{ state: GameState }> {
 
         const newHp = Math.max(0, target.hp - damage);
         const defenderDied = newHp <= 0;
+        const effective =
+            attacker.damageType !== "" &&
+            attacker.damageType !== "pure" &&
+            target.weakness.includes(attacker.damageType);
 
         // All attacker-side mutations (pos / hasMoved / hasActed / AP /
         // reachability) are deferred to _resolvePendingAttack so that the
@@ -910,6 +916,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             damage,
             defenderDied,
             newHp,
+            effective,
             moveTo: moveCommitted ? { q: moveTo.q, r: moveTo.r } : null,
             posBefore,
             moveApCost: moveCommitted ? AP_COST.MOVE : 0,
@@ -978,6 +985,14 @@ export class GameRoom extends Room<{ state: GameState }> {
             );
             target.hp = pa.newHp;
         }
+
+        this.broadcast("combat_result", {
+            attackerId: pa.attackerId,
+            defenderId: pa.targetId,
+            damage: pa.damage,
+            effective: pa.effective,
+            newDefenderHp: pa.newHp,
+        });
     }
 
     private _performTurnAdvance(): void {
