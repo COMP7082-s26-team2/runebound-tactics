@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { forwardRef, type ReactNode } from "react";
 
 export type ButtonIntent = "primary" | "secondary" | "destructive";
 export type ButtonSize = "sm" | "md" | "lg";
@@ -34,17 +34,21 @@ const BASE =
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brass-300)] " +
     "disabled:cursor-not-allowed";
 
-export function Button({
-    intent = "primary",
-    size = "md",
-    type = "button",
-    disabled,
-    onClick,
-    children,
-    className = "",
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+    {
+        intent = "primary",
+        size = "md",
+        type = "button",
+        disabled,
+        onClick,
+        children,
+        className = "",
+    },
+    ref,
+) {
     return (
         <button
+            ref={ref}
             type={type}
             onClick={onClick}
             disabled={disabled}
@@ -53,4 +57,6 @@ export function Button({
             {children}
         </button>
     );
-}
+});
+
+Button.displayName = "Button";
