@@ -10,11 +10,16 @@ import { Sigil } from "@/components/ui/Sigil";
 
 export default async function LoginPage() {
     const supabase = await createServerSideClient();
-    const {
-        data: { session },
-    } = await supabase.auth.getSession();
 
-    if (session) {
+    // getUser() contacts the Supabase Auth server for a cryptographically
+    // verified user identity — required for server-side auth guards (BCOMP-202).
+    const { data: { user } } = await supabase.auth.getUser();
+    console.log("[BCOMP-202] LoginPage getUser:", { userId: user?.id ?? null });
+
+    if (user) {
+        // getSession() here is for the session token passed to
+        // refreshPersistedAuthSession — not for auth verification (handled above).
+        const { data: { session } } = await supabase.auth.getSession();
         const refreshedSession = await refreshPersistedAuthSession(session);
 
         // Existing Supabase cookies should only bypass login when the matching
@@ -22,7 +27,7 @@ export default async function LoginPage() {
         if (!refreshedSession.success) {
             await supabase.auth.signOut();
         } else {
-            redirect("/dashboard");
+            redirect("/");
         }
     }
 
