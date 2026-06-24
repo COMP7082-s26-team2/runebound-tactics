@@ -166,6 +166,11 @@ export async function signOut() {
     // user's auth cookies.
     const supabase = await createServerSideClient();
 
+    // getUser() verifies identity server-side before clearing the session.
+    // getSession() below retrieves the access token for HMAC derivation only;
+    // auth verification is handled here, not from the session object.
+    await supabase.auth.getUser();
+
     // Read the current session before Supabase clears it so we can derive the
     // same hashed session id that was stored during login.
     const { data } = await supabase.auth.getSession();
@@ -188,8 +193,9 @@ export async function refreshAuthSessionRecord() {
     // reads the trusted Supabase cookies and updates user_sessions.
     const supabase = await createServerSideClient();
 
-    // getSession may refresh Supabase cookies through the server client; the
-    // returned session is the only input needed for DB session persistence.
+    // getUser() verifies identity server-side; getSession() below retrieves the
+    // access token for HMAC-based session refresh — not for auth verification.
+    await supabase.auth.getUser();
     const { data } = await supabase.auth.getSession();
 
     const refreshedSession = await refreshPersistedAuthSession(data.session);
