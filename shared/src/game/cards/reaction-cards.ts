@@ -52,8 +52,8 @@ export function applyReactionEffects(
     cardsPlayed: Array<{ playerId: string; cardId: string }>,
     attackerOwnerId: string,
     defenderOwnerId: string,
-    attacker: { baseAttackDamage: number; bonusAttackDamage: number },
-    defender: { baseDefense: number; bonusDefense: number },
+    attacker: { baseAttackDamage: number; bonusAttackDamage: number; damageType: string },
+    defender: { baseDefense: number; bonusDefense: number; weakness: readonly string[] },
 ): { damage: number; attackBonus: number; defenseBonus: number } {
     let attackBonus = 0;
     let defenseBonus = 0;
@@ -71,10 +71,12 @@ export function applyReactionEffects(
     const effectiveAttacker = {
         baseAttackDamage: attacker.baseAttackDamage,
         bonusAttackDamage: attacker.bonusAttackDamage + attackBonus,
+        damageType: attacker.damageType,
     };
     const effectiveDefender = {
         baseDefense: defender.baseDefense,
         bonusDefense: defender.bonusDefense + defenseBonus,
+        weakness: defender.weakness,
     };
 
     const damage = computeAttackDamage(effectiveAttacker, effectiveDefender);
