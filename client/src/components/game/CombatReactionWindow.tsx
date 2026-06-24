@@ -29,6 +29,8 @@ export function CombatReactionWindow({
     const state = rawState as unknown as GameState;
 
     const [activePlayer, setActivePlayer] = useState<string>("");
+    const [attackerOwnerId, setAttackerOwnerId] = useState<string>("");
+    const [defenderOwnerId, setDefenderOwnerId] = useState<string>("");
     const [secondsLeft, setSecondsLeft] = useState(REACTION_TIMEOUT_SECONDS);
     const [prevReactionPhase, setPrevReactionPhase] = useState<string>("");
 
@@ -42,10 +44,17 @@ export function CombatReactionWindow({
     }
 
     // Track which player is active in the current sub-phase.
-    useGameRoomMessage<{ phase: string; activePlayer: string }>(
+    useGameRoomMessage<{
+        phase: string;
+        activePlayer: string;
+        attackerOwnerId: string;
+        defenderOwnerId: string;
+    }>(
         "reaction_phase",
-        ({ phase, activePlayer: ap }) => {
+        ({ phase, activePlayer: ap, attackerOwnerId: aId, defenderOwnerId: dId }) => {
             setActivePlayer(phase === "closed" || phase === "" ? "" : ap);
+            setAttackerOwnerId(phase === "closed" ? "" : aId);
+            setDefenderOwnerId(phase === "closed" ? "" : dId);
         },
     );
 
@@ -60,6 +69,22 @@ export function CombatReactionWindow({
         );
         return () => clearInterval(id);
     }, [reactionPhase, isActivePlayer]);
+
+    // Derive reaction cards and gold directly from the live state snapshot.
+    const playerSlots = state?.players as unknown as Record<string, {
+        gold: number;
+        deck: { cards: Array<{ name: string; gold_cost: number; is_reaction: boolean; role: string }> };
+    }> | undefined;
+    const mySlot = playerSlots?.[sessionId];
+
+    const combatRole =
+        sessionId === attackerOwnerId ? "attacker" :
+        sessionId === defenderOwnerId ? "defender" : "";
+
+    const reactionCards = Array.from(mySlot?.deck?.cards ?? [])
+        .filter((c) => c.is_reaction)
+        .filter((c) => !c.role || c.role === combatRole || combatRole === "");
+    const playerGold = mySlot?.gold ?? 0;
 
     if (reactionPhase === "" && activePlayer === "") return null;
 

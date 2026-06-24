@@ -65,6 +65,10 @@ interface AttackUnitPayload {
 
 const REACTION_TIMEOUT_MS = 10_000;
 
+const STARTING_GOLD = 5;
+const GOLD_INCOME_PER_TURN = 3;
+const GOLD_KILL_REWARD = 2;
+
 interface PendingAttack {
     attackerId: string;
     targetId: string;
@@ -127,6 +131,7 @@ export class GameRoom extends Room<{ state: GameState }> {
     private _pendingAttack: PendingAttack | null = null;
     private _reactionMachine: ReactionWindowMachine | null = null;
     private _reactionTimer: ReturnType<typeof setTimeout> | null = null;
+    private _pendingKillAttackerOwner: string | null = null;
 
     onCreate(options: GameRoomOptions): void {
         const pending = pendingGames.get(options.lobbyRoomId);
@@ -228,6 +233,10 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (index === -1) return;
 
             const card = slot.deck.cards[index];
+
+            if (card.role === "attacker" && client.sessionId !== ctx.attackerOwnerId) return;
+            if (card.role === "defender" && client.sessionId !== ctx.defenderOwnerId) return;
+
             if (slot.gold < card.gold_cost) return;
 
             slot.gold -= card.gold_cost;
@@ -470,6 +479,8 @@ export class GameRoom extends Room<{ state: GameState }> {
 
         this._spawnInitialUnits();
         for (const slot of this.state.players.values()) {
+            slot.gold = STARTING_GOLD;
+            console.log(`[${new Date().toISOString()}] [GameRoom] gold: ${slot.sessionId} starting gold → ${slot.gold}`);
             slot.deck.initializeDeck(STARTER_DECK_BLUEPRINTS);
             console.log(`[${new Date().toISOString()}] [GameRoom] deck: seeded ${slot.deck.cards.length} cards for ${slot.sessionId}`);
         }
@@ -515,16 +526,29 @@ export class GameRoom extends Room<{ state: GameState }> {
                 break;
 
             case "combat":
+                this._pendingKillAttackerOwner =
+                    this._pendingAttack?.defenderDied
+                        ? (this.state.units.get(this._pendingAttack.attackerId)?.ownerId ?? null)
+                        : null;
                 this._resolvePendingAttack();
                 if (this.state.phase !== "ended") {
                     this._turnMachine.send("COMBAT_RESOLVED");
                 }
                 break;
 
-            case "post-combat":
-                console.log(`[${new Date().toISOString()}] [GameRoom] post-combat: gold distribution pending`);
+            case "post-combat": {
+                const attackerOwner = this._pendingKillAttackerOwner;
+                this._pendingKillAttackerOwner = null;
+                if (attackerOwner) {
+                    const slot = this.state.players.get(attackerOwner);
+                    if (slot) {
+                        slot.gold += GOLD_KILL_REWARD;
+                        console.log(`[${new Date().toISOString()}] [GameRoom] gold: ${attackerOwner} kill reward +${GOLD_KILL_REWARD} → ${slot.gold}`);
+                    }
+                }
                 this._turnMachine.send("POST_COMBAT_RESOLVED");
                 break;
+            }
         }
     }
 
@@ -559,7 +583,12 @@ export class GameRoom extends Room<{ state: GameState }> {
             ctx?.attackerOwnerId,
             ctx?.defenderOwnerId,
         );
-        this.broadcast("reaction_phase", { phase, activePlayer });
+        this.broadcast("reaction_phase", {
+            phase,
+            activePlayer,
+            attackerOwnerId: ctx?.attackerOwnerId ?? "",
+            defenderOwnerId: ctx?.defenderOwnerId ?? "",
+        });
 
         switch (phase) {
             case "defender":
@@ -984,6 +1013,12 @@ export class GameRoom extends Room<{ state: GameState }> {
         this._rebuildReachabilityCache(this.state.currentTurnId);
 
         console.log(`[${new Date().toISOString()}] [GameRoom] currentTurnId: ${prevTurnId} → ${this.state.currentTurnId}`);
+
+        const incomingSlot = this.state.players.get(this.state.currentTurnId);
+        if (incomingSlot) {
+            incomingSlot.gold += GOLD_INCOME_PER_TURN;
+            console.log(`[${new Date().toISOString()}] [GameRoom] gold: ${this.state.currentTurnId} income +${GOLD_INCOME_PER_TURN} → ${incomingSlot.gold}`);
+        }
     }
 
     /**

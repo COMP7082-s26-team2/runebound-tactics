@@ -70,6 +70,8 @@ export class GridMovementScene extends Scene {
                 name: "Swordsman",
                 defense: 5,
                 attackRange: 1,
+                damageType: "",
+                weakness: [],
             },
             {
                 assetKey: "tilemap:entity:castle:swordsman",
@@ -87,6 +89,8 @@ export class GridMovementScene extends Scene {
                 name: "Griffin",
                 defense: 5,
                 attackRange: 1,
+                damageType: "",
+                weakness: [],
             },
             {
                 assetKey: "tilemap:entity:castle:griffin",
@@ -105,6 +109,8 @@ export class GridMovementScene extends Scene {
                 name: "Death Knight",
                 defense: 2,
                 attackRange: 1,
+                damageType: "",
+                weakness: [],
             },
             {
                 assetKey: "tilemap:entity:necropolis:death_knight",
@@ -123,6 +129,8 @@ export class GridMovementScene extends Scene {
                 name: "Ghost",
                 defense: 2,
                 attackRange: 1,
+                damageType: "",
+                weakness: [],
             },
             {
                 assetKey: "tilemap:entity:necropolis:ghost",
@@ -141,6 +149,8 @@ export class GridMovementScene extends Scene {
                 name: "Skeleton",
                 defense: 2,
                 attackRange: 1,
+                damageType: "",
+                weakness: [],
             },
             {
                 assetKey: "tilemap:entity:necropolis:skeleton",
@@ -159,6 +169,8 @@ export class GridMovementScene extends Scene {
                 name: "Zombie",
                 defense: 2,
                 attackRange: 1,
+                damageType: "",
+                weakness: [],
             },
             {
                 assetKey: "tilemap:entity:necropolis:zombie",
