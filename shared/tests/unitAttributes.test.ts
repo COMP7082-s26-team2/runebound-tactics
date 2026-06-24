@@ -6,6 +6,7 @@ import {
     getEffectiveAp,
     getUnitDamageType,
     getUnitDefaultWeakness,
+    computeAttackDamage,
 } from "../src/game/units/unit-stats";
 
 describe("effective-stat helpers", () => {
@@ -64,5 +65,77 @@ describe("damage type", () => {
 
     it("returns null for unknown unit type", () => {
         expect(getUnitDamageType("unknown:unit")).toBeNull();
+    });
+});
+
+describe("computeAttackDamage — type effectiveness", () => {
+    const makeAttacker = (baseAttackDamage: number, damageType: string) =>
+        ({ baseAttackDamage, bonusAttackDamage: 0, damageType });
+
+    const makeDefender = (baseDefense: number, weakness: string[]) =>
+        ({ baseDefense, bonusDefense: 0, weakness });
+
+    it("physical with weakness applies 1.5× multiplier before defense", () => {
+        // floor(5 × 1.5) − 2 = 7 − 2 = 5
+        expect(computeAttackDamage(
+            makeAttacker(5, "cavalry"),
+            makeDefender(2, ["cavalry"]),
+        )).toBe(5);
+    });
+
+    it("physical without weakness uses flat attack minus defense", () => {
+        // 5 − 2 = 3
+        expect(computeAttackDamage(
+            makeAttacker(5, "melee"),
+            makeDefender(2, ["cavalry"]),
+        )).toBe(3);
+    });
+
+    it("physical damage floors at 1 when attack is less than defense", () => {
+        expect(computeAttackDamage(
+            makeAttacker(2, "melee"),
+            makeDefender(10, []),
+        )).toBe(1);
+    });
+
+    it("pure damage bypasses defense entirely", () => {
+        expect(computeAttackDamage(
+            makeAttacker(4, "pure"),
+            makeDefender(10, []),
+        )).toBe(4);
+    });
+
+    it("pure damage can be 0 when effectiveAttack is 0", () => {
+        expect(computeAttackDamage(
+            makeAttacker(0, "pure"),
+            makeDefender(10, []),
+        )).toBe(0);
+    });
+
+    it("null damage type applies defense but no weakness interaction", () => {
+        // 5 − 2 = 3 (weakness list ignored)
+        expect(computeAttackDamage(
+            makeAttacker(5, ""),
+            makeDefender(2, ["melee"]),
+        )).toBe(3);
+    });
+
+    it("null damage type floors at 1", () => {
+        expect(computeAttackDamage(
+            makeAttacker(1, ""),
+            makeDefender(10, []),
+        )).toBe(1);
+    });
+
+    it("cavalry beats melee — weakness hit deals more than no weakness", () => {
+        const withWeakness = computeAttackDamage(
+            makeAttacker(5, "cavalry"),
+            makeDefender(2, ["cavalry"]),
+        );
+        const withoutWeakness = computeAttackDamage(
+            makeAttacker(5, "cavalry"),
+            makeDefender(2, []),
+        );
+        expect(withWeakness).toBeGreaterThan(withoutWeakness);
     });
 });
