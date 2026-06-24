@@ -114,7 +114,7 @@ export function GameReconnectOverlay({
                     secondsTotal={reconnectWindowSeconds}
                 />
 
-                <Button type="danger" onClick={handleLeave}>
+                <Button intent="destructive" onClick={handleLeave}>
                     Leave the field
                 </Button>
             </div>

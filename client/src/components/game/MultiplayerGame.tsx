@@ -9,7 +9,6 @@ import {
     useGameRoomState,
 } from "@/context/colyseus";
 import { Button } from "@/components/ui/Button";
-import { clearGameToken } from "@/lib/multiplayer/reconnect";
 import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 import { InGameMenuModal } from "@/components/game/InGameMenuModal";
 import { EndGameStatsScreen } from "@/components/game/EndGameStatsScreen";
@@ -77,22 +76,30 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const roomMatches = room?.roomId === expectedRoomId;
 
     const leave = useCallback(async () => {
+        if (isReconnecting) return;
         clearGameToken();
         try {
-            await room?.leave(true);
+            if (room) {
+                await leaveGame(room);
+            }
         } catch {
             /* ignore */
         }
         router.push("/multiplayer");
-    }, [room, router]);
+    }, [clearGameToken, isReconnecting, leaveGame, room, router]);
 
     const endTurn = useCallback(() => {
+        if (isReconnecting) return;
         room?.send("end_turn", {});
-    }, [room]);
+    }, [isReconnecting, room]);
 
     const passReaction = useCallback(() => {
         room?.send("pass_reaction", {});
         setCardModalOpen(false);
+    }, [room]);
+
+    const playReactionCard = useCallback(() => {
+        room?.send("play_reaction_card", {});
     }, [room]);
 
     if (error && (!room || roomMatches)) {
@@ -120,37 +127,6 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                 Connecting…
             </main>
         );
-    }
-
-    async function leave() {
-        if (isReconnecting) {
-            return;
-        }
-
-        try {
-            if (room) {
-                await leaveGame(room);
-            }
-        } catch {
-            /* ignore */
-        }
-        router.push("/multiplayer");
-    }
-
-    function endTurn() {
-        if (isReconnecting) {
-            return;
-        }
-
-        room?.send("end_turn", {});
-    }
-
-    function passReaction() {
-        room?.send("pass_reaction", {});
-    }
-
-    function playReactionCard() {
-        room?.send("play_reaction_card", {});
     }
 
     // `useGameRoomState` returns a deep-readonly snapshot; cast to the

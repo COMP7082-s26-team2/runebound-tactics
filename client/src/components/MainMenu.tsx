@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "@/app/auth/actions";
+import { signOut } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { Panel } from "@/components/ui/Panel";

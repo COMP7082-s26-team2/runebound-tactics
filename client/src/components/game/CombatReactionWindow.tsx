@@ -75,7 +75,7 @@ export function CombatReactionWindow({
             {isActivePlayer ? (
                 <div className="flex gap-2 mt-1">
                     <span title="Card system coming soon">
-                        <Button type="secondary" disabled onClick={onPlay}>
+                        <Button intent="secondary" disabled onClick={onPlay}>
                             Play
                         </Button>
                     </span>

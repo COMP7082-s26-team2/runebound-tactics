@@ -14,7 +14,6 @@ import { Eyebrow } from "@/components/ui/Eyebrow";
 import { Hint } from "@/components/ui/Hint";
 import { Numeric } from "@/components/ui/Numeric";
 import { Panel } from "@/components/ui/Panel";
-import { clearLobbyToken } from "@/lib/multiplayer/reconnect";
 import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 
 export function LobbyWaitingRoom({

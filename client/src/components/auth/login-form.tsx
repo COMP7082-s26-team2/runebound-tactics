@@ -37,7 +37,6 @@ export default function LoginForm() {
             return;
         }
         if (result?.success) {
-            setSuccess('Authentication successful! Entering the realm...');
             window.location.href = '/';
         }
     }

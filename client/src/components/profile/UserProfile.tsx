@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { signOut } from "@/app/auth/actions";
+import { signOut } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/Button";
 import { Divider } from "@/components/ui/Divider";
 import { Eyebrow } from "@/components/ui/Eyebrow";
