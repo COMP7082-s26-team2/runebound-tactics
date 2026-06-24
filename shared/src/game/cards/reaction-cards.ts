@@ -38,6 +38,7 @@ export const IRON_WILL: CardBlueprint = {
     card_type: CardType.CARD_STATUS_EFFECT,
     gold_cost: 2,
     is_reaction: true,
+    role: "defender",
     effect: { defenseBonus: 4 },
 };
 
