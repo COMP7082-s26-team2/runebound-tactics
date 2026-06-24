@@ -1,5 +1,9 @@
 import type { UnitStatsData, AppearanceData } from "@/lib/game/components";
-import { getUnitMovement } from "@runebound-tactics/shared";
+import {
+    getUnitMovement,
+    getUnitDamageType,
+    getUnitDefaultWeakness,
+} from "@runebound-tactics/shared";
 
 /**
  * Minimal unit-type → stats / appearance mapping for the multiplayer scene.
@@ -21,6 +25,8 @@ export function unitTypeToStats(unitType: string): UnitStatsData {
         defense: 3,
         movement: getUnitMovement(unitType),
         attackRange: 1,
+        damageType: getUnitDamageType(unitType) ?? "",
+        weakness: getUnitDefaultWeakness(unitType),
     };
 }
 
