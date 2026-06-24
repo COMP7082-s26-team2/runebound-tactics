@@ -59,6 +59,7 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const [reactionActivePlayer, setReactionActivePlayer] = useState("");
     const [attackerOwnerId, setAttackerOwnerId] = useState("");
     const [defenderOwnerId, setDefenderOwnerId] = useState("");
+    const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
     const [secondsRemaining, setSecondsRemaining] = useState(
         REACTION_TIMEOUT_SECONDS,
     );
@@ -185,6 +186,14 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
         : [];
     const myGold = mySlot?.gold ?? 0;
 
+    const unitsMap = gameState.units as unknown as Record<
+        string,
+        { actionPoints: number } | undefined
+    >;
+    const selectedUnitAp = selectedUnitId
+        ? (unitsMap[selectedUnitId]?.actionPoints ?? null)
+        : null;
+
     return (
         <main className="h-dvh bg-[var(--ink-900)] text-[var(--ink-300)] flex flex-col overflow-hidden">
             <header className="shrink-0 w-full">
@@ -194,7 +203,8 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                     reactionPhase={reactionPhase}
                     deckCount={0}
                     discardCount={0}
-                    actionsRemaining={null}
+                    actionsRemaining={selectedUnitAp}
+                    gold={myGold}
                     onMenu={() => setMenuOpen(true)}
                     onEndTurn={endTurn}
                 />
@@ -203,7 +213,11 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
             <div className="flex-1 min-h-0 flex items-center justify-center p-3">
                 <div className="flex flex-col gap-2 h-full max-h-full items-center">
                     <div className="relative flex-1 min-h-0 aspect-square">
-                        <MultiplayerGameCanvas room={room} state={gameState} />
+                        <MultiplayerGameCanvas
+                            room={room}
+                            state={gameState}
+                            onSelectionChange={setSelectedUnitId}
+                        />
                         {gameState.phase === "ended" && (
                             <EndGameStatsScreen
                                 winnerId={winnerId}
