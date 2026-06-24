@@ -3,6 +3,7 @@
 import {
     createContext,
     useContext,
+    useEffect,
     type ReactNode,
 } from "react";
 import {
@@ -50,4 +51,18 @@ export function useGameRoom(): GameRoomSnapshot {
 export function useGameRoomState() {
     const { room } = useGameRoom();
     return useColyseusRoomState(room);
+}
+
+export function useGameRoomMessage<T>(
+    type: string,
+    callback: (message: T) => void,
+) {
+    const { room } = useGameRoom();
+    useEffect(() => {
+        if (!room) return;
+        room.onMessage(type, callback);
+        return () => {
+            room.onMessage(type, () => undefined);
+        };
+    }, [room, type, callback]);
 }
