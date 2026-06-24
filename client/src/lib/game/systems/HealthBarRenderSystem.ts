@@ -190,6 +190,15 @@ export class HealthBarRenderSystem implements GameComponent {
                 ctx.fillRect(barX, barY, fillW, BAR_H);
             }
 
+            // HP segment dividers — one vertical line per HP boundary
+            if (entry.maxHp > 1) {
+                ctx.fillStyle = this._border;
+                for (let i = 1; i < entry.maxHp; i++) {
+                    const lineX = barX + Math.round((i / entry.maxHp) * barW);
+                    ctx.fillRect(lineX, barY, 1, BAR_H);
+                }
+            }
+
             // Top bevel highlight
             ctx.fillStyle = this._bevel;
             ctx.fillRect(barX, barY, barW, 1);
