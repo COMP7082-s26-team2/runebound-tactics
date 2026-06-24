@@ -70,6 +70,7 @@ export class MultiplayerGameScene extends Scene {
     private _eventBus = new EventBus();
     private _lastSeenHp = new Map<string, number>();
     private _prevSnapshot = new Map<string, LiteUnit>();
+    private _hasAuthoritativeSnapshot = false;
     public input: InputSystem;
     private _terrainLayer: TerrainLayer;
     private _tilemapSheet: HTMLImageElement;
@@ -168,11 +169,86 @@ export class MultiplayerGameScene extends Scene {
     }
 
     destroy(): void {
-        // ComponentManager.remove handles per-component destroy.
-        // Scene base class doesn't expose a bulk-remove, but the engine's
-        // lifecycle disposes the scene wholesale when switched away from.
+        // InputSystem and any future stateful components receive their
+        // destroy hooks before this scene and its world are discarded.
+        this.components.clear();
         this._prevSnapshot.clear();
         this._lastSeenHp.clear();
+        this._hasAuthoritativeSnapshot = false;
+    }
+
+    /**
+     * Seeds a newly created scene directly from the server snapshot.
+     * Restoration must not replay movement, combat, or death animations that
+     * occurred while this client was disconnected.
+     */
+    private _restoreAuthoritativeSnapshot(
+        incoming: Map<string, LiteUnit>,
+        mySessionId: string,
+    ): void {
+        // Remove any local entity that is absent from the restored snapshot.
+        // A fresh reconnect scene normally has none, but this keeps repeated
+        // reconciliation idempotent if scene reuse is introduced later.
+        for (const serverId of this._world.getAllServerIds()) {
+            if (incoming.has(serverId)) {
+                continue;
+            }
+
+            const entityId = this._world.getEntityByServerId(serverId);
+            if (entityId !== undefined) {
+                this._sequencer.cancel(entityId);
+                this._animationController.deregister(entityId);
+                this._world.removeUnit(entityId);
+            }
+        }
+
+        for (const [unitId, unit] of incoming) {
+            const exhausted =
+                unit.ownerId === mySessionId && unitIsExhausted(unit);
+            const existing = this._world.getEntityByServerId(unitId);
+
+            if (existing === undefined) {
+                const appearance = {
+                    ...unitTypeToAppearance(unit.unitType, unit.ownerId),
+                    exhausted,
+                };
+                const entityId = this._world.spawnUnit(
+                    { q: unit.x, r: unit.y },
+                    unitTypeToStats(unit.unitType),
+                    appearance,
+                    unit.ownerId,
+                    unitId,
+                );
+                const sheet = this._assetHandler.getSpriteSheet(
+                    appearance.assetKey,
+                );
+                this._animationController.register(
+                    entityId,
+                    "idle",
+                    sheet?.frameCount ?? 1,
+                );
+                continue;
+            }
+
+            const current = this._world.gridPositions.get(existing);
+            if (!current || current.q !== unit.x || current.r !== unit.y) {
+                this._world.moveUnit(existing, { q: unit.x, r: unit.y });
+            }
+
+            const appearance = this._world.unitAppearance.get(existing);
+            if (appearance) {
+                appearance.exhausted = exhausted;
+                appearance.alpha = 1;
+                appearance.scale = 1;
+            }
+            this._animationController.setState(existing, "idle");
+        }
+
+        this._prevSnapshot = new Map(incoming);
+        this._lastSeenHp = new Map(
+            [...incoming].map(([unitId, unit]) => [unitId, unit.hp]),
+        );
+        this._hasAuthoritativeSnapshot = true;
     }
 
     /**
@@ -218,6 +294,13 @@ export class MultiplayerGameScene extends Scene {
         }
 
         const mySessionId = this._room.sessionId;
+
+        // The first patch received by a new scene is a complete source of
+        // truth, not a gameplay delta from the empty local world.
+        if (!this._hasAuthoritativeSnapshot) {
+            this._restoreAuthoritativeSnapshot(incoming, mySessionId);
+            return;
+        }
 
         // ── 2. HP delta detection + _lastSeenHp update ──────────
         for (const [unitId, unit] of incoming) {

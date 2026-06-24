@@ -2,9 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useGameRoom, useGameRoomState } from "@/context/colyseus";
+import {
+    useGameConnection,
+    useGameRoom,
+    useGameRoomState,
+} from "@/context/colyseus";
 import { Button } from "@/components/ui/Button";
-import { clearGameToken } from "@/lib/multiplayer/reconnect";
+import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 import { MultiplayerGameCanvas } from "@/components/game/MultiplayerGameCanvas";
 import { GameHUD } from "@/components/game/GameHUD";
 import { CombatReactionWindow } from "@/components/game/CombatReactionWindow";
@@ -25,6 +29,12 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const { room, error } = useGameRoom();
     const state = useGameRoomState();
     const router = useRouter();
+    const {
+        isReconnecting,
+        stateSyncVersion,
+        leaveGame,
+    } = useGameConnection();
+    const { clearGameToken } = useRoomConnect();
 
     const roomMatches = room?.roomId === expectedRoomId;
 
@@ -74,9 +84,14 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     }
 
     async function leave() {
-        clearGameToken();
+        if (isReconnecting) {
+            return;
+        }
+
         try {
-            await room?.leave(true);
+            if (room) {
+                await leaveGame(room);
+            }
         } catch {
             /* ignore */
         }
@@ -84,6 +99,10 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     }
 
     function endTurn() {
+        if (isReconnecting) {
+            return;
+        }
+
         room?.send("end_turn", {});
     }
 
@@ -104,10 +123,15 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center">
             <div className="relative inline-block">
-                <MultiplayerGameCanvas room={room} state={gameState} />
+                <MultiplayerGameCanvas
+                    key={`${room.roomId}:${stateSyncVersion}`}
+                    room={room}
+                    state={gameState}
+                />
                 <GameHUD
                     state={gameState}
                     sessionId={room.sessionId}
+                    interactionDisabled={isReconnecting}
                     onLeave={leave}
                     onEndTurn={endTurn}
                 />

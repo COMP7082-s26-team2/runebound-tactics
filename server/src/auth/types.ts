@@ -12,6 +12,8 @@ export interface VerifiedClientAuth {
     userId: string;
     // Supabase Auth user UUID stored in player.auth_id.
     authId: string;
+    // Hashed Supabase session identifier stored in user_sessions.supabase_session_id.
+    supabaseSessionId: string;
     // Display name from the trusted player row or Supabase fallback metadata.
     username: string;
     email: string | null;

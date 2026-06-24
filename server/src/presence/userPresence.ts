@@ -76,9 +76,12 @@ export async function markUserLeftLobby(
 
 // Record the active game room for game reconnection lookup. Moving into a game
 // clears the lobby id because the game room becomes the user's current location.
+// records which persisted Supabase session owns this active
+// game presence row for future reconnect and single-session enforcement.
 export async function markUserInGame(
     userId: PresenceUserId,
     gameRoomId: string,
+    supabaseSessionId: string,
 ): Promise<void> {
     const playerId = toPlayerId(userId);
     const now = new Date();
@@ -93,12 +96,14 @@ export async function markUserInGame(
             user_id: playerId,
             current_lobby_id: null,
             current_room_id: gameRoomId,
+            supabase_session_id: supabaseSessionId,
             connection_status: CONNECTION_STATUS.IN_GAME,
             last_seen_at: now,
         },
         update: {
             current_lobby_id: null,
             current_room_id: gameRoomId,
+            supabase_session_id: supabaseSessionId,
             connection_status: CONNECTION_STATUS.IN_GAME,
             last_seen_at: now,
         },

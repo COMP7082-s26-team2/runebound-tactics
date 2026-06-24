@@ -88,6 +88,8 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
         return () => {
             cancelled = true;
             engine?.stop();
+            sceneRef.current?.destroy();
+            handler.clear();
             sceneRef.current = null;
         };
     }, [room]);
