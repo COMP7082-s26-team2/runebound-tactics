@@ -25,7 +25,6 @@ model player {
   turns                  turn[]
   units                  unit[]
   presence               user_presence?
-  sessions               user_sessions[]
 }
 
 model user_presence {
