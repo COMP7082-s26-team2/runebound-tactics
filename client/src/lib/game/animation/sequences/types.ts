@@ -5,6 +5,7 @@ import type { TweenManager } from "@/lib/engine/core/TweenManager";
 import type { AnimationController } from "@/lib/engine/assets/animationController";
 import type { AssetHandler } from "@/lib/engine/assets/assetHandler";
 import type { AnimationSequencer } from "@/lib/engine/animation/AnimationSequencer";
+import type { TerrainLayer } from "@/lib/game/tilemap";
 
 /**
  * Shared dependency bundle passed to every sequence builder. Keeps builder
@@ -18,6 +19,7 @@ export interface SequenceDeps {
     anim: AnimationController;
     assets: AssetHandler;
     sequencer: AnimationSequencer;
+    terrainLayer: TerrainLayer;
 }
 
 /** A unit moved (logical position changed in the snapshot diff). */
@@ -83,4 +85,5 @@ export interface LiteUnit {
     y: number;
     hp: number;
     hasMoved: boolean;
+    actionPoints: number;
 }

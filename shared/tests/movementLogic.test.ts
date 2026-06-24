@@ -1,4 +1,4 @@
-import { computeReachableTiles } from "../src/game/logic/MovementLogic";
+import { computeReachableTiles, computeShortestPath } from "../src/game/logic/MovementLogic";
 import { squareGridNeighbors } from "../src/game/grid-utils";
 
 describe("computeReachableTiles", () => {
@@ -99,5 +99,83 @@ describe("computeReachableTiles", () => {
             start: { q: 0, r: 0 },
         });
         expect(openTiles.has("2,0")).toBe(true);
+    });
+});
+
+describe("computeReachableTiles with canEnter", () => {
+    const start = { q: 5, r: 5 };
+    const noOccupants = () => false;
+
+    it("respects canEnter veto", () => {
+        const tiles = computeReachableTiles({
+            getNeighbors: squareGridNeighbors,
+            isOccupied: noOccupants,
+            canEnter: (c) => c.q !== 6, // block column 6
+            movement: 3,
+            start,
+        });
+        // Cells in column 6 must NOT appear
+        for (const key of tiles) {
+            const [q] = key.split(",").map(Number);
+            expect(q).not.toBe(6);
+        }
+    });
+
+    it("absent canEnter = enter-everywhere (backward compat)", () => {
+        const without = computeReachableTiles({
+            getNeighbors: squareGridNeighbors,
+            isOccupied: noOccupants,
+            movement: 3,
+            start,
+        });
+        const withPermissive = computeReachableTiles({
+            getNeighbors: squareGridNeighbors,
+            isOccupied: noOccupants,
+            canEnter: () => true,
+            movement: 3,
+            start,
+        });
+        expect(without).toEqual(withPermissive);
+    });
+});
+
+describe("computeShortestPath with canEnter", () => {
+    const noOccupants = () => false;
+
+    it("goal-bypass: arrives at goal even when canEnter blocks all non-goal cells", () => {
+        const start = { q: 0, r: 0 };
+        const goal  = { q: 0, r: 2 };
+        const path = computeShortestPath({
+            start,
+            goal,
+            getNeighbors: squareGridNeighbors,
+            isOccupied: noOccupants,
+            canEnter: (c) =>
+                // block every cell except the goal itself
+                c.q === goal.q && c.r === goal.r,
+        });
+        // Path is reachable because goal-bypass lets BFS land on goal.
+        // The fallback path [start, goal] is acceptable when intermediates
+        // are blocked — what matters is that the function does NOT stall.
+        expect(path[0]).toEqual(start);
+        expect(path[path.length - 1]).toEqual(goal);
+    });
+
+    it("respects canEnter for intermediate cells (blocks a column, routes around)", () => {
+        const start = { q: 0, r: 0 };
+        const goal  = { q: 2, r: 0 };
+        const path = computeShortestPath({
+            start,
+            goal,
+            getNeighbors: squareGridNeighbors,
+            isOccupied: noOccupants,
+            canEnter: (c) => !(c.q === 1 && c.r === 0), // block (1,0)
+        });
+        // path must reach the goal and must not step on the blocked cell
+        // (unless the goal-bypass let it — but the blocked cell is not the goal here).
+        expect(path[0]).toEqual(start);
+        expect(path[path.length - 1]).toEqual(goal);
+        const usedBlocked = path.some((c) => c.q === 1 && c.r === 0);
+        expect(usedBlocked).toBe(false);
     });
 });

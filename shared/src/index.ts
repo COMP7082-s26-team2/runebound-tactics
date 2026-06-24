@@ -2,6 +2,7 @@
 export { TestPlayer, ChatMessage, TestRoomState } from "./schemas/TestRoomState";
 export { LobbyPlayerSlot, LobbyState } from "./schemas/LobbyState";
 export { GameUnit, GamePlayerSlot, GameState } from "./schemas/GameState";
+export { CardType, Card, DeckState, DeckManager } from "./schemas/Card";
 
 // Plain TypeScript types (metadata, enums, value objects)
 export * from "./types";

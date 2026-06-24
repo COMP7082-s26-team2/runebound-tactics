@@ -6,11 +6,24 @@ CREATE TABLE "player" (
     "player_id" BIGSERIAL NOT NULL,
     "username" VARCHAR(255),
     "password_hash" VARCHAR(255),
+    "avatar_url" TEXT,
 
     CONSTRAINT "player_pkey" PRIMARY KEY ("player_id")
 );
 
 -- CreateTable
+CREATE TABLE "user_sessions" (
+    "id" BIGSERIAL NOT NULL,
+    "user_id" BIGINT NOT NULL,
+    "supabase_session_id" TEXT NOT NULL,
+    "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expires_at" TIMESTAMP(6) NOT NULL,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "last_active_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "user_sessions_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "user_sessions_supabase_session_id_key" UNIQUE ("supabase_session_id"),
+    CONSTRAINT "user_sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "player"("player_id") ON DELETE CASCADE ON UPDATE NO ACTION
 CREATE TABLE "user_presence" (
     "user_id" BIGINT NOT NULL,
     "current_lobby_id" TEXT,
@@ -184,6 +197,13 @@ CREATE TABLE "game_action" (
 CREATE UNIQUE INDEX "player_username_key" ON "player"("username");
 
 -- CreateIndex
+CREATE INDEX "user_sessions_user_id_idx" ON "user_sessions"("user_id");
+
+-- CreateIndex
+CREATE INDEX "user_sessions_is_active_idx" ON "user_sessions"("is_active");
+
+-- CreateIndex
+CREATE INDEX "user_sessions_expires_at_idx" ON "user_sessions"("expires_at");
 CREATE INDEX "user_presence_current_lobby_id_idx" ON "user_presence"("current_lobby_id");
 
 -- CreateIndex

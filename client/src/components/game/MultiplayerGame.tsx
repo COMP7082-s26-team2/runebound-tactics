@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 import { MultiplayerGameCanvas } from "@/components/game/MultiplayerGameCanvas";
 import { GameHUD } from "@/components/game/GameHUD";
+import { CombatReactionWindow } from "@/components/game/CombatReactionWindow";
 import type { GameState } from "@runebound-tactics/shared";
 
 interface MultiplayerGameProps {
@@ -105,6 +106,14 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
         room?.send("end_turn", {});
     }
 
+    function passReaction() {
+        room?.send("pass_reaction", {});
+    }
+
+    function playReactionCard() {
+        room?.send("play_reaction_card", {});
+    }
+
     // `useGameRoomState` returns a deep-readonly snapshot; cast to the
     // schema class for consumer-side typing. Read-only access is safe — we
     // never call schema mutator methods (assign, clone, etc.) on the
@@ -125,6 +134,12 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                     interactionDisabled={isReconnecting}
                     onLeave={leave}
                     onEndTurn={endTurn}
+                />
+                <CombatReactionWindow
+                    state={gameState}
+                    sessionId={room.sessionId}
+                    onPass={passReaction}
+                    onPlay={playReactionCard}
                 />
             </div>
         </div>

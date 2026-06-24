@@ -10,6 +10,13 @@ import { cellKey } from "../grid-utils";
 export interface MovementContext {
     getNeighbors(coord: GridCoord): GridCoord[];
     isOccupied(cellKey: string): boolean;
+    /**
+     * Phase 1 (terrain-movement-table_design_v1.3): optional terrain veto.
+     * Returns false to treat the cell as impassable. Absent = treat as
+     * always enterable (backward-compatible with callers that have no
+     * terrain source, e.g. legacy server before TerrainGrid lands).
+     */
+    canEnter?(coord: GridCoord): boolean;
     movement: number;
     start: GridCoord;
 }
@@ -40,6 +47,7 @@ export function computeReachableTiles(ctx: MovementContext): Set<string> {
             const key = cellKey(neighbor);
             if (visited.has(key)) continue;
             if (ctx.isOccupied(key)) continue;
+            if (ctx.canEnter && !ctx.canEnter(neighbor)) continue;
             visited.set(key, steps + 1);
             queue.push({ coord: neighbor, steps: steps + 1 });
         }
@@ -59,15 +67,22 @@ export function computeReachableTiles(ctx: MovementContext): Set<string> {
 export interface PathfindingContext {
     getNeighbors(coord: GridCoord): GridCoord[];
     isOccupied(cellKey: string): boolean;
+    /**
+     * Phase 1 (terrain-movement-table_design_v1.3): optional terrain veto.
+     * The goal cell bypasses this check (server already validated the goal
+     * is valid; an animation must not stall because client's predicate
+     * temporarily disagrees during a desync window).
+     */
+    canEnter?(coord: GridCoord): boolean;
     start: GridCoord;
     goal: GridCoord;
 }
 
 /**
  * Returns a shortest grid path from `start` to `goal` as `[start, ..., goal]`.
- * Path passes through unoccupied cells only (`isOccupied` predicate gates
- * intermediate cells). The goal itself is treated as reachable even if
- * `isOccupied` reports true (the mover may have already been placed there).
+ * Path passes through unoccupied + enterable cells only. The goal itself is
+ * treated as reachable even if `isOccupied`/`canEnter` would reject it (the
+ * mover may have already been placed there or server has validated entry).
  *
  * If no path exists, returns `[start, goal]` as a straight-line fallback
  * so the renderer still tweens to the destination instead of stalling.
@@ -92,6 +107,8 @@ export function computeShortestPath(ctx: PathfindingContext): GridCoord[] {
             if (parent.has(key)) continue;
             // Allow goal even if "occupied" (mover's destination).
             if (ctx.isOccupied(key) && key !== goalKey) continue;
+            // Goal-bypass for canEnter too — see PathfindingContext jsdoc.
+            if (ctx.canEnter && !ctx.canEnter(neighbor) && key !== goalKey) continue;
             parent.set(key, coord);
             if (key === goalKey) {
                 found = true;

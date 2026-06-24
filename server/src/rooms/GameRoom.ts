@@ -1,15 +1,30 @@
 import { Room, Client } from "colyseus";
 import {
+    ActionPointSystem,
+    AP_COST,
+    CHOKEPOINT_MAP,
     GamePlayerSlot,
     GameState,
     GameUnit,
     createTurnMachine,
     type TurnMachine,
+    canEnter,
+    createReactionWindowMachine,
+    type ReactionWindowMachine,
     cellKey,
     computeReachableTiles,
     computeAttackDamage,
+    getEffectiveMaxHealth,
+    getUnitAttack,
+    getUnitBaseAp,
+    getUnitBaseHealth,
+    getUnitDefaultWeakness,
+    getUnitDefense,
+    getUnitDamageType,
     getUnitMovement,
+    getUnitMovementType,
     squareGridNeighbors,
+    terrainAt,
     unitIsExhausted,
     GRID_ROWS,
 } from "@runebound-tactics/shared";
@@ -46,12 +61,20 @@ interface AttackUnitPayload {
     moveTo?: { q: number; r: number };
 }
 
+const REACTION_TIMEOUT_MS = 10_000;
+
 interface PendingAttack {
     attackerId: string;
     targetId: string;
     damage: number;
     defenderDied: boolean;
     newHp: number;
+    /** Where the attacker should end up. Null = zero-move attack. */
+    moveTo: GridCoord | null;
+    /** Attacker's pos at declare-time (for reachability rebuild on resolve). */
+    posBefore: GridCoord;
+    /** AP to deduct for the move half on resolve (0 for zero-move attack). */
+    moveApCost: number;
 }
 
 // Product default for how long a disconnected game player keeps their slot
@@ -100,6 +123,8 @@ export class GameRoom extends Room<{ state: GameState }> {
      * "combat" subscriber. Null outside of the quick-play → combat window.
      */
     private _pendingAttack: PendingAttack | null = null;
+    private _reactionMachine: ReactionWindowMachine | null = null;
+    private _reactionTimer: ReturnType<typeof setTimeout> | null = null;
 
     onCreate(options: GameRoomOptions): void {
         const pending = pendingGames.get(options.lobbyRoomId);
@@ -132,8 +157,8 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (!this._isCurrentTurn(player)) return;
 
             const unit = this.state.units.get(payload?.unitId);
-            if (!unit || unit.ownerId !== playerSessionId) return;
-            if (unit.hasMoved) return;
+            if (!unit || unit.ownerId !== client.sessionId) return;
+            if (!ActionPointSystem.canAfford(unit, AP_COST.MOVE)) return;
 
             const destKey = cellKey({ q: payload.x, r: payload.y });
             const reachable = this._reachabilityCache.get(unit.unitId);
@@ -143,8 +168,10 @@ export class GameRoom extends Room<{ state: GameState }> {
             unit.x = payload.x;
             unit.y = payload.y;
             unit.hasMoved = true;
+            ActionPointSystem.deduct(unit, AP_COST.MOVE);
 
             console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: move ${unit.unitId} (${prevPos.q},${prevPos.r}) → (${payload.x},${payload.y})`);
+            console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${unit.unitId} spent ${AP_COST.MOVE} (move) → ${unit.actionPoints} remaining`);
 
             this._updateReachabilityAfterMove(unit.unitId, prevPos, {
                 q: payload.x,
@@ -168,6 +195,26 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (!this._isCurrentTurn(player)) return;
             console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: end_turn from ${client.sessionId}`);
             this._turnMachine.send("END_TURN");
+        });
+
+        this.onMessage("pass_reaction", (client) => {
+            if (!this._reactionMachine) return;
+            const phase = this._reactionMachine.state;
+            const ctx = this._reactionMachine.context;
+            const expected =
+                phase === "defender" ? ctx.defenderOwnerId :
+                phase === "attacker-ally" ? ctx.attackerOwnerId :
+                null;
+            if (expected === null || client.sessionId !== expected) return;
+            this._clearReactionTimer();
+            this._reactionMachine.send("REACTION_PASS");
+        });
+
+        this.onMessage<{ cardId: string }>("play_reaction_card", (client, payload) => {
+            // Card system pending — reject all cards until is_reaction validation is wired.
+            console.log(`[${new Date().toISOString()}] [GameRoom] play_reaction_card: rejected (card system pending) from ${client.sessionId}`);
+            void client;
+            void payload;
         });
     }
 
@@ -433,8 +480,7 @@ export class GameRoom extends Room<{ state: GameState }> {
                 break;
 
             case "quick-play":
-                console.log(`[${new Date().toISOString()}] [GameRoom] quick-play: no opponent responses`);
-                this._turnMachine.send("QUICK_PLAY_RESOLVED");
+                this._openReactionWindow();
                 break;
 
             case "combat":
@@ -448,6 +494,95 @@ export class GameRoom extends Room<{ state: GameState }> {
                 console.log(`[${new Date().toISOString()}] [GameRoom] post-combat: gold distribution pending`);
                 this._turnMachine.send("POST_COMBAT_RESOLVED");
                 break;
+        }
+    }
+
+    private _openReactionWindow(): void {
+        const pa = this._pendingAttack;
+        if (!pa) {
+            this._turnMachine.send("QUICK_PLAY_RESOLVED");
+            return;
+        }
+
+        const attackerUnit = this.state.units.get(pa.attackerId);
+        const defenderUnit = this.state.units.get(pa.targetId);
+        if (!attackerUnit || !defenderUnit) {
+            this._turnMachine.send("QUICK_PLAY_RESOLVED");
+            return;
+        }
+
+        this._reactionMachine = createReactionWindowMachine(
+            attackerUnit.ownerId,
+            defenderUnit.ownerId,
+        );
+        this._reactionMachine.subscribe((phase) => this._onReactionPhase(phase));
+    }
+
+    private _onReactionPhase(phase: string): void {
+        console.log(`[${new Date().toISOString()}] [GameRoom] reactionPhase: ${phase}`);
+        this.state.reactionPhase = phase === "closed" ? "" : phase;
+
+        const ctx = this._reactionMachine?.context;
+        const activePlayer = this._activeReactionPlayer(
+            phase,
+            ctx?.attackerOwnerId,
+            ctx?.defenderOwnerId,
+        );
+        this.broadcast("reaction_phase", { phase, activePlayer });
+
+        switch (phase) {
+            case "defender":
+                this._startReactionTimer();
+                break;
+
+            case "defender-ally":
+                this._clearReactionTimer();
+                this._startReactionTimer();
+                this._reactionMachine?.send("REACTION_PASS");  // placeholder: auto-pass
+                break;
+
+            case "attacker-ally":
+                this._clearReactionTimer();
+                this._startReactionTimer();
+                this._reactionMachine?.send("REACTION_PASS");  // placeholder: auto-pass
+                break;
+
+            case "resolve":
+                this._clearReactionTimer();
+                this._reactionMachine?.send("REACTION_PASS");
+                break;
+
+            case "closed":
+                this._clearReactionTimer();
+                this._reactionMachine = null;
+                this._turnMachine.send("QUICK_PLAY_RESOLVED");
+                break;
+        }
+    }
+
+    private _activeReactionPlayer(
+        phase: string,
+        attackerOwnerId?: string,
+        defenderOwnerId?: string,
+    ): string {
+        if (phase === "defender") return defenderOwnerId ?? "";
+        if (phase === "attacker-ally") return attackerOwnerId ?? "";
+        return "";
+    }
+
+    private _startReactionTimer(): void {
+        this._clearReactionTimer();
+        this._reactionTimer = setTimeout(() => {
+            if (!this._reactionMachine) return;
+            this._clearReactionTimer();
+            this._reactionMachine.send("REACTION_TIMEOUT");
+        }, REACTION_TIMEOUT_MS);
+    }
+
+    private _clearReactionTimer(): void {
+        if (this._reactionTimer !== null) {
+            clearTimeout(this._reactionTimer);
+            this._reactionTimer = null;
         }
     }
 
@@ -476,15 +611,29 @@ export class GameRoom extends Room<{ state: GameState }> {
 
             for (let j = 0; j < unitTypes.length; j++) {
                 const unit = new GameUnit();
-                unit.unitId = `${sessionId}:u${j + 1}`;
+                unit.unitId  = `${sessionId}:u${j + 1}`;
                 unit.ownerId = sessionId;
                 unit.unitType = unitTypes[j]!;
                 unit.x = 2 + j * 2;
                 unit.y = row;
-                unit.hp = 30;
-                unit.maxHp = 30;
+
+                unit.baseMaxHealth    = getUnitBaseHealth(unit.unitType);
+                unit.baseAttackDamage = getUnitAttack(unit.unitType);
+                unit.baseDefense      = getUnitDefense(unit.unitType);
+                unit.baseMovement     = getUnitMovement(unit.unitType);
+                unit.baseAp           = getUnitBaseAp(unit.unitType);
+
+                unit.hp = getEffectiveMaxHealth(unit);
+
+                const dt = getUnitDamageType(unit.unitType);
+                unit.damageType = dt ?? "";
+                for (const w of getUnitDefaultWeakness(unit.unitType)) {
+                    unit.weakness.push(w);
+                }
+
                 unit.hasMoved = false;
                 unit.hasActed = false;
+                ActionPointSystem.restore(unit);
                 this.state.units.set(unit.unitId, unit);
             }
         }
@@ -496,10 +645,6 @@ export class GameRoom extends Room<{ state: GameState }> {
             this.state.currentTurnId === player.sessionId &&
             this._turnMachine.state === "action-phase"
         );
-    }
-
-    private _isVerifiedClientSession(client: Client): boolean {
-        return this._getVerifiedPlayer(client) !== null;
     }
 
     private _getVerifiedUserId(client: Client): string | null {
@@ -637,53 +782,35 @@ export class GameRoom extends Room<{ state: GameState }> {
             moveTo.q === posBefore.q &&
             moveTo.r === posBefore.r;
 
-        // ── Half 1: optional move ─────────────────────────────────────
+        // ── Half 1: validate optional move (no mutation) ──────────────
         if (moveTo && !moveToIsCurrentPos) {
-            if (attacker.hasMoved) return;                   // already moved this turn
+            if (!ActionPointSystem.canAfford(attacker, AP_COST.MOVE)) return;
             const reachable = this._reachabilityCache.get(attacker.unitId);
             if (!reachable) return;
             const moveKey = cellKey({ q: moveTo.q, r: moveTo.r });
             if (!reachable.has(moveKey)) return;
 
-            // Pre-validate half-2 adjacency BEFORE mutating
+            // Pre-validate half-2 adjacency from post-move position.
             if (manhattan({ q: moveTo.q, r: moveTo.r }, targetPos) !== 1) return;
-
-            attacker.x = moveTo.q;
-            attacker.y = moveTo.r;
-            // hasMoved is set unconditionally below after half-2 success.
         } else {
             // Zero-move attack — validate adjacency from current position.
             if (manhattan(posBefore, targetPos) !== 1) return;
         }
 
-        // ── Half 2: resolve attack ────────────────────────────────────
-        const damage = computeAttackDamage(attacker.unitType, target.unitType);
-        if (damage <= 0) {
-            // Defensive: rollback move-half if applied, then bail.
-            if (moveTo && !moveToIsCurrentPos) {
-                attacker.x = posBefore.q;
-                attacker.y = posBefore.r;
-            }
-            return;
-        }
+        // ── Half 2: pre-compute damage (no mutation) ─────────────────
+        const damage = computeAttackDamage(attacker, target);
+        if (damage <= 0) return;
 
         const newHp = Math.max(0, target.hp - damage);
         const defenderDied = newHp <= 0;
 
-        // 1-AP exhaustion: flip on any successful attack.
-        attacker.hasMoved = true;
-        attacker.hasActed = true;
-
-        // Update reachability cache. Move+attack uses surgical update;
-        // zero-move attack just removes the now-exhausted attacker.
-        if (moveTo && !moveToIsCurrentPos) {
-            this._updateReachabilityAfterMove(attacker.unitId, posBefore, {
-                q: moveTo.q,
-                r: moveTo.r,
-            });
-        } else {
-            this._reachabilityCache.delete(attacker.unitId);
-        }
+        // All attacker-side mutations (pos / hasMoved / hasActed / AP /
+        // reachability) are deferred to _resolvePendingAttack so that the
+        // reaction window can run in between without leaking partial state
+        // patches to clients. The client's snapshot-diff classifier needs
+        // the attacker's hasMoved flip and the target's HP drop to land in
+        // the same patch to produce an AttackEvent.
+        const moveCommitted = moveTo !== undefined && !moveToIsCurrentPos;
 
         this._pendingAttack = {
             attackerId: attacker.unitId,
@@ -691,6 +818,9 @@ export class GameRoom extends Room<{ state: GameState }> {
             damage,
             defenderDied,
             newHp,
+            moveTo: moveCommitted ? { q: moveTo.q, r: moveTo.r } : null,
+            posBefore,
+            moveApCost: moveCommitted ? AP_COST.MOVE : 0,
         };
 
         console.log(`[${new Date().toISOString()}] [GameRoom] action-phase: attack declared ${attacker.unitId} → ${target.unitId} (dmg ${damage}${defenderDied ? ", lethal" : ""})`);
@@ -713,6 +843,34 @@ export class GameRoom extends Room<{ state: GameState }> {
         if (!pa) return;
         this._pendingAttack = null;
 
+        // ── Apply deferred attacker mutations ────────────────────────
+        // Order: move attacker → exhaust + AP deduct → reachability refresh.
+        // All four happen in the same Colyseus state patch as the target's
+        // HP / death write below, so the client's diffSnapshots classifier
+        // sees the hasMoved flip and the HP drop together and produces a
+        // single AttackEvent for buildAttackSequence.
+        const attacker = this.state.units.get(pa.attackerId);
+        if (attacker) {
+            if (pa.moveTo) {
+                attacker.x = pa.moveTo.q;
+                attacker.y = pa.moveTo.r;
+                if (pa.moveApCost > 0) {
+                    ActionPointSystem.deduct(attacker, pa.moveApCost);
+                    console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${attacker.unitId} spent ${pa.moveApCost} (move) → ${attacker.actionPoints} remaining`);
+                }
+            }
+            attacker.hasMoved = true;
+            attacker.hasActed = true;
+            ActionPointSystem.deduct(attacker, AP_COST.ATTACK);
+            console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${attacker.unitId} spent ${AP_COST.ATTACK} (attack) → ${attacker.actionPoints} remaining`);
+
+            if (pa.moveTo) {
+                this._updateReachabilityAfterMove(attacker.unitId, pa.posBefore, pa.moveTo);
+            } else {
+                this._reachabilityCache.delete(attacker.unitId);
+            }
+        }
+
         const target = this.state.units.get(pa.targetId);
         if (!target) return;
 
@@ -721,7 +879,7 @@ export class GameRoom extends Room<{ state: GameState }> {
                 `[${new Date().toISOString()}] [GameRoom] combat: ${pa.attackerId} → ${pa.targetId} | dmg ${pa.damage} | hp ${target.hp} → 0 (died)`,
             );
             this.state.units.delete(pa.targetId);
-            this._checkWinCondition();
+            this._checkUnitElimination();
         } else {
             console.log(
                 `[${new Date().toISOString()}] [GameRoom] combat: ${pa.attackerId} → ${pa.targetId} | dmg ${pa.damage} | hp ${target.hp} → ${pa.newHp}`,
@@ -736,6 +894,8 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (unit.ownerId === this.state.currentTurnId) {
                 unit.hasMoved = false;
                 unit.hasActed = false;
+                ActionPointSystem.restore(unit);
+                console.log(`[${new Date().toISOString()}] [GameRoom] ap: ${unit.unitId} restored → ${unit.actionPoints}`);
             }
         }
 
@@ -773,11 +933,14 @@ export class GameRoom extends Room<{ state: GameState }> {
         for (const unit of this.state.units.values()) {
             if (unit.ownerId !== playerId) continue;
             if (unit.hasMoved) continue;
+            const movementType = getUnitMovementType(unit.unitType);
             this._reachabilityCache.set(
                 unit.unitId,
                 computeReachableTiles({
                     getNeighbors: squareGridNeighbors,
                     isOccupied: (k) => occupied.has(k),
+                    canEnter: (coord) =>
+                        canEnter({ movementType }, terrainAt(CHOKEPOINT_MAP, coord.r, coord.q)),
                     movement: getUnitMovement(unit.unitType),
                     start: { q: unit.x, r: unit.y },
                 }),
@@ -792,47 +955,29 @@ export class GameRoom extends Room<{ state: GameState }> {
      */
     private _updateReachabilityAfterMove(
         movedUnitId: string,
-        prevPos: GridCoord,
-        newPos: GridCoord,
+        _prevPos: GridCoord,
+        _newPos: GridCoord,
     ): void {
+        // Full rebuild of the active player's reachability cache.
+        //
+        // Why not a surgical update keyed on the moved unit's prev/new tile:
+        // the old "surgical" pass recomputed only units whose oldReachable
+        // set already contained prevKey or newKey. But the moved unit was
+        // BLOCKING prevKey before this call — so prevKey was never in any
+        // other unit's reachable set. The condition collapsed to
+        // "recompute only if newKey was previously reachable," missing the
+        // common case where vacating prevKey opens new paths for a teammate
+        // standing on the other side. A second friendly couldn't move into
+        // the just-vacated tile because their cached BFS still treated it
+        // as occupied.
+        //
+        // _rebuildReachabilityCache iterates the player's units, skips ones
+        // with hasMoved=true (the moved unit just had that flag set), and
+        // recomputes the rest. O(units × cells) per move with N=4 units —
+        // sub-millisecond, no perf concern.
         const movedUnit = this.state.units.get(movedUnitId);
         if (!movedUnit) return;
-        const playerId = movedUnit.ownerId;
-        const prevKey = cellKey(prevPos);
-        const newKey = cellKey(newPos);
-        const occupied = this._buildOccupiedSet();
-
-        const recompute = (unitId: string) => {
-            const u = this.state.units.get(unitId);
-            if (!u) return;
-            this._reachabilityCache.set(
-                unitId,
-                computeReachableTiles({
-                    getNeighbors: squareGridNeighbors,
-                    isOccupied: (k) => occupied.has(k),
-                    movement: getUnitMovement(u.unitType),
-                    start: { q: u.x, r: u.y },
-                }),
-            );
-        };
-
-        for (const [unitId, oldReachable] of [
-            ...this._reachabilityCache.entries(),
-        ]) {
-            const unit = this.state.units.get(unitId);
-            if (!unit || unit.ownerId !== playerId) continue;
-            if (unitId === movedUnitId) {
-                if (unit.hasMoved) {
-                    this._reachabilityCache.delete(unitId);
-                } else {
-                    recompute(unitId);
-                }
-                continue;
-            }
-            if (oldReachable.has(prevKey) || oldReachable.has(newKey)) {
-                recompute(unitId);
-            }
-        }
+        this._rebuildReachabilityCache(movedUnit.ownerId);
     }
 
     private _buildOccupiedSet(): Set<string> {
@@ -841,6 +986,28 @@ export class GameRoom extends Room<{ state: GameState }> {
             occupied.add(cellKey({ q: unit.x, r: unit.y }));
         }
         return occupied;
+    }
+
+    /**
+     * Scan unit ownership and mark players with 0 remaining units as
+     * eliminated. Called after a unit dies in combat. Falls through to
+     * `_checkWinCondition()` so the standard last-player-standing path
+     * still ends the game.
+     */
+    private _checkUnitElimination(): void {
+        const unitsByOwner = new Map<string, number>();
+        for (const unit of this.state.units.values()) {
+            unitsByOwner.set(unit.ownerId, (unitsByOwner.get(unit.ownerId) ?? 0) + 1);
+        }
+        for (const player of this.state.players.values()) {
+            if (player.isEliminated) continue;
+            const count = unitsByOwner.get(player.sessionId) ?? 0;
+            if (count === 0) {
+                player.isEliminated = true;
+                console.log(`[${new Date().toISOString()}] [GameRoom] ${player.displayName} has no units remaining — eliminated`);
+            }
+        }
+        this._checkWinCondition();
     }
 
     private _checkWinCondition(): void {

@@ -11,6 +11,12 @@
 export type Faction = "castle" | "necropolis";
 
 // ---------------------------------------------------------------------------
+// Damage types
+// ---------------------------------------------------------------------------
+
+export type DamageType = "melee" | "range" | "cavalry" | "pure";
+
+// ---------------------------------------------------------------------------
 // Unit rosters (must match tilemap asset folder names under public/assets/tilemaps/entities/)
 // ---------------------------------------------------------------------------
 
