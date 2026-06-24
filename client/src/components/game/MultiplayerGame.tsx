@@ -71,13 +71,17 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
         defenderOwnerId: string;
     }>(
         "reaction_phase",
-        ({ phase, activePlayer, attackerOwnerId: aId, defenderOwnerId: dId }) => {
+        ({
+            phase,
+            activePlayer,
+            attackerOwnerId: aId,
+            defenderOwnerId: dId,
+        }) => {
             setReactionPhase(phase === "closed" ? "" : phase);
             setReactionActivePlayer(activePlayer ?? "");
             setSecondsRemaining(REACTION_TIMEOUT_SECONDS);
             setAttackerOwnerId(phase === "closed" ? "" : aId);
             setDefenderOwnerId(phase === "closed" ? "" : dId);
-            if (phase === "closed") setCardModalOpen(false);
         },
     );
 
@@ -174,14 +178,12 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     >;
     const mySlot = playersBySession[room.sessionId];
     const combatRole =
-        room.sessionId === attackerOwnerId ? "attacker" :
-        room.sessionId === defenderOwnerId ? "defender" : "";
+        room.sessionId === attackerOwnerId
+            ? "attacker"
+            : room.sessionId === defenderOwnerId
+              ? "defender"
+              : "";
 
-    const myReactionCards = mySlot?.deck?.cards
-        ? Array.from(mySlot.deck.cards)
-              .filter((c) => c.is_reaction)
-              .filter((c) => !c.role || c.role === combatRole || combatRole === "")
-        : [];
     const myGold = mySlot?.gold ?? 0;
     const rawFaction = mySlot?.faction;
     const myFaction: Faction | null =
@@ -194,6 +196,9 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const myReactionCards: CardData[] = mySlot?.deck?.cards
         ? Array.from(mySlot.deck.cards)
               .filter((c) => c.is_reaction)
+              .filter(
+                  (c) => !c.role || c.role === combatRole || combatRole === "",
+              )
               .map((c) => ({
                   name: c.name,
                   kind: c.name.toLowerCase().replace(/\s+/g, "-"),
