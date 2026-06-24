@@ -14,8 +14,9 @@ import { InGameMenuModal } from "@/components/game/InGameMenuModal";
 import { EndGameStatsScreen } from "@/components/game/EndGameStatsScreen";
 import { GameTopBar } from "@/components/game/GameTopBar";
 import { ReactionStrip } from "@/components/game/ReactionStrip";
-import { ReactionCardModal } from "@/components/game/ReactionCardModal";
 import { MultiplayerGameCanvas } from "@/components/game/MultiplayerGameCanvas";
+import type { CardData } from "@/components/ui/CardHand";
+import type { Faction } from "@/components/ui/Card";
 import type { GameState } from "@runebound-tactics/shared";
 
 interface MultiplayerGameProps {
@@ -33,6 +34,7 @@ interface ReactionCardSchema {
 
 interface PlayerCardSlot {
     gold: number;
+    faction?: string;
     deck?: { cards: Iterable<ReactionCardSchema> };
 }
 
@@ -43,8 +45,8 @@ interface PlayerCardSlot {
  *   GameTopBar  →  MultiplayerGameCanvas  →  ReactionStrip
  *
  * Everything except the board canvas is React DOM, built on the BCOMP-124
- * design-system primitives. The reaction sub-phase opens
- * `ReactionCardModal` as the card picker.
+ * design-system primitives. The reaction sub-phase renders the active
+ * reactor's hand inline in `ReactionStrip` — no modal context switch.
  */
 export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const { room, error } = useGameRoom();
@@ -54,7 +56,6 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const { clearGameToken } = useRoomConnect();
 
     const [menuOpen, setMenuOpen] = useState(false);
-    const [cardModalOpen, setCardModalOpen] = useState(false);
     const [reactionPhase, setReactionPhase] = useState("");
     const [reactionActivePlayer, setReactionActivePlayer] = useState("");
     const [attackerOwnerId, setAttackerOwnerId] = useState("");
@@ -70,13 +71,17 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
         defenderOwnerId: string;
     }>(
         "reaction_phase",
-        ({ phase, activePlayer, attackerOwnerId: aId, defenderOwnerId: dId }) => {
+        ({
+            phase,
+            activePlayer,
+            attackerOwnerId: aId,
+            defenderOwnerId: dId,
+        }) => {
             setReactionPhase(phase === "closed" ? "" : phase);
             setReactionActivePlayer(activePlayer ?? "");
             setSecondsRemaining(REACTION_TIMEOUT_SECONDS);
             setAttackerOwnerId(phase === "closed" ? "" : aId);
             setDefenderOwnerId(phase === "closed" ? "" : dId);
-            if (phase === "closed") setCardModalOpen(false);
         },
     );
 
@@ -111,13 +116,11 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
 
     const passReaction = useCallback(() => {
         room?.send("pass_reaction", {});
-        setCardModalOpen(false);
     }, [room]);
 
     const playReactionCard = useCallback(
         (cardName: string) => {
             room?.send("play_reaction_card", { cardName });
-            setCardModalOpen(false);
         },
         [room],
     );
@@ -175,15 +178,35 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     >;
     const mySlot = playersBySession[room.sessionId];
     const combatRole =
-        room.sessionId === attackerOwnerId ? "attacker" :
-        room.sessionId === defenderOwnerId ? "defender" : "";
+        room.sessionId === attackerOwnerId
+            ? "attacker"
+            : room.sessionId === defenderOwnerId
+              ? "defender"
+              : "";
 
-    const myReactionCards = mySlot?.deck?.cards
+    const myGold = mySlot?.gold ?? 0;
+    const rawFaction = mySlot?.faction;
+    const myFaction: Faction | null =
+        rawFaction === "castle" || rawFaction === "necropolis"
+            ? rawFaction
+            : null;
+    // Show all reaction cards in the hand. Quickplay's "one play per window"
+    // rule is enforced client-side inside `ReactionStrip` via a `hasPlayed`
+    // lock that fires on the first card click and resets on phase transition.
+    const myReactionCards: CardData[] = mySlot?.deck?.cards
         ? Array.from(mySlot.deck.cards)
               .filter((c) => c.is_reaction)
-              .filter((c) => !c.role || c.role === combatRole || combatRole === "")
+              .filter(
+                  (c) => !c.role || c.role === combatRole || combatRole === "",
+              )
+              .map((c) => ({
+                  name: c.name,
+                  kind: c.name.toLowerCase().replace(/\s+/g, "-"),
+                  cost: c.gold_cost,
+                  description: "",
+                  factionInk: myFaction,
+              }))
         : [];
-    const myGold = mySlot?.gold ?? 0;
 
     return (
         <main className="h-dvh bg-[var(--ink-900)] text-[var(--ink-300)] flex flex-col overflow-hidden">
@@ -201,30 +224,32 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
             </header>
 
             <div className="flex-1 min-h-0 flex items-center justify-center p-3">
-                <div className="flex flex-col gap-2 h-full max-h-full items-center">
-                    <div className="relative flex-1 min-h-0 aspect-square">
-                        <MultiplayerGameCanvas room={room} state={gameState} />
-                        {gameState.phase === "ended" && (
-                            <EndGameStatsScreen
-                                winnerId={winnerId}
-                                winnerName={winnerName}
-                                mySessionId={room.sessionId}
-                                turnsPlayed={gameState.turnNumber + 1}
-                                onLeave={leave}
-                            />
-                        )}
-                    </div>
-
-                    <div className="w-full max-w-[800px] shrink-0">
-                        <ReactionStrip
-                            phase={reactionPhase}
-                            isActiveReactor={isActiveReactor}
-                            waitingForName={reactorName}
-                            secondsRemaining={secondsRemaining}
-                            onPass={passReaction}
-                            onOpenCards={() => setCardModalOpen(true)}
+                <div className="relative h-full">
+                    <MultiplayerGameCanvas room={room} state={gameState} />
+                    {gameState.phase === "ended" && (
+                        <EndGameStatsScreen
+                            winnerId={winnerId}
+                            winnerName={winnerName}
+                            mySessionId={room.sessionId}
+                            turnsPlayed={gameState.turnNumber + 1}
+                            onLeave={leave}
                         />
-                    </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="fixed bottom-3 left-1/2 -translate-x-1/2 w-full max-w-[800px] px-3 z-40 pointer-events-none">
+                <div className="pointer-events-auto">
+                    <ReactionStrip
+                        phase={reactionPhase}
+                        isActiveReactor={isActiveReactor}
+                        waitingForName={reactorName}
+                        secondsRemaining={secondsRemaining}
+                        cards={myReactionCards}
+                        playerGold={myGold}
+                        onPass={passReaction}
+                        onPlayCard={playReactionCard}
+                    />
                 </div>
             </div>
 
@@ -232,15 +257,6 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                 isOpen={menuOpen}
                 onClose={() => setMenuOpen(false)}
                 onLeave={leave}
-            />
-            <ReactionCardModal
-                isOpen={cardModalOpen}
-                onClose={() => setCardModalOpen(false)}
-                phase={reactionPhase}
-                reactionCards={myReactionCards}
-                playerGold={myGold}
-                onPass={passReaction}
-                onPlayCard={playReactionCard}
             />
         </main>
     );

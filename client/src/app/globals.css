@@ -129,3 +129,27 @@ body {
         0%, 100% { transform: none; opacity: 1; }
     }
 }
+
+/* Reaction rail enter — stepped 3-frame slide-up over 220ms */
+@keyframes reaction-rail-enter {
+    0%   { transform: translateY(24px); opacity: 0; }
+    33%  { transform: translateY(16px); opacity: 0.5; }
+    66%  { transform: translateY(8px);  opacity: 1; }
+    100% { transform: translateY(0);    opacity: 1; }
+}
+
+/* Reaction rail exit — stepped 2-frame collapse over 150ms */
+@keyframes reaction-rail-exit {
+    0%   { transform: translateY(0);    opacity: 1; }
+    50%  { transform: translateY(8px);  opacity: 0.5; }
+    100% { transform: translateY(24px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    @keyframes reaction-rail-enter {
+        0%, 100% { transform: none; opacity: 1; }
+    }
+    @keyframes reaction-rail-exit {
+        0%, 100% { transform: none; opacity: 1; }
+    }
+}

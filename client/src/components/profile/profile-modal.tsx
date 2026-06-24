@@ -53,7 +53,13 @@ export default function ProfileModal() {
     }
 
     useEffect(() => {
-        fetchProfile();
+        // Deferred via setTimeout so the setState calls inside fetchProfile
+        // fire from a timer callback rather than synchronously in the effect
+        // body — matches the codebase pattern from T14 (BCOMP-124).
+        const id = setTimeout(() => {
+            fetchProfile();
+        }, 0);
+        return () => clearTimeout(id);
     }, []);
 
     function handleOpen() {
