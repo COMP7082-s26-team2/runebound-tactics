@@ -120,4 +120,11 @@ export class GameState extends Schema {
      * Written exclusively by the GameRoom TurnMachine subscriber.
      */
     @type("string") turnPhase: string = "action-phase";
+
+    /**
+     * Active sub-phase of the reaction window.
+     * Values: "defender" | "defender-ally" | "attacker-ally" | "resolve" | "" (outside window)
+     * Written exclusively by the GameRoom ReactionWindowMachine subscriber.
+     */
+    @type("string") reactionPhase: string = "";
 }
