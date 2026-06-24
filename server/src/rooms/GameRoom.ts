@@ -16,6 +16,7 @@ import {
 import type { Faction, GridCoord } from "@runebound-tactics/shared";
 import { AuthJoinError, verifySupabaseJoinAuth } from "../auth/supabaseAuth";
 import type { AuthenticatedJoinOptions, VerifiedClientAuth } from "../auth/types";
+import { markUserInGame, markUserLeftGame, markUserOffline } from "../presence/userPresence";
 import { pendingGames } from "./pendingGames";
 
 interface PendingPlayer {
@@ -164,7 +165,7 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
     }
 
-    onJoin(client: Client): void {
+    async onJoin(client: Client): Promise<void> {
         // Colyseus sets client.auth from the value returned by onAuth. If it is
         // missing here, the room should fail closed rather than creating an
         // anonymous GamePlayerSlot.
@@ -193,6 +194,11 @@ export class GameRoom extends Room<{ state: GameState }> {
         slot.faction = pending.faction as Faction;
         this.state.players.set(client.sessionId, slot);
 
+        // Game presence is written only after the verified user has claimed a
+        // real game slot. markUserInGame also clears any lobby id left over
+        // from the lobby-to-game transfer.
+        await this._markPlayerInGame(userId);
+
         // Remove the verified user from the pending list after they claim their
         // seat; _allPlayersJoined() uses this to decide when the match can start.
         this._pendingPlayers.delete(userId);
@@ -207,25 +213,57 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
     }
 
+    async onReconnect(client: Client): Promise<void> {
+        // This installed Colyseus version calls onReconnect with only the
+        // reconnected client, not (client, previousClient). During
+        // allowReconnection, Colyseus reserves the original sessionId and copies
+        // previousClient.auth onto the reconnected client, so the correct guard
+        // here is: does this client.auth.userId still match the player slot
+        // stored under this sessionId?
+        if (!this._getVerifiedPlayer(client)) {
+            throw new Error("Reconnect user does not match player slot");
+        }
+
+        // No sessionId replacement is needed in this Colyseus reconnect path:
+        // the reconnected client reclaims the same sessionId that owns the
+        // GamePlayerSlot, turn order, and unit owner IDs.
+        const userId = this._getVerifiedUserId(client);
+        if (userId) {
+            // A successful reconnect means the same verified player is back in
+            // the active game room, so restore their DB presence to in_game.
+            await this._markPlayerInGame(userId);
+        }
+    }
+
     async onDrop(client: Client, code?: number): Promise<void> {
+        const player = this._getVerifiedPlayer(client);
+        if (player?.userId) {
+            // Temporary disconnects must keep current_room_id for reconnection
+            // lookup. markUserOffline only updates status/last_seen_at.
+            await this._markPlayerOffline(player.userId);
+        }
+
         try {
             await this.allowReconnection(client, 30);
             console.log(`[${new Date().toISOString()}] [GameRoom] ${client.sessionId} reconnected`);
         } catch {
             console.log(`[${new Date().toISOString()}] [GameRoom] ${client.sessionId} reconnect window expired (code ${code})`);
-            this._eliminatePlayer(client.sessionId);
+            await this._eliminatePlayer(client.sessionId);
         }
     }
 
-    onLeave(client: Client): void {
-        this._eliminatePlayer(client.sessionId);
+    async onLeave(client: Client): Promise<void> {
+        await this._eliminatePlayer(client.sessionId);
     }
 
-    private _eliminatePlayer(sessionId: string): void {
+    private async _eliminatePlayer(sessionId: string): Promise<void> {
         const player = this.state.players.get(sessionId);
         if (player) {
             player.isEliminated = true;
             console.log(`[${new Date().toISOString()}] [GameRoom] ${player.displayName} eliminated`);
+            // Explicit leave or reconnect timeout means this player no longer
+            // has a claim to this active game room for presence lookup.
+            await this._markPlayerLeftGame(player.userId);
         }
         if (this.state.currentTurnId === sessionId) {
             // Only fire END_TURN if the machine is in action-phase. If
@@ -368,6 +406,67 @@ export class GameRoom extends Room<{ state: GameState }> {
         }
 
         return player;
+    }
+
+    private _canReclaimPlayerSlot(client: Client, previousClient: Client): boolean {
+        const userId = this._getVerifiedUserId(client);
+        const previousPlayer = this.state.players.get(previousClient.sessionId);
+
+        // When a player reconnects, Colyseus gives us a new/current client and
+        // the previous disconnected client. The reconnect should only succeed
+        // when the current client's verified app userId matches the userId that
+        // was stored on the previous player slot.
+        //
+        // This prevents another authenticated player from reclaiming someone
+        // else's game slot even if they somehow reach the same room/reconnect
+        // path. The durable userId is the authority here, not the Colyseus
+        // sessionId, which can change across reconnect flows.
+        //
+        // Reconnect ownership is based on the durable app userId stored in the
+        // previous player slot, not on either Colyseus sessionId by itself.
+        return !!userId && !!previousPlayer && previousPlayer.userId === userId;
+    }
+
+    private async _markPlayerInGame(userId: string): Promise<void> {
+        try {
+            await markUserInGame(userId, this.roomId);
+        } catch (error) {
+            console.error(
+                `[GameRoom] Failed to mark user ${userId} in game ${this.roomId}:`,
+                error,
+            );
+        }
+    }
+
+    private async _markPlayerLeftGame(userId: string): Promise<void> {
+        try {
+            await markUserLeftGame(userId, this.roomId);
+        } catch (error) {
+            console.error(
+                `[GameRoom] Failed to clear game presence for user ${userId} in game ${this.roomId}:`,
+                error,
+            );
+        }
+    }
+
+    private async _markPlayerOffline(userId: string): Promise<void> {
+        try {
+            await markUserOffline(userId);
+        } catch (error) {
+            console.error(
+                `[GameRoom] Failed to mark user ${userId} offline for game ${this.roomId}:`,
+                error,
+            );
+        }
+    }
+
+    private _clearGamePresenceForAllPlayers(): void {
+        // Game-over cleanup is best-effort presence maintenance. We do not
+        // await each write here because _checkWinCondition is called from sync
+        // combat resolution, but each helper logs its own DB failure.
+        for (const player of this.state.players.values()) {
+            void this._markPlayerLeftGame(player.userId);
+        }
     }
 
     /**
@@ -639,6 +738,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             console.log(`[${new Date().toISOString()}] [GameRoom] phase: active → ended`);
             this.state.phase = "ended";
             this.state.winnerId = winner.sessionId;
+            this._clearGamePresenceForAllPlayers();
             this.broadcast("game_over", { winnerId: winner.sessionId, displayName: winner.displayName });
             console.log(`[${new Date().toISOString()}] [GameRoom] Game over. Winner: ${winner.displayName}`);
         }
