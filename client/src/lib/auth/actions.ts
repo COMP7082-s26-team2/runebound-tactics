@@ -166,14 +166,13 @@ export async function signOut() {
     // user's auth cookies.
     const supabase = await createServerSideClient();
 
-    // getUser() verifies identity server-side before proceeding (BCOMP-202).
-    const { data: { user } } = await supabase.auth.getUser();
-    console.log("[BCOMP-202] signOut getUser:", { userId: user?.id ?? null });
+    // getUser() verifies identity server-side before clearing the session.
+    // getSession() below retrieves the access token for HMAC derivation only;
+    // auth verification is handled here, not from the session object.
+    await supabase.auth.getUser();
 
     // Read the current session before Supabase clears it so we can derive the
     // same hashed session id that was stored during login.
-    // getSession() here retrieves the access token for HMAC derivation only;
-    // auth verification is handled by getUser() above.
     const { data } = await supabase.auth.getSession();
     const deactivatedSession = await deactivateAuthSession(data.session);
 
@@ -194,12 +193,9 @@ export async function refreshAuthSessionRecord() {
     // reads the trusted Supabase cookies and updates user_sessions.
     const supabase = await createServerSideClient();
 
-    // getUser() verifies identity server-side before proceeding (BCOMP-202).
-    const { data: { user } } = await supabase.auth.getUser();
-    console.log("[BCOMP-202] refreshAuthSessionRecord getUser:", { userId: user?.id ?? null });
-
-    // getSession() retrieves the access token for HMAC-based session refresh;
-    // auth verification is handled by getUser() above.
+    // getUser() verifies identity server-side; getSession() below retrieves the
+    // access token for HMAC-based session refresh — not for auth verification.
+    await supabase.auth.getUser();
     const { data } = await supabase.auth.getSession();
 
     const refreshedSession = await refreshPersistedAuthSession(data.session);

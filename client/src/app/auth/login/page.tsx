@@ -12,9 +12,8 @@ export default async function LoginPage() {
     const supabase = await createServerSideClient();
 
     // getUser() contacts the Supabase Auth server for a cryptographically
-    // verified user identity — required for server-side auth guards (BCOMP-202).
+    // verified user identity — required for server-side auth guards.
     const { data: { user } } = await supabase.auth.getUser();
-    console.log("[BCOMP-202] LoginPage getUser:", { userId: user?.id ?? null });
 
     if (user) {
         // getSession() here is for the session token passed to
