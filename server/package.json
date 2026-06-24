@@ -9,7 +9,8 @@
         "start": "node dist/index.js",
         "test:cards": "yarn ts-node --transpile-only ./src/test-integration/test-cards.ts",
         "typecheck": "tsc --noEmit",
-        "lint": "eslint src"
+        "lint": "eslint src",
+        "postinstall": "prisma generate"
     },
     "dependencies": {
         "@colyseus/schema": "^4.0.0",
