@@ -24,12 +24,16 @@ import { Button } from "@/components/ui/Button";
 const INK_500 = "#4a546b";
 const INK_300 = "#b3bbcc";
 const BRASS_500 = "#b8893d";
+const VELLUM_050 = "#f3eddc";
 
 interface ReactionCardModalProps {
     isOpen: boolean;
     onClose: () => void;
     phase: string;
     onPass: () => void;
+    reactionCards: Array<{ name: string; gold_cost: number }>;
+    playerGold: number;
+    onPlayCard: (cardName: string) => void;
 }
 
 export function ReactionCardModal({
@@ -37,6 +41,9 @@ export function ReactionCardModal({
     onClose,
     phase,
     onPass,
+    reactionCards,
+    playerGold,
+    onPlayCard,
 }: ReactionCardModalProps) {
     // Auto-close on phase transition so a stale picker can't linger.
     useEffect(() => {
@@ -61,17 +68,41 @@ export function ReactionCardModal({
                     Choose a card to play, or pass to let the exchange resolve.
                 </p>
 
-                <div
-                    className="min-h-[180px] flex flex-col items-center justify-center gap-2 p-6"
-                    style={{ border: `1px dashed ${INK_500}` }}
-                >
-                    <p className="text-sm" style={{ color: INK_300 }}>
-                        No cards in hand.
-                    </p>
-                    <p className="text-xs" style={{ color: INK_500 }}>
-                        Pass to let the exchange resolve.
-                    </p>
-                </div>
+                {reactionCards.length === 0 ? (
+                    <div
+                        className="min-h-45 flex flex-col items-center justify-center gap-2 p-6"
+                        style={{ border: `1px dashed ${INK_500}` }}
+                    >
+                        <p className="text-sm" style={{ color: INK_300 }}>
+                            No cards in hand.
+                        </p>
+                        <p className="text-xs" style={{ color: INK_500 }}>
+                            Pass to let the exchange resolve.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="flex flex-col gap-2">
+                        {reactionCards.map((card) => (
+                            <button
+                                key={card.name}
+                                disabled={playerGold < card.gold_cost}
+                                onClick={() => onPlayCard(card.name)}
+                                className="flex items-center justify-between px-3 py-2 text-sm text-left"
+                                style={{
+                                    background: INK_500,
+                                    color: VELLUM_050,
+                                    opacity: playerGold < card.gold_cost ? 0.4 : 1,
+                                    cursor: playerGold < card.gold_cost ? "not-allowed" : "pointer",
+                                }}
+                            >
+                                <span>{card.name}</span>
+                                {card.gold_cost > 0 && (
+                                    <span style={{ color: BRASS_500 }}>{card.gold_cost}g</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 <div className="flex justify-end pt-2">
                     <Button type="secondary" onClick={onPass}>

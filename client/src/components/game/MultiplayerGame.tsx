@@ -110,8 +110,8 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
         room?.send("pass_reaction", {});
     }
 
-    function playReactionCard() {
-        room?.send("play_reaction_card", {});
+    function playReactionCard(cardName: string) {
+        room?.send("play_reaction_card", { cardName });
     }
 
     // `useGameRoomState` returns a deep-readonly snapshot; cast to the
@@ -136,7 +136,6 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                     onEndTurn={endTurn}
                 />
                 <CombatReactionWindow
-                    state={gameState}
                     sessionId={room.sessionId}
                     onPass={passReaction}
                     onPlay={playReactionCard}

@@ -4,3 +4,4 @@ export * from "./logic";
 export * from "./units/unit-stats";
 export * from "./units/unit-status";
 export * from "./terrain";
+export * from "./cards/reaction-cards";
