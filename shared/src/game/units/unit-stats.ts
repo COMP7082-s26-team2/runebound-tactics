@@ -182,16 +182,34 @@ export function getEffectiveAp(u: {
     return Math.max(0, u.baseAp + u.bonusAp);
 }
 
+export const WEAKNESS_MULTIPLIER = 1.5;
+
 /**
- * Server-authoritative damage formula. Pure — same inputs always produce
- * the same output, with a minimum of 1 damage per hit (so attacks always
- * have some effect; balancing of "0-damage" cases is a future design).
+ * Server-authoritative damage formula. Branches on attacker damageType:
+ *   pure   → effectiveAttack (bypasses defense, no weakness)
+ *   ""     → max(1, effectiveAttack − effectiveDefense) (no weakness)
+ *   other  → max(1, floor(effectiveAttack × multiplier) − effectiveDefense)
+ *             where multiplier = WEAKNESS_MULTIPLIER if attacker type is in defender.weakness, else 1
  */
 export function computeAttackDamage(
-    attacker: { baseAttackDamage: number; bonusAttackDamage: number },
-    defender: { baseDefense: number; bonusDefense: number },
+    attacker: { baseAttackDamage: number; bonusAttackDamage: number; damageType: string },
+    defender: { baseDefense: number; bonusDefense: number; weakness: readonly string[] },
 ): number {
-    return Math.max(1, getEffectiveAttack(attacker) - getEffectiveDefense(defender));
+    const effectiveAttack = getEffectiveAttack(attacker);
+    const effectiveDefense = getEffectiveDefense(defender);
+
+    if (attacker.damageType === "pure") {
+        return effectiveAttack;
+    }
+
+    if (!attacker.damageType) {
+        return Math.max(1, effectiveAttack - effectiveDefense);
+    }
+
+    const multiplier = defender.weakness.includes(attacker.damageType)
+        ? WEAKNESS_MULTIPLIER
+        : 1;
+    return Math.max(1, Math.floor(effectiveAttack * multiplier) - effectiveDefense);
 }
 
 const UNIT_MOVEMENT_TYPE: Record<string, MovementType> = {
