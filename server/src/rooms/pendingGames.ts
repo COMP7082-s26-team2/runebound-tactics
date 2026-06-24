@@ -1,5 +1,5 @@
 export interface PendingGameData {
-    players: { displayName: string; faction: string }[];
+    players: { userId: string; displayName: string; faction: string }[];
 }
 
 /**

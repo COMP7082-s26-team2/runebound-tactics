@@ -58,10 +58,13 @@ export class GameUnit extends Schema {
  * A player participating in an active game session.
  */
 export class GamePlayerSlot extends Schema {
-    /** Colyseus session ID. */
+    /** Colyseus connection/session ID used by the current room state maps. */
     @type("string") sessionId: string = "";
 
-    /** Display name. */
+    /** Verified app player ID from player.player_id; stable across reconnects. */
+    @type("string") userId: string = "";
+
+    /** Display name from the verified player profile. */
     @type("string") displayName: string = "";
 
     /** Chosen faction string ("castle" | "necropolis"). */
