@@ -1,3 +1,4 @@
+export * from "./CallbackStep";
 export * from "./WaitStep";
 export * from "./ParallelStep";
 export * from "./SerialStep";

@@ -72,6 +72,7 @@ export class MultiplayerGameScene extends Scene {
     private _seqDeps: SequenceDeps;
     private _eventBus = new EventBus();
     private _lastSeenHp = new Map<string, number>();
+    private _pendingDamage = new Map<string, { amount: number; newHp: number; effective: boolean }>();
     private _unitFactionMap = new Map<string, string>();
     private _prevSnapshot = new Map<string, LiteUnit>();
     private _hasAuthoritativeSnapshot = false;
@@ -197,8 +198,9 @@ export class MultiplayerGameScene extends Scene {
                 effective: boolean;
                 newDefenderHp: number;
             }) => {
-                this._eventBus.emit("combat:damage", {
-                    unitId: msg.defenderId,
+                // Buffer with authoritative effective flag; onImpact inside the
+                // attack sequence will consume this at the hit frame.
+                this._pendingDamage.set(msg.defenderId, {
                     amount: msg.damage,
                     newHp: msg.newDefenderHp,
                     effective: msg.effective,
@@ -345,14 +347,16 @@ export class MultiplayerGameScene extends Scene {
         for (const [unitId, unit] of incoming) {
             const prevHp = this._lastSeenHp.get(unitId);
             if (prevHp !== undefined && unit.hp < prevHp) {
-                // Fallback emission when combat_result message was lost.
-                // effective is unknown here so defaults to false.
-                this._eventBus.emit("combat:damage", {
-                    unitId,
-                    amount: prevHp - unit.hp,
-                    newHp: unit.hp,
-                    effective: false,
-                });
+                // Seed fallback entry only if combat_result hasn't already
+                // provided authoritative data. The attack sequence's onImpact
+                // will consume whichever entry exists at the hit frame.
+                if (!this._pendingDamage.has(unitId)) {
+                    this._pendingDamage.set(unitId, {
+                        amount: prevHp - unit.hp,
+                        newHp: unit.hp,
+                        effective: false,
+                    });
+                }
             }
             this._lastSeenHp.set(unitId, unit.hp);
 
@@ -453,7 +457,24 @@ export class MultiplayerGameScene extends Scene {
                 buildMoveSequence(move, this._seqDeps),
             );
         }
+        const claimedDamage = new Set<string>();
         for (const attack of events.attacks) {
+            const targetServerId = this._world.getServerIdByEntity(attack.targetId);
+            if (targetServerId && this._pendingDamage.has(targetServerId)) {
+                claimedDamage.add(targetServerId);
+                const sid = targetServerId;
+                attack.onImpact = () => {
+                    const dmg = this._pendingDamage.get(sid);
+                    if (!dmg) return;
+                    this._pendingDamage.delete(sid);
+                    this._eventBus.emit("combat:damage", {
+                        unitId: sid,
+                        amount: dmg.amount,
+                        newHp: dmg.newHp,
+                        effective: dmg.effective,
+                    });
+                };
+            }
             this._sequencer.play(
                 attack.attackerId,
                 buildAttackSequence(attack, this._seqDeps),
@@ -464,6 +485,19 @@ export class MultiplayerGameScene extends Scene {
                 death.entityId,
                 buildDeathSequence(death, this._seqDeps),
             );
+        }
+        // Flush any damage entries not claimed by an attack sequence
+        // (orphan deaths, edge cases where combat_result arrived late).
+        for (const [unitId, dmg] of this._pendingDamage) {
+            if (!claimedDamage.has(unitId)) {
+                this._pendingDamage.delete(unitId);
+                this._eventBus.emit("combat:damage", {
+                    unitId,
+                    amount: dmg.amount,
+                    newHp: dmg.newHp,
+                    effective: dmg.effective,
+                });
+            }
         }
     }
 }
