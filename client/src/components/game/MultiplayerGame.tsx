@@ -136,7 +136,6 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
                     onEndTurn={endTurn}
                 />
                 <CombatReactionWindow
-                    state={gameState}
                     sessionId={room.sessionId}
                     onPass={passReaction}
                     onPlay={playReactionCard}
