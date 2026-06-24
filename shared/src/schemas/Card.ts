@@ -17,13 +17,15 @@ export class Card extends Schema {
     @type("string") card_type: CardType;
     @type("number") gold_cost: number;
     @type("boolean") is_reaction: boolean = false;
+    @type("string") role: string = "";
 
-    constructor(name: string, card_type: CardType, gold_cost: number, is_reaction: boolean) {
+    constructor(name: string, card_type: CardType, gold_cost: number, is_reaction: boolean, role: string = "") {
         super();
         this.name = name;
         this.card_type = card_type;
         this.gold_cost = gold_cost;
         this.is_reaction = is_reaction;
+        this.role = role;
     }
 }
 
@@ -47,7 +49,7 @@ export class DeckManager extends DeckState {
      * Initializes the deck using an array of card blueprints.
      * Allows you to easily construct distinct decks or pool piles.
      */
-    initializeDeck(blueprints: Array<{ name: string; card_type: CardType; gold_cost: number; is_reaction: boolean }>) {
+    initializeDeck(blueprints: Array<{ name: string; card_type: CardType; gold_cost: number; is_reaction: boolean; role?: string }>) {
         this.cards = new ArraySchema<Card>(); // Reset the array securely for Colyseus tracking
         this.discardPile = new ArraySchema<Card>(); // Reset discard pile on new game initialization
 
@@ -57,7 +59,8 @@ export class DeckManager extends DeckState {
                     blueprint.name,
                     blueprint.card_type,
                     blueprint.gold_cost,
-                    blueprint.is_reaction
+                    blueprint.is_reaction,
+                    blueprint.role ?? "",
                 )
             );
         }
