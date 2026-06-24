@@ -1,111 +1,103 @@
 "use client";
 
 import { useEffect } from "react";
-import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { Eyebrow } from "@/components/ui/Eyebrow";
+import { Hint } from "@/components/ui/Hint";
+import { Modal } from "@/components/ui/Modal";
+import { Numeric } from "@/components/ui/Numeric";
 
-/**
- * Reaction card picker modal — refined per BCOMP-194 / vault
- * `runebound-tactics/reaction-window-redesign_design_v1.0`.
- *
- * Refinements vs PR #58's `ReactionCardModal`:
- *   - Title "Reaction cards" (was "Cards Available").
- *   - Pass button labeled "Pass without playing" — disambiguates against
- *     the strip's "Pass" and against future per-card play buttons.
- *   - Empty-state hint adds "Pass to let the exchange resolve." — empty
- *     states are direction, not mood.
- *   - Auto-closes when phase transitions (incl. → "") so the player
- *     never stares at a stale picker.
- *
- * Phase-1 lite: token values inlined; swap to `var(--ink-300)` etc. once
- * the BCOMP-124 UI line merges below.
- */
-
-const INK_500 = "#4a546b";
-const INK_300 = "#b3bbcc";
-const BRASS_500 = "#b8893d";
-const VELLUM_050 = "#f3eddc";
+interface ReactionCard {
+    name: string;
+    gold_cost: number;
+}
 
 interface ReactionCardModalProps {
     isOpen: boolean;
     onClose: () => void;
     phase: string;
-    onPass: () => void;
-    reactionCards: Array<{ name: string; gold_cost: number }>;
+    reactionCards: ReactionCard[];
     playerGold: number;
+    onPass: () => void;
     onPlayCard: (cardName: string) => void;
 }
 
+/**
+ * Reaction card picker modal — per vault designs:
+ *   - `runebound-tactics/ui-design-system_design_v1.5` (BCOMP-124 primitives)
+ *   - `runebound-tactics/reaction-window-redesign_design_v1.0` (BCOMP-194)
+ *
+ * Title "Reaction cards" (action-named, not surface-named).
+ * Pass button reads "Pass without playing" — disambiguates from the strip's Pass
+ * and from per-card play actions inside the modal.
+ * Auto-closes when phase transitions so a stale picker can't linger.
+ */
 export function ReactionCardModal({
     isOpen,
     onClose,
     phase,
-    onPass,
     reactionCards,
     playerGold,
+    onPass,
     onPlayCard,
 }: ReactionCardModalProps) {
-    // Auto-close on phase transition so a stale picker can't linger.
     useEffect(() => {
         if (isOpen) onClose();
-        // Only re-runs when phase changes; isOpen/onClose intentionally
-        // omitted — this hook fires *because* phase changed, not because
-        // the modal was just opened.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [phase]);
+        // Intentionally watches only `phase` — fires when the sub-phase
+        // changes, not when the modal opens.
+    }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Reaction cards">
             <div className="flex flex-col gap-4">
-                <div
-                    className="text-xs font-bold tracking-[0.18em] uppercase"
-                    style={{ color: BRASS_500 }}
-                >
-                    Reaction — {phase || "Idle"}
+                <div className="flex items-baseline justify-between gap-3">
+                    <Eyebrow className="text-[var(--brass-500)]">
+                        Reaction — {phase || "Idle"}
+                    </Eyebrow>
+                    <span className="inline-flex items-baseline gap-1 text-[var(--text-2xs)] text-[var(--ink-300)]">
+                        Gold
+                        <Numeric size="sm" tone="brass">
+                            {playerGold}
+                        </Numeric>
+                    </span>
                 </div>
 
-                <p className="text-sm" style={{ color: INK_300 }}>
+                <Hint>
                     Choose a card to play, or pass to let the exchange resolve.
-                </p>
+                </Hint>
 
                 {reactionCards.length === 0 ? (
-                    <div
-                        className="min-h-45 flex flex-col items-center justify-center gap-2 p-6"
-                        style={{ border: `1px dashed ${INK_500}` }}
-                    >
-                        <p className="text-sm" style={{ color: INK_300 }}>
-                            No cards in hand.
-                        </p>
-                        <p className="text-xs" style={{ color: INK_500 }}>
-                            Pass to let the exchange resolve.
-                        </p>
+                    <div className="min-h-[180px] flex flex-col items-center justify-center gap-2 p-6 border border-dashed border-[var(--ink-500)]">
+                        <Hint>No cards in hand.</Hint>
+                        <Hint>Pass to let the exchange resolve.</Hint>
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-2">
-                        {reactionCards.map((card) => (
-                            <button
-                                key={card.name}
-                                disabled={playerGold < card.gold_cost}
-                                onClick={() => onPlayCard(card.name)}
-                                className="flex items-center justify-between px-3 py-2 text-sm text-left"
-                                style={{
-                                    background: INK_500,
-                                    color: VELLUM_050,
-                                    opacity: playerGold < card.gold_cost ? 0.4 : 1,
-                                    cursor: playerGold < card.gold_cost ? "not-allowed" : "pointer",
-                                }}
-                            >
-                                <span>{card.name}</span>
-                                {card.gold_cost > 0 && (
-                                    <span style={{ color: BRASS_500 }}>{card.gold_cost}g</span>
-                                )}
-                            </button>
-                        ))}
-                    </div>
+                    <ul className="flex flex-col gap-2">
+                        {reactionCards.map((card) => {
+                            const canAfford = playerGold >= card.gold_cost;
+                            return (
+                                <li key={card.name}>
+                                    <button
+                                        type="button"
+                                        disabled={!canAfford}
+                                        onClick={() => onPlayCard(card.name)}
+                                        className="w-full flex items-center justify-between px-3 py-2 text-left text-[var(--text-sm)] bg-[var(--ink-700)] text-[var(--vellum-050)] [box-shadow:var(--bevel-chamber)] hover:bg-[var(--ink-500)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brass-300)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[var(--ink-700)]"
+                                    >
+                                        <span>{card.name}</span>
+                                        {card.gold_cost > 0 && (
+                                            <span className="text-[var(--brass-500)] font-bold">
+                                                {card.gold_cost}g
+                                            </span>
+                                        )}
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ul>
                 )}
 
                 <div className="flex justify-end pt-2">
-                    <Button type="secondary" onClick={onPass}>
+                    <Button intent="secondary" onClick={onPass}>
                         Pass without playing
                     </Button>
                 </div>

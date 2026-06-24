@@ -85,7 +85,7 @@ export function CombatReactionWindow({
                 </div>
                 {isActivePlayer ? (
                     <div className="flex gap-2 mt-1">
-                        <Button type="secondary" onClick={() => setIsCardModalOpen(true)}>
+                        <Button intent="secondary" onClick={() => setIsCardModalOpen(true)}>
                             Play
                         </Button>
                         <Button onClick={onPass}>Pass</Button>
