@@ -53,6 +53,8 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
                         name: "Warrior",
                         defense: 5,
                         attackRange: 1,
+                        damageType: "",
+                        weakness: [],
                     },
                     {
                         assetKey: "tilemap:entity:castle:swordsman",
@@ -69,6 +71,8 @@ export default function GameCanvas({ debug = false }: GameCanvasOptions) {
                         name: "Archer",
                         defense: 5,
                         attackRange: 1,
+                        damageType: "",
+                        weakness: [],
                     },
                     {
                         assetKey: "tilemap:entity:castle:archer",
