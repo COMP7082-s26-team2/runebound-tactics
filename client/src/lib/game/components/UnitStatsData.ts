@@ -5,4 +5,6 @@ export type UnitStatsData = {
     defense: number;
     movement: number;
     attackRange: number;
+    damageType: string;
+    weakness: readonly string[];
 };
