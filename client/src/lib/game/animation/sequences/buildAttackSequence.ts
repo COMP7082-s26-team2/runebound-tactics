@@ -1,6 +1,7 @@
 import type { AnimationStep } from "@/lib/engine/animation";
 import {
     AnimationSequence,
+    CallbackStep,
     WalkStep,
     LungeStep,
     RecoilStep,
@@ -103,6 +104,7 @@ export function buildAttackSequence(
             ),
             new SerialStep([
                 new WaitStep(impactDelay),
+                ...(ev.onImpact ? [new CallbackStep(ev.onImpact)] : []),
                 new ParallelStep([
                     new RecoilStep(
                         ev.targetId,

@@ -43,6 +43,8 @@ export interface AttackEvent {
     targetWillDie: boolean;
     /** Target HP after this snapshot. 0 if dying. */
     targetHpAfter: number;
+    /** Called at the moment of impact (mid-lunge). Used to emit combat:damage in sync with the hit frame. */
+    onImpact?: () => void;
 }
 
 /** A unit despawned without a matched attacker (orphan death — rare in 1v1). */

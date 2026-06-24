@@ -16,6 +16,9 @@ import {
 import { MultiplayerSelectionSystem } from "@/lib/game/systems/MultiplayerSelectionSystem";
 import { MovementRangeRenderSystem } from "@/lib/game/systems/MovementRangeRenderSystem";
 import { EnemyTargetOutlineSystem } from "@/lib/game/systems/EnemyTargetOutlineSystem";
+import { TileFlashSystem } from "@/lib/game/systems/TileFlashSystem";
+import { HealthBarRenderSystem } from "@/lib/game/systems/HealthBarRenderSystem";
+import { DamageNumberSystem } from "@/lib/game/systems/DamageNumberSystem";
 import {
     unitTypeToStats,
     unitTypeToAppearance,
@@ -69,6 +72,8 @@ export class MultiplayerGameScene extends Scene {
     private _seqDeps: SequenceDeps;
     private _eventBus = new EventBus();
     private _lastSeenHp = new Map<string, number>();
+    private _pendingDamage = new Map<string, { amount: number; newHp: number; effective: boolean }>();
+    private _unitFactionMap = new Map<string, string>();
     private _prevSnapshot = new Map<string, LiteUnit>();
     private _hasAuthoritativeSnapshot = false;
     public input: InputSystem;
@@ -165,7 +170,43 @@ export class MultiplayerGameScene extends Scene {
                 this._selection,
             ),
         );
+        this.components.add(
+            new TileFlashSystem(this._world, this._eventBus, CELL_SIZE),
+        );
+        this.components.add(
+            new HealthBarRenderSystem(
+                this._world,
+                this.input,
+                this._eventBus,
+                this._lastSeenHp,
+                (ownerId) => this._room.state.players.get(ownerId)?.faction ?? "",
+                CELL_SIZE,
+                this._tweens,
+            ),
+        );
+        this.components.add(
+            new DamageNumberSystem(this._world, this._eventBus, CELL_SIZE),
+        );
         this.components.add(this.input);
+
+        this._room.onMessage(
+            "combat_result",
+            (msg: {
+                attackerId: string;
+                defenderId: string;
+                damage: number;
+                effective: boolean;
+                newDefenderHp: number;
+            }) => {
+                // Buffer with authoritative effective flag; onImpact inside the
+                // attack sequence will consume this at the hit frame.
+                this._pendingDamage.set(msg.defenderId, {
+                    amount: msg.damage,
+                    newHp: msg.newDefenderHp,
+                    effective: msg.effective,
+                });
+            },
+        );
     }
 
     destroy(): void {
@@ -306,13 +347,22 @@ export class MultiplayerGameScene extends Scene {
         for (const [unitId, unit] of incoming) {
             const prevHp = this._lastSeenHp.get(unitId);
             if (prevHp !== undefined && unit.hp < prevHp) {
-                this._eventBus.emit("combat:damage", {
-                    unitId,
-                    amount: prevHp - unit.hp,
-                    newHp: unit.hp,
-                });
+                // Seed fallback entry only if combat_result hasn't already
+                // provided authoritative data. The attack sequence's onImpact
+                // will consume whichever entry exists at the hit frame.
+                if (!this._pendingDamage.has(unitId)) {
+                    this._pendingDamage.set(unitId, {
+                        amount: prevHp - unit.hp,
+                        newHp: unit.hp,
+                        effective: false,
+                    });
+                }
             }
             this._lastSeenHp.set(unitId, unit.hp);
+
+            const faction =
+                this._room.state.players.get(unit.ownerId)?.faction ?? "";
+            this._unitFactionMap.set(unitId, faction);
         }
 
         // ── 3 + 4. Update exhausted + spawn new units ───────────
@@ -407,7 +457,24 @@ export class MultiplayerGameScene extends Scene {
                 buildMoveSequence(move, this._seqDeps),
             );
         }
+        const claimedDamage = new Set<string>();
         for (const attack of events.attacks) {
+            const targetServerId = this._world.getServerIdByEntity(attack.targetId);
+            if (targetServerId && this._pendingDamage.has(targetServerId)) {
+                claimedDamage.add(targetServerId);
+                const sid = targetServerId;
+                attack.onImpact = () => {
+                    const dmg = this._pendingDamage.get(sid);
+                    if (!dmg) return;
+                    this._pendingDamage.delete(sid);
+                    this._eventBus.emit("combat:damage", {
+                        unitId: sid,
+                        amount: dmg.amount,
+                        newHp: dmg.newHp,
+                        effective: dmg.effective,
+                    });
+                };
+            }
             this._sequencer.play(
                 attack.attackerId,
                 buildAttackSequence(attack, this._seqDeps),
@@ -418,6 +485,19 @@ export class MultiplayerGameScene extends Scene {
                 death.entityId,
                 buildDeathSequence(death, this._seqDeps),
             );
+        }
+        // Flush any damage entries not claimed by an attack sequence
+        // (orphan deaths, edge cases where combat_result arrived late).
+        for (const [unitId, dmg] of this._pendingDamage) {
+            if (!claimedDamage.has(unitId)) {
+                this._pendingDamage.delete(unitId);
+                this._eventBus.emit("combat:damage", {
+                    unitId,
+                    amount: dmg.amount,
+                    newHp: dmg.newHp,
+                    effective: dmg.effective,
+                });
+            }
         }
     }
 }

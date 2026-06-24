@@ -1,6 +1,7 @@
 import type { UnitStatsData, AppearanceData } from "@/lib/game/components";
 import {
     getUnitMovement,
+    getUnitBaseHealth,
     getUnitDamageType,
     getUnitDefaultWeakness,
 } from "@runebound-tactics/shared";
@@ -20,7 +21,7 @@ export function unitTypeToStats(unitType: string): UnitStatsData {
     const name = unitType.split(":")[1] ?? unitType;
     return {
         name,
-        health: 30,
+        health: getUnitBaseHealth(unitType),
         attack: 5,
         defense: 3,
         movement: getUnitMovement(unitType),
