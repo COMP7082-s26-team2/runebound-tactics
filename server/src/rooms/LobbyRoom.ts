@@ -1,11 +1,10 @@
 import { Room, Client, matchMaker } from "colyseus";
 import { LobbyPlayerSlot, LobbyState, ROOM_GAME } from "@runebound-tactics/shared";
 import type { Faction, LobbySummary } from "@runebound-tactics/shared";
+import { AuthJoinError, verifySupabaseJoinAuth } from "../auth/supabaseAuth";
+import type { AuthenticatedJoinOptions, VerifiedClientAuth } from "../auth/types";
+import { markUserInLobby, markUserLeftLobby } from "../presence/userPresence";
 import { pendingGames } from "./pendingGames";
-
-interface JoinOptions {
-    displayName?: string;
-}
 
 interface SetReadyPayload {
     isReady: boolean;
@@ -57,12 +56,48 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
         });
     }
 
-    onJoin(client: Client, options?: JoinOptions): void {
+    async onAuth(
+        _client: Client,
+        options?: AuthenticatedJoinOptions,
+    ): Promise<VerifiedClientAuth> {
+        try {
+            // Colyseus stores the returned payload on client.auth before onJoin
+            // runs. Every lobby mutation after this point can use verified app
+            // identity instead of trusting browser-supplied display names.
+            return await verifySupabaseJoinAuth(options);
+        } catch (error) {
+            // Avoid logging JWTs or raw join options; the helper already keeps
+            // token details out of errors. Colyseus rejects the seat reservation.
+            if (error instanceof AuthJoinError) {
+                console.warn(`[LobbyRoom] Rejected unauthenticated join: ${error.message}`);
+            } else {
+                console.error("[LobbyRoom] Auth verification failed:", error);
+            }
+            throw error;
+        }
+    }
+
+    async onJoin(client: Client): Promise<void> {
         if (this.state.status === "transferring") {
             throw new Error("Game is already starting");
         }
 
-        const displayName = String(options?.displayName ?? "Player").slice(0, 32);
+        const auth = client.auth as VerifiedClientAuth | undefined;
+        if (!auth?.userId) {
+            throw new Error("Missing verified lobby auth");
+        }
+
+        const alreadyJoined = [...this.state.players.values()].some(
+            player => player.userId === auth.userId,
+        );
+
+        if (alreadyJoined) {
+            throw new Error("Authenticated user is already in this lobby");
+        }
+
+        // displayName remains a client-facing field, but its value now comes
+        // from the verified player profile returned by onAuth.
+        const displayName = auth.username.slice(0, 32);
 
         const usedSlots = new Set([...this.state.players.values()].map(p => p.slot));
         const nextSlot = Array.from(
@@ -76,16 +111,33 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
 
         const slot = new LobbyPlayerSlot();
         slot.sessionId = client.sessionId;
+        slot.userId = auth.userId;
         slot.displayName = displayName;
         slot.slot = nextSlot;
         this.state.players.set(client.sessionId, slot);
+
+        // Presence is written after the lobby slot exists so the database only
+        // tracks users who were actually accepted into this room.
+        try {
+            await markUserInLobby(auth.userId, this.roomId);
+        } catch (error) {
+            // Presence persistence should not break the live Colyseus room. If
+            // the DB write fails, the server logs it for diagnosis while the
+            // player can continue through the current lobby flow.
+            console.error(
+                `[LobbyRoom] Failed to mark user ${auth.userId} in lobby ${this.roomId}:`,
+                error,
+            );
+        }
 
         if (this.state.players.size === 1) {
             this._hostSessionId = client.sessionId;
         }
 
         this._updateMetadata();
-        console.log(`[LobbyRoom] ${displayName} joined slot ${nextSlot} (${client.sessionId})`);
+        console.log(
+            `[LobbyRoom] ${displayName} joined slot ${nextSlot} as user ${auth.userId} (${client.sessionId})`,
+        );
     }
 
     async onDrop(client: Client, code?: number): Promise<void> {
@@ -94,22 +146,35 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
             console.log(`[LobbyRoom] ${client.sessionId} reconnected`);
         } catch {
             console.log(`[LobbyRoom] ${client.sessionId} reconnect window expired (code ${code})`);
-            this._removePlayer(client.sessionId);
+            await this._removePlayer(client.sessionId);
         }
     }
 
-    onLeave(client: Client): void {
-        this._removePlayer(client.sessionId);
+    async onLeave(client: Client): Promise<void> {
+        await this._removePlayer(client.sessionId);
     }
 
     onDispose(): void {
         this._cancelCountdown();
     }
 
-    private _removePlayer(sessionId: string): void {
+    private async _removePlayer(sessionId: string): Promise<void> {
         const player = this.state.players.get(sessionId);
         console.log(`[LobbyRoom] ${player?.displayName ?? sessionId} left`);
         this.state.players.delete(sessionId);
+
+        if (player?.userId) {
+            // The helper only clears the lobby if this room is still the stored
+            // current_lobby_id, protecting newer lobby joins from stale leaves.
+            try {
+                await markUserLeftLobby(player.userId, this.roomId);
+            } catch (error) {
+                console.error(
+                    `[LobbyRoom] Failed to clear lobby presence for user ${player.userId} in lobby ${this.roomId}:`,
+                    error,
+                );
+            }
+        }
 
         if (sessionId === this._hostSessionId) {
             const next = this.state.players.keys().next().value as string | undefined;
@@ -162,6 +227,7 @@ export class LobbyRoom extends Room<{ state: LobbyState }> {
         this.state.status = "transferring";
 
         const players = [...this.state.players.values()].map(p => ({
+            userId: p.userId,
             displayName: p.displayName,
             faction: p.faction,
         }));

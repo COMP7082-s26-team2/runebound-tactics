@@ -16,6 +16,7 @@ import {
     ANIMATION_FRAME_DURATIONS,
     DEFAULT_FRAME_DURATION,
 } from "@/lib/game/assets";
+import type { TerrainLayer } from "@/lib/game/tilemap";
 
 /**
  * A simple scene demonstrating grid-based movement and combat.
@@ -40,11 +41,15 @@ export class GridMovementScene extends Scene {
     public turnFlow = new TurnFlow();
     public turnSystem!: TurnSystem;
     private _assetHandler?: AssetHandler;
+    private _terrainLayer: TerrainLayer;
+    private _tilemapSheet: HTMLImageElement;
 
-    constructor(canvas: HTMLCanvasElement, assetHandler?: AssetHandler) {
+    constructor(canvas: HTMLCanvasElement, assetHandler?: AssetHandler, terrainLayer?: TerrainLayer, tilemapSheet?: HTMLImageElement) {
         super();
         this._canvas = canvas;
         this._assetHandler = assetHandler;
+        this._terrainLayer = terrainLayer!;
+        this._tilemapSheet = tilemapSheet!;
         this.input = new InputSystem(canvas);
     }
 
@@ -293,7 +298,7 @@ export class GridMovementScene extends Scene {
             ),
         );
         this.components.add(
-            new GridRenderSystem(this._world, GRID_COLS, GRID_ROWS, CELL_SIZE),
+            new GridRenderSystem(this._terrainLayer, this._tilemapSheet, CELL_SIZE),
         );
         this.components.add(
             new MovementRangeSystem(this._world, CELL_SIZE, this.state),

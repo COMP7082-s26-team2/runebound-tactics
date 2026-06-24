@@ -9,6 +9,7 @@ import { ClientOnly } from "@/components/util/ClientOnly";
 import { Button } from "@/components/ui/Button";
 import { BackButton } from "@/components/ui/BackButton";
 import { CreateLobbyModal } from "@/components/lobby/CreateLobbyModal";
+import { LobbyReconnectGate } from "@/components/lobby/LobbyReconnectGate";
 
 function LobbiesPageInner() {
     const router = useRouter();
@@ -22,6 +23,7 @@ function LobbiesPageInner() {
 
     return (
         <div className="min-h-screen bg-gray-900 flex flex-col gap-4 p-4">
+            <LobbyReconnectGate />
             <h1 className="text-white text-2xl">Lobbies</h1>
             {error && <p className="text-red-400">Error: {error.message}</p>}
             {loading && rooms === null && <p className="text-white">Loading…</p>}

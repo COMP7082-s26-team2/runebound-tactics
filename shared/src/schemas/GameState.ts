@@ -1,4 +1,5 @@
-import { MapSchema, Schema, type } from "@colyseus/schema";
+import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
+import { DeckManager } from "./Card"
 
 /**
  * A single unit on the game grid.
@@ -20,11 +21,21 @@ export class GameUnit extends Schema {
     /** Grid row. */
     @type("int16") y: number = 0;
 
-    /** Current hit points. */
+    /** Current hit points. Managed by BCOMP-128. */
     @type("int32") hp: number = 0;
 
-    /** Maximum hit points. */
-    @type("int32") maxHp: number = 0;
+    @type("int32") baseMaxHealth: number = 0;
+    @type("int32") bonusMaxHealth: number = 0;
+    @type("int32") baseAttackDamage: number = 0;
+    @type("int32") bonusAttackDamage: number = 0;
+    @type("int32") baseAp: number = 0;
+    @type("int32") bonusAp: number = 0;
+    @type("int32") baseMovement: number = 0;
+    @type("int32") bonusMovement: number = 0;
+    @type("int32") baseDefense: number = 0;
+    @type("int32") bonusDefense: number = 0;
+    @type("string") damageType: string = "";
+    @type(["string"]) weakness = new ArraySchema<string>();
 
     /**
      * Whether this unit has used its action (attack/ability) this turn.
@@ -38,16 +49,22 @@ export class GameUnit extends Schema {
      * Reset to false at the start of the owning player's turn.
      */
     @type("boolean") hasMoved: boolean = false;
+
+    /** Current action points. Decrements per move/attack; restored at turn start. */
+    @type("int32") actionPoints: number = 0;
 }
 
 /**
  * A player participating in an active game session.
  */
 export class GamePlayerSlot extends Schema {
-    /** Colyseus session ID. */
+    /** Colyseus connection/session ID used by the current room state maps. */
     @type("string") sessionId: string = "";
 
-    /** Display name. */
+    /** Verified app player ID from player.player_id; stable across reconnects. */
+    @type("string") userId: string = "";
+
+    /** Display name from the verified player profile. */
     @type("string") displayName: string = "";
 
     /** Chosen faction string ("castle" | "necropolis"). */
@@ -55,6 +72,9 @@ export class GamePlayerSlot extends Schema {
 
     /** Current gold. Increased by city income at the start of each player's turn. */
     @type("int32") gold: number = 0;
+
+    /** Card Deck Manager. See the Card Schema for more details */
+    @type(DeckManager) deck = new DeckManager();
 
     /**
      * Whether this player has been eliminated.
@@ -103,4 +123,11 @@ export class GameState extends Schema {
      * Written exclusively by the GameRoom TurnMachine subscriber.
      */
     @type("string") turnPhase: string = "action-phase";
+
+    /**
+     * Active sub-phase of the reaction window.
+     * Values: "defender" | "defender-ally" | "attacker-ally" | "resolve" | "" (outside window)
+     * Written exclusively by the GameRoom ReactionWindowMachine subscriber.
+     */
+    @type("string") reactionPhase: string = "";
 }
