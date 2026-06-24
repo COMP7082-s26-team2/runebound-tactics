@@ -1,0 +1,15 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches:
+      - develop  # Change this to whatever branch you are actively using
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render Deploy Hook
+        run: |
+          curl -X POST "${{ secrets.RENDER_BACKEND_DEV_DEPLOY_HOOK }}"
+          curl -X POST "${{ secrets.RENDER_FRONTEND_DEV_DEPLOY_HOOK }}"
