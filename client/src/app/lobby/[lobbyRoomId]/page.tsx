@@ -1,18 +1,17 @@
 "use client";
 
 import { use } from "react";
-import { useRouter } from "next/navigation";
 import type { LobbyState } from "@runebound-tactics/shared";
 import { LobbyRoomProvider } from "@/context/colyseus";
 import { LobbyWaitingRoom } from "@/components/lobby/LobbyWaitingRoom";
-import { joinOrReconnectLobby, clearLobbyToken } from "@/lib/multiplayer/reconnect";
+import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 import { getDisplayName } from "@/lib/multiplayer/identity";
 import { peekHandoff } from "@/lib/multiplayer/roomHandoff";
 import { ClientOnly } from "@/components/util/ClientOnly";
 
 export default function LobbyPage({ params }: { params: Promise<{ lobbyRoomId: string }> }) {
     const { lobbyRoomId } = use(params);
-    const router = useRouter();
+    const { joinOrReconnectLobby, clearLobbyToken } = useRoomConnect();
 
     return (
         <ClientOnly fallback={<p className="text-white p-4">Connecting…</p>}>

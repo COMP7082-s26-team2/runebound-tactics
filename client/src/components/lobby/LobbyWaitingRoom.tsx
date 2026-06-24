@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { useLobbyRoom, useLobbyRoomMessage, useLobbyRoomState } from "@/context/colyseus";
 import { SlotList } from "./SlotList";
 import { Button } from "@/components/ui/Button";
-import { clearLobbyToken } from "@/lib/multiplayer/reconnect";
+import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 
 export function LobbyWaitingRoom({ expectedRoomId }: { expectedRoomId: string }) {
     const { room, error } = useLobbyRoom();
     const state = useLobbyRoomState();
     const router = useRouter();
+    const { clearLobbyToken } = useRoomConnect();
     const [countdown, setCountdown] = useState<number | null>(null);
 
     const roomMatches = room?.roomId === expectedRoomId;
@@ -35,7 +36,7 @@ export function LobbyWaitingRoom({ expectedRoomId }: { expectedRoomId: string })
             clearLobbyToken();
             router.push(`/game/${gameRoomId}`);
         }
-    }, [gameRoomId, router]);
+    }, [clearLobbyToken, gameRoomId, router]);
 
     if (error) {
         return (

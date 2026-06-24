@@ -2,9 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useGameRoom, useGameRoomState } from "@/context/colyseus";
+import {
+    useGameConnection,
+    useGameRoom,
+    useGameRoomState,
+} from "@/context/colyseus";
 import { Button } from "@/components/ui/Button";
-import { clearGameToken } from "@/lib/multiplayer/reconnect";
+import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 import { MultiplayerGameCanvas } from "@/components/game/MultiplayerGameCanvas";
 import { GameHUD } from "@/components/game/GameHUD";
 import type { GameState } from "@runebound-tactics/shared";
@@ -24,6 +28,8 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     const { room, error } = useGameRoom();
     const state = useGameRoomState();
     const router = useRouter();
+    const { leaveGame } = useGameConnection();
+    const { clearGameToken } = useRoomConnect();
 
     const roomMatches = room?.roomId === expectedRoomId;
 
@@ -73,9 +79,10 @@ export function MultiplayerGame({ expectedRoomId }: MultiplayerGameProps) {
     }
 
     async function leave() {
-        clearGameToken();
         try {
-            await room?.leave(true);
+            if (room) {
+                await leaveGame(room);
+            }
         } catch {
             /* ignore */
         }
