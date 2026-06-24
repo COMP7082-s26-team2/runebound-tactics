@@ -15,10 +15,9 @@ import type { GameState } from "@runebound-tactics/shared";
 import { usePathname, useRouter } from "next/navigation";
 import {
     GameRoomStoreProvider,
-    useGameRoomState,
     type GameRoomSnapshot,
 } from "@/context/colyseus/gameRoomContext";
-import { ClientOnly } from "@/components/util/ClientOnly";
+import { GameReconnectOverlay } from "@/components/game/GameReconnectOverlay";
 import { useRoomConnect } from "@/lib/multiplayer/reconnect";
 
 export type GameReconnectStatus = "idle" | "reconnecting" | "failed";
@@ -29,60 +28,16 @@ interface ActiveGameTarget {
 }
 
 interface GameConnectionContextValue {
+    isReconnecting: boolean;
+    stateSyncVersion: number;
     reconnectError: string | null;
     connectGame: (roomId: string, displayName: string) => void;
     leaveGame: (room: Room<unknown, GameState>) => Promise<void>;
     clearReconnectError: () => void;
 }
 
-interface GameStateSyncProps {
-    activeGameRoomId: string | null;
-    reconnectStatus: GameReconnectStatus;
-    completeReconnect: () => void;
-}
-
 const GameConnectionContext =
     createContext<GameConnectionContextValue | null>(null);
-
-/**
- * Waits for the reconnected room's full state before returning the player to
- * the game route and dismissing reconnecting state.
- */
-function GameStateSync({
-    activeGameRoomId,
-    reconnectStatus,
-    completeReconnect,
-}: GameStateSyncProps) {
-    const state = useGameRoomState();
-    const pathname = usePathname();
-    const router = useRouter();
-
-    useEffect(() => {
-        if (
-            reconnectStatus !== "reconnecting" ||
-            !activeGameRoomId ||
-            !state
-        ) {
-            return;
-        }
-
-        const gamePath = `/game/${activeGameRoomId}`;
-        completeReconnect();
-
-        if (pathname !== gamePath) {
-            router.replace(gamePath);
-        }
-    }, [
-        activeGameRoomId,
-        completeReconnect,
-        pathname,
-        reconnectStatus,
-        router,
-        state,
-    ]);
-
-    return null;
-}
 
 /**
  * Owns one active game room across route navigation and explicitly replaces a
@@ -96,7 +51,6 @@ export function GameConnectionProvider({
 }: {
     children: ReactNode;
 }) {
-    const [target, setTarget] = useState<ActiveGameTarget | null>(null);
     const [roomSnapshot, setRoomSnapshot] = useState<GameRoomSnapshot>({
         room: undefined,
         error: undefined,
@@ -104,14 +58,21 @@ export function GameConnectionProvider({
     const [reconnectStatus, setReconnectStatus] =
         useState<GameReconnectStatus>("idle");
     const [reconnectError, setReconnectError] = useState<string | null>(null);
+    const [stateSyncVersion, setStateSyncVersion] = useState(0);
     const targetRef = useRef<ActiveGameTarget | null>(null);
     const connectionGenerationRef = useRef(0);
+    const pathname = usePathname();
+    const pathnameRef = useRef(pathname);
     const router = useRouter();
     const {
         joinOrReconnectGame,
         clearGameToken,
         watchGameConnection,
     } = useRoomConnect();
+
+    useEffect(() => {
+        pathnameRef.current = pathname;
+    }, [pathname]);
 
     const failConnection = useCallback(
         (error: unknown) => {
@@ -123,7 +84,6 @@ export function GameConnectionProvider({
             connectionGenerationRef.current += 1;
             targetRef.current = null;
             clearGameToken();
-            setTarget(null);
             setRoomSnapshot({
                 room: undefined,
                 error:
@@ -162,9 +122,33 @@ export function GameConnectionProvider({
                     return;
                 }
 
-                setRoomSnapshot({
-                    room: nextRoom,
-                    error: undefined,
+                // A joined room exists before its authoritative ROOM_STATE
+                // message arrives. Waiting for the first state change prevents
+                // the UI from treating an empty/default schema as restored.
+                nextRoom.onStateChange.once(() => {
+                    if (connectionGenerationRef.current !== generation) {
+                        return;
+                    }
+
+                    // Publish the replacement room only after its state exists.
+                    // Consumers therefore never render its default schema.
+                    setRoomSnapshot({
+                        room: nextRoom,
+                        error: undefined,
+                    });
+                    setStateSyncVersion((version) => version + 1);
+
+                    if (!reconnectOnly) {
+                        return;
+                    }
+
+                    setReconnectStatus("idle");
+                    setReconnectError(null);
+
+                    const gamePath = `/game/${gameTarget.roomId}`;
+                    if (pathnameRef.current !== gamePath) {
+                        router.replace(gamePath);
+                    }
                 });
             } catch (error) {
                 if (connectionGenerationRef.current === generation) {
@@ -172,7 +156,7 @@ export function GameConnectionProvider({
                 }
             }
         },
-        [failConnection, joinOrReconnectGame],
+        [failConnection, joinOrReconnectGame, router],
     );
 
     const requestReconnect = useCallback(() => {
@@ -208,18 +192,12 @@ export function GameConnectionProvider({
 
             const nextTarget = { roomId, displayName };
             targetRef.current = nextTarget;
-            setTarget(nextTarget);
             setReconnectStatus("idle");
             setReconnectError(null);
             void startConnection(nextTarget, false);
         },
         [roomSnapshot.room, startConnection],
     );
-
-    const completeReconnect = useCallback(() => {
-        setReconnectStatus("idle");
-        setReconnectError(null);
-    }, []);
 
     const leaveGame = useCallback(
         async (activeRoom: Room<unknown, GameState>) => {
@@ -228,7 +206,6 @@ export function GameConnectionProvider({
             connectionGenerationRef.current += 1;
             targetRef.current = null;
             clearGameToken();
-            setTarget(null);
             setRoomSnapshot({
                 room: undefined,
                 error: undefined,
@@ -246,6 +223,8 @@ export function GameConnectionProvider({
 
     const contextValue = useMemo<GameConnectionContextValue>(
         () => ({
+            isReconnecting: reconnectStatus === "reconnecting",
+            stateSyncVersion,
             reconnectError,
             connectGame,
             leaveGame,
@@ -256,21 +235,18 @@ export function GameConnectionProvider({
             connectGame,
             leaveGame,
             reconnectError,
+            reconnectStatus,
+            stateSyncVersion,
         ],
     );
 
     return (
         <GameConnectionContext.Provider value={contextValue}>
             <GameRoomStoreProvider value={roomSnapshot}>
-                {/* Colyseus state snapshots require a browser subscription. */}
-                <ClientOnly>
-                    <GameStateSync
-                        activeGameRoomId={target?.roomId ?? null}
-                        reconnectStatus={reconnectStatus}
-                        completeReconnect={completeReconnect}
-                    />
-                </ClientOnly>
                 {children}
+                {reconnectStatus === "reconnecting" && (
+                    <GameReconnectOverlay />
+                )}
             </GameRoomStoreProvider>
         </GameConnectionContext.Provider>
     );

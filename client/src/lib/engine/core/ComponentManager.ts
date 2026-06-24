@@ -17,6 +17,14 @@ export class ComponentManager {
         component.destroy?.();
     }
 
+    /** Destroys every registered component and releases their references. */
+    clear(): void {
+        for (const component of this._components) {
+            component.destroy?.();
+        }
+        this._components = [];
+    }
+
     update(dt: number): void {
         for (const c of this._components) {
             c.update?.(dt);
