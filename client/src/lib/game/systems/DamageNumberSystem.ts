@@ -3,8 +3,8 @@ import type { World } from "@/lib/engine/world/World";
 import type EventBus from "@/lib/engine/EventBus";
 import { token, getFontFamily } from "@/lib/theme/tokens";
 
-const STD_DURATION_MS = 600;
-const LETHAL_EXTRA_MS = 400;
+const STD_DURATION_MS = 1000;
+const LETHAL_EXTRA_MS = 1200;
 const RISE_PX = 18;
 const MAX_FLOATS_PER_UNIT = 5;
 const STAGGER_PX = 8;
@@ -109,7 +109,7 @@ export class DamageNumberSystem implements GameComponent {
                     coord.q * this._cellSize +
                     this._cellSize / 2 +
                     staggerX,
-                spawnCy: coord.r * this._cellSize - 8, // aligns with health bar top (BAR_Y_OFFSET)
+                spawnCy: coord.r * this._cellSize - 10, // aligns with health bar top (BAR_Y_OFFSET)
                 stackSlot: slot,
             });
         });
@@ -136,7 +136,7 @@ export class DamageNumberSystem implements GameComponent {
         for (const f of this._floats) {
             const { yOffset, opacity } = this._interpolate(f);
             const text = `${f.lethal ? "✕" : "-"}${f.amount}`;
-            const fontSize = f.lethal ? 18 : 14;
+            const fontSize = f.lethal ? 50 : 50;
 
             ctx.globalAlpha = opacity;
             ctx.fillStyle = f.effective ? this._sealRed : this._white;
