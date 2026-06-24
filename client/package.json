@@ -7,7 +7,8 @@
         "build": "next build",
         "start": "next start",
         "lint": "eslint",
-        "test": "jest"
+        "test": "jest",
+        "postinstall": "prisma generate --schema=../prisma/schema.prisma"
     },
     "dependencies": {
         "@tailwindcss/postcss": "^4.0.0",
