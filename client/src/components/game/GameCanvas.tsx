@@ -1,102 +1,68 @@
 "use client";
 
-/**
- * This component is for MVP purposes only. It will be replaced with a more robust implementation in the future.
- */
+import { useEffect, useRef, useMemo } from "react";
+import { GameEngine, AssetHandler } from "@/lib/";
+import { GridMovementScene, ASSET_MANIFEST } from "@/lib/game/";
+import { CanvasHUDSystem } from "@/components/game/CanvasHUDSystem";
 
-import { useEffect, useRef } from "react";
-import { GameEngine, World } from "@/lib/";
-import { UnitRenderSystem } from "@/lib/game/";
-import { GridRenderSystem } from "@/lib/game/";
-import { SquareGrid } from "@/lib/engine/";
-
-export interface GameCanvasOptions {
-    debug?: boolean;
-}
-
-export default function GameCanvas({ debug = false }: GameCanvasOptions) {
+export default function GameCanvas({ debug = false }: { debug?: boolean }) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const hud = useMemo(() => new CanvasHUDSystem(), []);
+
+    const uiData = useMemo(() => ({
+        tactician: { name: "Tactician Jas", rank: "Diamond I" },
+        stats: { hp: "100/100", ad: 10 },
+        status: { phase: "Action", turn: 1 },
+        cards: Array(10).fill(null)
+    }), []);
 
     useEffect(() => {
         if (!canvasRef.current) return;
-
         const canvas = canvasRef.current;
-
-        const engine = new GameEngine({
-            canvas,
-            width: 800,
-            height: 800,
-            fixedDelta: 1 / 60,
-            debug,
+        
+        const engine = new GameEngine({ 
+            canvas, 
+            width: 1200, 
+            height: 900, 
+            fixedDelta: 1 / 60, 
+            debug 
         });
 
-        // init hook
-        engine.init = () => {
-            console.log("Engine initialized");
+        const assetHandler = new AssetHandler(ASSET_MANIFEST);
 
-            const grid = new SquareGrid(50);
-            const world = new World(grid);
-            world.spawnUnit(
-                { q: 2, r: 3 },
-                {
-                    attack: 10,
-                    health: 100,
-                    movement: 3,
-                    name: "Warrior",
-                    defense: 5,
-                    attackRange: 1,
-                },
-                {
-                    assetKey: "tilemap:entity:castle:swordsman",
-                    animationState: "idle",
-                    color: "red",
-                },
-            );
-            world.spawnUnit(
-                { q: 5, r: 6 },
-                {
-                    attack: 10,
-                    health: 100,
-                    movement: 3,
-                    name: "Archer",
-                    defense: 5,
-                    attackRange: 1,
-                },
-                {
-                    assetKey: "tilemap:entity:castle:archer",
-                    animationState: "idle",
-                    color: "green",
-                },
-            );
-
-            engine.addComponent(new GridRenderSystem(world, 10, 10, 80));
-            engine.addComponent(new UnitRenderSystem(world, 10, 10, 80));
+        engine.init = async () => {
+            await assetHandler.preload(Object.keys(ASSET_MANIFEST));
+            const scene = new GridMovementScene(canvas, assetHandler);
+            engine.scenes.register("main", scene);
+            engine.scenes.switch("main");
         };
 
-        // render pipeline hooks
-        engine.preDraw = (ctx) => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // NEW: Apply clipping before the scene draws
+        engine.preDraw = (ctx: CanvasRenderingContext2D) => {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, 800, 800); // Grid is 10x10 at 80px = 800px total
+            ctx.clip(); // Anything drawn outside this 800x800 box is now invisible
         };
 
-        engine.draw = (ctx) => {
-            engine.components.draw(ctx, 1);
+        // NEW: Restore state after scene draws so HUD can render globally
+        engine.postDraw = (ctx: CanvasRenderingContext2D) => {
+            ctx.restore(); // Undo the clip
+            hud.draw(ctx, uiData); // Draw UI on top
         };
 
-        engine.postDraw = (ctx) => { };
-
-        // start engine
         engine.start();
-
-        // cleanup
-        return () => {
-            engine.stop();
-        };
-    }, []);
+        return () => engine.stop();
+    }, [debug, hud, uiData]);
 
     return (
-        <canvas
-            ref={canvasRef}
-            style={{ width: "800px", height: "800px", display: "block" }}
-        />
+        <div className="flex items-center justify-center min-h-screen bg-black">
+            <canvas 
+                ref={canvasRef} 
+                width={1200} 
+                height={900} 
+                className="border-2 border-slate-800" 
+            />
+        </div>
     );
 }

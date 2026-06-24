@@ -3,7 +3,7 @@
 /**
  * This component is for MVP purposes only. It will be replaced with a more robust implementation in the future.
  */
-
+import { GameHUD } from "@/components/game/GameHUD"; 
 import { useEffect, useRef, useState } from "react";
 import { GameEngine, AssetHandler } from "@/lib/";
 import { GridMovementScene, ASSET_MANIFEST } from "@/lib/game/";
@@ -82,34 +82,37 @@ export default function GridMovementCanvas({
     }, []);
 
     return (
-        <div style={{ position: "relative", width: "800px", height: "800px" }}>
-            <canvas
-                ref={canvasRef}
-                style={{ display: "block", width: "800px", height: "800px" }}
-            />
-            <div
-                style={{
-                    position: "absolute",
-                    top: 8,
-                    left: 8,
-                    color: "white",
-                    background: "rgba(0,0,0,0.5)",
-                    padding: "4px 8px",
-                    fontFamily: "monospace",
-                    fontSize: "13px",
-                    lineHeight: "1.6",
-                }}
-            >
-                <div>Turn: {activePlayer}</div>
-                <div>Turn phase: {turnPhase ?? "—"}</div>
-                <div>Game phase: {gamePhase ?? "—"}</div>
+        // A full-screen dark background for your testing environment
+        <div className="min-h-screen bg-black flex items-center justify-center p-4">
+            
+            {/* The Expanded Game Container (1350x950). The relative positioning here keeps the HUD tied to this outer box */}
+            <div className="relative flex items-start justify-center pt-8 w-[1350px] h-[950px]">
+                
+               {/* The actual Game Canvas (800x800) */}
+                <div 
+                    className="border-2 border-slate-800 shadow-2xl rounded-lg overflow-hidden bg-slate-900" 
+                    style={{ width: "800px", height: "800px" }}
+                >
+                    <canvas
+                        ref={canvasRef}
+                        width={800}
+                        height={800}
+                        style={{ display: "block", width: "800px", height: "800px" }}
+                    />
+                </div>
+                {/* The HUD overlays the 1350x950 area, naturally pushing the absolute UI elements into the empty side margins! */}
+                <GameHUD 
+                    state={{ 
+                        phase: turnPhase || "active", 
+                        turnNumber: 0, 
+                        currentTurnId: activePlayer, 
+                        players: { [activePlayer]: { displayName: "Player 1", sessionId: activePlayer } } 
+                    } as any}
+                    sessionId={activePlayer}
+                    onLeave={() => console.log("Leave clicked")}
+                    onEndTurn={() => sceneRef.current?.endTurn()}
+                />
             </div>
-            <button
-                style={{ position: "absolute", bottom: 8, right: 8 }}
-                onClick={() => sceneRef.current?.endTurn()}
-            >
-                End Turn
-            </button>
         </div>
     );
 }
