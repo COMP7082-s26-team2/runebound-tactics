@@ -62,7 +62,7 @@ export default function RegistrationForm() {
             return;
         }
         if (result?.success) {
-            window.location.href = "/dashboard";
+            window.location.href = "/";
         }
     }
 
