@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { logIn } from "@/app/auth/actions";
+import { logIn } from "@/lib/auth/actions";
 
 export default function LoginForm() {
     const [error, setError] = useState<string | null>(null);
