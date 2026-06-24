@@ -9,4 +9,7 @@ These guidelines must be followed at all times when making code changes.
 ## Newline Space
 All modified files must have a newline space at EOF.
 
+# Package Manager
+Never use pnpm; use either yarn or npx for most commands (preferably yarn)
+
 <!-- END:nextjs-agent-rules -->
