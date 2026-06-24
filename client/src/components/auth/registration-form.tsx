@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signUp, verifyOtp } from "@/app/auth/actions";
+import { signUp, verifyOtp } from "@/lib/auth/actions";
 
 export default function RegistrationForm() {
     const [error, setError] = useState<string | null>(null);
