@@ -1,16 +1,28 @@
 import type { Metadata } from "next";
+import { Pixelify_Sans, Jacquard_12, Tiny5 } from "next/font/google";
 import { Geist, Geist_Mono } from "next/font/google";
 import { GameConnectionProvider } from "@/context/colyseus";
 import "./globals.css";
 
-const geistSans = Geist({
-    variable: "--font-geist-sans",
+const pixelify = Pixelify_Sans({
+    variable: "--font-pixelify",
     subsets: ["latin"],
+    weight: ["400", "500", "600", "700"],
+    display: "swap",
 });
 
-const geistMono = Geist_Mono({
-    variable: "--font-geist-mono",
+const jacquard = Jacquard_12({
+    variable: "--font-jacquard",
     subsets: ["latin"],
+    weight: "400",
+    display: "swap",
+});
+
+const tiny5 = Tiny5({
+    variable: "--font-tiny5",
+    subsets: ["latin"],
+    weight: "400",
+    display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -26,7 +38,7 @@ export default function RootLayout({
     return (
         <html
             lang="en"
-            className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+            className={`${pixelify.variable} ${jacquard.variable} ${tiny5.variable} h-full`}
             suppressHydrationWarning
         >
             <body className="min-h-full flex flex-col">

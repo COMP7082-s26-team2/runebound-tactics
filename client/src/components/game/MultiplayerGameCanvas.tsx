@@ -105,20 +105,21 @@ export function MultiplayerGameCanvas({ room, state }: MultiplayerGameCanvasProp
 
     return (
         <div
-            className="relative"
-            style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+            className="relative aspect-square max-w-full max-h-full [image-rendering:pixelated]"
         >
             <canvas
                 ref={canvasRef}
-                style={{ display: "block", width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+                width={CANVAS_WIDTH}
+                height={CANVAS_HEIGHT}
+                style={{ display: "block", width: "100%", height: "100%" }}
             />
             {phase === "loading" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 text-white">
+                <div className="absolute inset-0 flex items-center justify-center bg-[var(--ink-900)]/80 text-[var(--ink-300)]">
                     Loading assets…
                 </div>
             )}
             {phase === "error" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 text-red-400">
+                <div className="absolute inset-0 flex items-center justify-center bg-[var(--ink-900)]/90 text-[var(--seal-red)]">
                     Failed to load assets. Refresh to retry.
                 </div>
             )}
