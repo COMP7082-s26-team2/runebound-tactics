@@ -10,6 +10,12 @@ const FADE_MS = 200;
 const FADE_STEPS = 5;
 const BAR_H = 4;
 const BAR_Y_OFFSET = 8;
+const MAX_HP_DIVIDERS = 12;
+const NICE_STEPS = [1, 2, 3, 5, 10] as const;
+
+function segmentStep(maxHp: number): number {
+    return NICE_STEPS.find((n) => maxHp / n <= MAX_HP_DIVIDERS) ?? 10;
+}
 
 // Stepped opacity levels for fade-out (index 0 = fully visible, 4 = gone)
 const FADE_OPACITY = [1, 0.75, 0.5, 0.25, 0];
@@ -190,9 +196,9 @@ export class HealthBarRenderSystem implements GameComponent {
                 ctx.fillRect(barX, barY, fillW, BAR_H);
             }
 
-            // HP segment dividers — grouped by HP range to avoid visual noise
+            // HP segment dividers — step size keeps divider count ≤ MAX_HP_DIVIDERS
             if (entry.maxHp > 1) {
-                const step = entry.maxHp > 20 ? 5 : entry.maxHp > 12 ? 3 : 1;
+                const step = segmentStep(entry.maxHp);
                 ctx.fillStyle = this._border;
                 for (let i = step; i < entry.maxHp; i += step) {
                     const lineX = barX + Math.round((i / entry.maxHp) * barW);
