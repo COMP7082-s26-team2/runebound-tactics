@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getProfile, updateUsername, uploadAvatar, verifyCurrentPassword, updatePassword } from '@/lib/profile/actions';
-import { signOut } from '@/app/auth/actions';
+import { signOut } from '@/lib/auth/actions';
 
 const DEFAULT_AVATAR = '/assets/default-avatar.svg';
 
