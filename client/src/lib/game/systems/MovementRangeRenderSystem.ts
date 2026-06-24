@@ -40,37 +40,55 @@ export class MovementRangeRenderSystem implements GameComponent {
         const reachable = this._selection.reachableTiles;
         const attackFrom = this._selection.attackFromPositions;
 
-        // Blue fill for reachable tiles that are NOT attack-from positions
-        ctx.fillStyle = "rgba(100, 149, 237, 0.4)";
+        // Blue fill + outline for reachable tiles that are NOT attack-from
+        const MOVE_FILL = "rgba(100, 149, 237, 0.30)";
+        const MOVE_STROKE = "rgba(100, 149, 237, 0.95)";
+        ctx.save();
+        ctx.lineWidth = 2;
         for (const key of reachable) {
             if (attackFrom.has(key)) continue;
             const [q, r] = key.split(",").map(Number);
-            ctx.fillRect(
-                q! * this._cellSize,
-                r! * this._cellSize,
-                this._cellSize,
-                this._cellSize,
+            const x = q! * this._cellSize;
+            const y = r! * this._cellSize;
+            ctx.fillStyle = MOVE_FILL;
+            ctx.fillRect(x, y, this._cellSize, this._cellSize);
+            ctx.strokeStyle = MOVE_STROKE;
+            ctx.strokeRect(
+                x + 1,
+                y + 1,
+                this._cellSize - 2,
+                this._cellSize - 2,
             );
         }
+        ctx.restore();
 
-        // Green fill for attack-from positions (includes attacker's own tile)
-        ctx.fillStyle = "rgba(0, 180, 70, 0.45)";
+        // Orange fill + outline for attack-from positions
+        const ATTACK_FILL = "rgba(255, 140, 0, 0.30)";
+        const ATTACK_STROKE = "rgba(255, 140, 0, 0.95)";
+        ctx.save();
+        ctx.lineWidth = 2;
         for (const key of attackFrom) {
             const [q, r] = key.split(",").map(Number);
-            ctx.fillRect(
-                q! * this._cellSize,
-                r! * this._cellSize,
-                this._cellSize,
-                this._cellSize,
+            const x = q! * this._cellSize;
+            const y = r! * this._cellSize;
+            ctx.fillStyle = ATTACK_FILL;
+            ctx.fillRect(x, y, this._cellSize, this._cellSize);
+            ctx.strokeStyle = ATTACK_STROKE;
+            ctx.strokeRect(
+                x + 1,
+                y + 1,
+                this._cellSize - 2,
+                this._cellSize - 2,
             );
         }
+        ctx.restore();
 
-        // Red fill on attackable enemies — only in "selected" (before commit)
+        // Red fill on attackable enemies — only in "selected" (before commit).
         // Outline drawn separately by EnemyTargetOutlineSystem (zIndex=3) so it
         // renders on top of unit sprites.
         if (state === "selected") {
             ctx.save();
-            ctx.fillStyle = "rgba(220, 50, 50, 0.4)";
+            ctx.fillStyle = "rgba(220, 50, 50, 0.35)";
             for (const enemyServerId of this._selection.attackableEnemies) {
                 const entityId =
                     this._world.getEntityByServerId(enemyServerId);
