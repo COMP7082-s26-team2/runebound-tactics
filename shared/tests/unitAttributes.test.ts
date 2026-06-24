@@ -34,16 +34,16 @@ describe("effective-stat helpers", () => {
 });
 
 describe("RPS weakness mapping", () => {
-    it("melee is weak to cavalry", () => {
-        expect(getUnitDefaultWeakness("castle:swordsman")).toContain("cavalry");
+    it("melee is weak to range", () => {
+        expect(getUnitDefaultWeakness("castle:swordsman")).toContain("range");
     });
 
-    it("cavalry is weak to range", () => {
-        expect(getUnitDefaultWeakness("castle:cavalier")).toContain("range");
+    it("cavalry is weak to melee", () => {
+        expect(getUnitDefaultWeakness("castle:cavalier")).toContain("melee");
     });
 
-    it("range is weak to melee", () => {
-        expect(getUnitDefaultWeakness("castle:archer")).toContain("melee");
+    it("range is weak to cavalry", () => {
+        expect(getUnitDefaultWeakness("castle:archer")).toContain("cavalry");
     });
 
     it("pure has no weakness", () => {
@@ -127,13 +127,13 @@ describe("computeAttackDamage — type effectiveness", () => {
         )).toBe(1);
     });
 
-    it("cavalry beats melee — weakness hit deals more than no weakness", () => {
+    it("range beats melee — weakness hit deals more than no weakness", () => {
         const withWeakness = computeAttackDamage(
-            makeAttacker(5, "cavalry"),
-            makeDefender(2, ["cavalry"]),
+            makeAttacker(5, "range"),
+            makeDefender(2, ["range"]),
         );
         const withoutWeakness = computeAttackDamage(
-            makeAttacker(5, "cavalry"),
+            makeAttacker(5, "range"),
             makeDefender(2, []),
         );
         expect(withWeakness).toBeGreaterThan(withoutWeakness);
