@@ -27,6 +27,8 @@ import {
     terrainAt,
     unitIsExhausted,
     GRID_ROWS,
+    STARTER_DECK_BLUEPRINTS,
+    applyReactionEffects,
 } from "@runebound-tactics/shared";
 import type { Faction, GridCoord } from "@runebound-tactics/shared";
 import { AuthJoinError, verifySupabaseJoinAuth } from "../auth/supabaseAuth";
@@ -210,11 +212,36 @@ export class GameRoom extends Room<{ state: GameState }> {
             this._reactionMachine.send("REACTION_PASS");
         });
 
-        this.onMessage<{ cardId: string }>("play_reaction_card", (client, payload) => {
-            // Card system pending — reject all cards until is_reaction validation is wired.
-            console.log(`[${new Date().toISOString()}] [GameRoom] play_reaction_card: rejected (card system pending) from ${client.sessionId}`);
-            void client;
-            void payload;
+        this.onMessage<{ cardName: string }>("play_reaction_card", (client, payload) => {
+            if (!this._reactionMachine) return;
+            if (this._reactionMachine.state !== "defender") return;
+
+            const ctx = this._reactionMachine.context;
+            if (client.sessionId !== ctx.defenderOwnerId) return;
+
+            const slot = this.state.players.get(client.sessionId);
+            if (!slot) return;
+
+            const index = slot.deck.cards.findIndex(
+                (c) => c.name === payload?.cardName && c.is_reaction,
+            );
+            if (index === -1) return;
+
+            const card = slot.deck.cards[index];
+            if (slot.gold < card.gold_cost) return;
+
+            slot.gold -= card.gold_cost;
+            slot.deck.cards.splice(index, 1);
+            slot.deck.discard(card);
+
+            console.log(
+                `[${new Date().toISOString()}] [GameRoom] play_reaction_card: ${client.sessionId} played "${card.name}"`,
+            );
+
+            this._reactionMachine.send("PLAY_CARD", {
+                playerId: client.sessionId,
+                cardId: card.name,
+            });
         });
     }
 
@@ -442,6 +469,10 @@ export class GameRoom extends Room<{ state: GameState }> {
         this.state.currentTurnId = this._turnOrder[0] ?? "";
 
         this._spawnInitialUnits();
+        for (const slot of this.state.players.values()) {
+            slot.deck.initializeDeck(STARTER_DECK_BLUEPRINTS);
+            console.log(`[${new Date().toISOString()}] [GameRoom] deck: seeded ${slot.deck.cards.length} cards for ${slot.sessionId}`);
+        }
         this._rebuildReachabilityCache(this.state.currentTurnId);
 
         this._turnMachine = createTurnMachine(this.state.currentTurnId);
@@ -549,6 +580,7 @@ export class GameRoom extends Room<{ state: GameState }> {
 
             case "resolve":
                 this._clearReactionTimer();
+                this._applyReactionCardEffects();
                 this._reactionMachine?.send("REACTION_PASS");
                 break;
 
@@ -584,6 +616,37 @@ export class GameRoom extends Room<{ state: GameState }> {
             clearTimeout(this._reactionTimer);
             this._reactionTimer = null;
         }
+    }
+
+    private _applyReactionCardEffects(): void {
+        if (!this._pendingAttack || !this._reactionMachine) return;
+
+        const { cardsPlayed, attackerOwnerId, defenderOwnerId } =
+            this._reactionMachine.context;
+        if (cardsPlayed.length === 0) return;
+
+        const attacker = this.state.units.get(this._pendingAttack.attackerId);
+        const defender = this.state.units.get(this._pendingAttack.targetId);
+        if (!attacker || !defender) return;
+
+        const { damage, attackBonus, defenseBonus } = applyReactionEffects(
+            cardsPlayed,
+            attackerOwnerId,
+            defenderOwnerId,
+            attacker,
+            defender,
+        );
+
+        const oldDamage = this._pendingAttack.damage;
+        const newHp = Math.max(0, defender.hp - damage);
+
+        this._pendingAttack.damage = damage;
+        this._pendingAttack.newHp = newHp;
+        this._pendingAttack.defenderDied = newHp <= 0;
+
+        console.log(
+            `[${new Date().toISOString()}] [GameRoom] reaction-effects: attackBonus=${attackBonus} defenseBonus=${defenseBonus} damage ${oldDamage} → ${damage}`,
+        );
     }
 
     /**
