@@ -64,6 +64,9 @@ export function ReactionStrip({
         if (hasPlayed) return;
         setHasPlayed(true);
         onPlayCard(cardName);
+        // Quickplay: a card play closes the window. Auto-fire Pass so the
+        // server moves to resolve without waiting for a second click.
+        onPass();
     };
 
     const passVisible =
