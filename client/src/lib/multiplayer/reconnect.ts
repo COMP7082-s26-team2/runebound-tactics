@@ -1,0 +1,261 @@
+"use client";
+
+import type { Room } from "@colyseus/sdk";
+import { LobbyState, GameState } from "@runebound-tactics/shared";
+import { useCallback } from "react";
+import { client } from "./client";
+import { getAuthenticatedJoinOptions } from "./authJoinOptions";
+
+const LOBBY_TOKEN = "lobby_token";
+const GAME_TOKEN  = "game_token";
+const DEFAULT_RECONNECT_WINDOW_SECONDS = 60;
+const RECONNECT_RETRY_INTERVAL_MS = 1_000;
+const MILLISECONDS_PER_SECOND = 1_000;
+
+interface GameConnectOptions {
+    reconnectOnly?: boolean;
+}
+
+interface InFlightGameReconnect {
+    roomId: string;
+    promise: Promise<Room<unknown, GameState>>;
+}
+
+interface GameConnectionCallbacks {
+    onDrop?: () => void;
+}
+
+let inFlightGameReconnect: InFlightGameReconnect | null = null;
+
+/** Returns the reconnect grace period shared by retries and UI warnings. */
+export function getReconnectWindowSeconds(): number {
+    const configuredSeconds = Number(
+        process.env.NEXT_PUBLIC_GAME_RECONNECT_WINDOW_SECONDS,
+    );
+
+    return Number.isFinite(configuredSeconds) && configuredSeconds > 0
+        ? configuredSeconds
+        : DEFAULT_RECONNECT_WINDOW_SECONDS;
+}
+
+function getReconnectWindowMs(): number {
+    return getReconnectWindowSeconds() * MILLISECONDS_PER_SECOND;
+}
+
+function wait(delayMs: number): Promise<void> {
+    return new Promise((resolve) => {
+        window.setTimeout(resolve, delayMs);
+    });
+}
+
+async function reconnectGameWithRetry(
+    reconnectToken: string,
+): Promise<Room<unknown, GameState>> {
+    const deadline = Date.now() + getReconnectWindowMs();
+    let lastError: unknown;
+
+    while (Date.now() < deadline) {
+        try {
+            return await client.reconnect<GameState>(
+                reconnectToken,
+                GameState,
+            );
+        } catch (error) {
+            lastError = error;
+
+            // The server may briefly reject the token before its onLeave
+            // handler has registered allowReconnection. Retry that response
+            // alongside network failures until the reconnect window closes.
+            const remainingMs = deadline - Date.now();
+            if (remainingMs <= 0) break;
+
+            await wait(Math.min(RECONNECT_RETRY_INTERVAL_MS, remainingMs));
+        }
+    }
+
+    throw lastError instanceof Error
+        ? lastError
+        : new Error("The game reconnection window expired.");
+}
+
+function getStoredRoomToken(storageKey: string, roomId: string): string | null {
+    const stored = window.sessionStorage.getItem(storageKey);
+    if (!stored) return null;
+
+    const [tokenRoomId] = stored.split(":");
+    if (tokenRoomId === roomId) {
+        return stored;
+    }
+
+    window.sessionStorage.removeItem(storageKey);
+    return null;
+}
+
+async function joinOrReconnect<S>(
+    storageKey: string,
+    roomId: string,
+    options: { displayName: string },
+    rootSchema: new () => S,
+): Promise<Room<unknown, S>> {
+    if (typeof window === "undefined") {
+        throw new Error("Cannot join from server-side");
+    }
+    const stored = getStoredRoomToken(storageKey, roomId);
+    if (stored) {
+        try {
+            const room = await client.reconnect<S>(stored, rootSchema);
+            window.sessionStorage.setItem(storageKey, room.reconnectionToken);
+            return room;
+        } catch {
+            window.sessionStorage.removeItem(storageKey);
+        }
+    }
+    // Attach Supabase auth to normal joins. Reconnect uses the stored Colyseus
+    // reconnection token above, while fresh joins must prove the user identity.
+    const authOptions = await getAuthenticatedJoinOptions();
+    const room = await client.joinById<S>(
+        roomId,
+        {
+            ...options,
+            ...authOptions,
+        },
+        rootSchema,
+    );
+    window.sessionStorage.setItem(storageKey, room.reconnectionToken);
+    return room;
+}
+
+async function joinOrReconnectGameRoom(
+    roomId: string,
+    displayName: string,
+    options: GameConnectOptions = {},
+): Promise<Room<unknown, GameState>> {
+    if (typeof window === "undefined") {
+        throw new Error("Cannot join from server-side");
+    }
+
+    if (inFlightGameReconnect) {
+        if (inFlightGameReconnect.roomId !== roomId) {
+            throw new Error("Another game reconnection is already in progress.");
+        }
+
+        // Repeated drop signals for the same room share the existing promise
+        // instead of attempting to consume the same single-use token twice.
+        const room = await inFlightGameReconnect.promise;
+        room.reconnection.enabled = false;
+        window.sessionStorage.setItem(GAME_TOKEN, room.reconnectionToken);
+        return room;
+    }
+
+    const storedToken = getStoredRoomToken(GAME_TOKEN, roomId);
+
+    if (storedToken) {
+        // A reconnection token is single-use. Remove it before the attempt so
+        // another caller cannot consume the same token concurrently.
+        window.sessionStorage.removeItem(GAME_TOKEN);
+
+        const promise = reconnectGameWithRetry(storedToken);
+        inFlightGameReconnect = { roomId, promise };
+
+        try {
+            const room = await inFlightGameReconnect.promise;
+
+            // Explicit reconnects are coordinated by useRoomConnect, so disable
+            // the SDK's independent retry loop before a future connection drop.
+            room.reconnection.enabled = false;
+            window.sessionStorage.setItem(
+                GAME_TOKEN,
+                room.reconnectionToken,
+            );
+            return room;
+        } catch (error) {
+            if (options.reconnectOnly) {
+                throw error;
+            }
+        } finally {
+            inFlightGameReconnect = null;
+        }
+    }
+
+    if (options.reconnectOnly) {
+        throw new Error("The game reconnection token is unavailable or expired.");
+    }
+
+    const authOptions = await getAuthenticatedJoinOptions();
+    const room = await client.joinById<GameState>(
+        roomId,
+        {
+            displayName,
+            ...authOptions,
+        },
+        GameState,
+    );
+
+    room.reconnection.enabled = false;
+    window.sessionStorage.setItem(GAME_TOKEN, room.reconnectionToken);
+    return room;
+}
+
+/**
+ * Provides the existing room join helpers through one React hook and manages
+ * the live game connection lifecycle after a room has been joined.
+ */
+export function useRoomConnect() {
+    const joinOrReconnectLobby = useCallback(
+        (roomId: string, displayName: string) =>
+            joinOrReconnect<LobbyState>(
+                LOBBY_TOKEN,
+                roomId,
+                { displayName },
+                LobbyState,
+            ),
+        [],
+    );
+
+    const joinOrReconnectGame = useCallback(
+        (
+            roomId: string,
+            displayName: string,
+            options?: GameConnectOptions,
+        ) => joinOrReconnectGameRoom(roomId, displayName, options),
+        [],
+    );
+
+    const clearLobbyToken = useCallback(() => {
+        if (typeof window !== "undefined") {
+            window.sessionStorage.removeItem(LOBBY_TOKEN);
+        }
+    }, []);
+
+    const clearGameToken = useCallback(() => {
+        if (typeof window !== "undefined") {
+            window.sessionStorage.removeItem(GAME_TOKEN);
+        }
+    }, []);
+
+    const watchGameConnection = useCallback(
+        (
+            room: Room<unknown, GameState>,
+            callbacks: GameConnectionCallbacks = {},
+        ) => {
+            const handleDrop = () => {
+                callbacks.onDrop?.();
+            };
+
+            room.onDrop(handleDrop);
+
+            return () => {
+                room.onDrop.remove(handleDrop);
+            };
+        },
+        [],
+    );
+
+    return {
+        joinOrReconnectLobby,
+        joinOrReconnectGame,
+        clearLobbyToken,
+        clearGameToken,
+        watchGameConnection,
+    };
+}

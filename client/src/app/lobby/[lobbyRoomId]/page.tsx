@@ -1,0 +1,40 @@
+"use client";
+
+import { use } from "react";
+import type { LobbyState } from "@runebound-tactics/shared";
+import { LobbyRoomProvider } from "@/context/colyseus";
+import { LobbyWaitingRoom } from "@/components/lobby/LobbyWaitingRoom";
+import { useRoomConnect } from "@/lib/multiplayer/reconnect";
+import { getDisplayName } from "@/lib/multiplayer/identity";
+import { peekHandoff } from "@/lib/multiplayer/roomHandoff";
+import { ClientOnly } from "@/components/util/ClientOnly";
+
+export default function LobbyPage({ params }: { params: Promise<{ lobbyRoomId: string }> }) {
+    const { lobbyRoomId } = use(params);
+    const { joinOrReconnectLobby, clearLobbyToken } = useRoomConnect();
+
+    return (
+        <ClientOnly
+            fallback={
+                <main className="min-h-screen bg-[var(--ink-900)] text-[var(--ink-500)] flex items-center justify-center p-6">
+                    Connecting…
+                </main>
+            }
+        >
+            <LobbyRoomProvider
+                connect={() => {
+                    const handed = peekHandoff<LobbyState>(lobbyRoomId);
+                    if (handed) return Promise.resolve(handed);
+                    return joinOrReconnectLobby(lobbyRoomId, getDisplayName()).catch(err => {
+                        console.error("[LobbyPage] join failed:", err);
+                        clearLobbyToken();
+                        throw err;
+                    });
+                }}
+                deps={[lobbyRoomId]}
+            >
+                <LobbyWaitingRoom expectedRoomId={lobbyRoomId} />
+            </LobbyRoomProvider>
+        </ClientOnly>
+    );
+}

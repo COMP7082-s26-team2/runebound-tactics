@@ -1,0 +1,19 @@
+{
+    "extends": "../tsconfig.base.json",
+    "compilerOptions": {
+        // This is to work with base.json config.  Should turn to a bundler later...
+        "ignoreDeprecations": "6.0",
+        "rootDir": "src",
+        "outDir": "dist",
+        "composite": true,
+        "paths": {
+            "@runebound-tactics/shared": ["../shared/src/index.ts"],
+            "@runebound-tactics/shared/*": ["../shared/src/*"]
+        }
+    },
+    "references": [{ "path": "../shared" }],
+    "include": ["src"],
+    "exclude": [
+      "src/test-integration/**/*"
+    ]
+}

@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+:root {
+    /* Cool side — chamber surround */
+    --ink-900: #0c1018;
+    --ink-800: #131826;
+    --ink-700: #1b2333;
+    --ink-500: #4a546b;
+    --ink-300: #b3bbcc;
+
+    /* Warm side — manual surfaces */
+    --vellum-050: #f3eddc;
+    --vellum-200: #e6dec7;
+    --vellum-400: #c8bd9c;
+    --ink-mark: #2b2118;
+    --ink-faded: #6b5d4b;
+
+    /* Brass accent */
+    --brass-500: #b8893d;
+    --brass-300: #d6b072;
+    --brass-700: #7a5a23;
+
+    /* Pitch — max-contrast text on light surfaces */
+    --ink-pitch: #000000;
+
+    /* Factions */
+    --castle-ink: #2b4c87;
+    --castle-leaf: #c9a14a;
+    --necro-ink: #6e1c25;
+    --necro-bone: #d9cdb6;
+
+    /* Seals — semantic feedback */
+    --seal-red: #9b2a2a;
+    --seal-blue: #2f5d8a;
+    --seal-amber: #b8893d;
+    /* HP-bar mid-range — between brass-500 and seal-red */
+    --seal-warning: #c2742a;
+
+    /* Type scale */
+    --text-2xs: 0.75rem;
+    --text-xs: 0.875rem;
+    --text-sm: 1rem;
+    --text-md: 1.125rem;
+    --text-lg: 1.375rem;
+    --text-xl: 1.875rem;
+    --text-2xl: 2.5rem;
+    --text-3xl: 4rem;
+
+    /* Spacing */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-12: 48px;
+    --space-16: 64px;
+
+    /* Radius — square corners, only pill survives */
+    --radius-sm: 0;
+    --radius-md: 0;
+    --radius-lg: 0;
+    --radius-pill: 999px;
+
+    /* Bevel borders */
+    --bevel-vellum: inset 1px 1px 0 var(--vellum-050), inset -1px -1px 0 var(--vellum-400);
+    --bevel-chamber: inset 1px 1px 0 var(--ink-500), inset -1px -1px 0 var(--ink-900);
+    --bevel-inset: inset -1px -1px 0 var(--vellum-050), inset 1px 1px 0 var(--vellum-400);
+
+    /* Elevation */
+    --elev-rest: none;
+    --elev-pixel-raised: 4px 4px 0 0 rgba(20, 16, 8, 0.55);
+
+    /* Motion */
+    --ease-stamp: cubic-bezier(0.2, 0.9, 0.3, 1);
+    --ease-step-3: steps(3, end);
+    --ease-step-4: steps(4, end);
+    --dur-150: 150ms;
+    --dur-220: 220ms;
+    --dur-380: 380ms;
+}
+
+@theme inline {
+    --color-ink-900: var(--ink-900);
+    --color-ink-800: var(--ink-800);
+    --color-ink-700: var(--ink-700);
+    --color-ink-500: var(--ink-500);
+    --color-ink-300: var(--ink-300);
+    --color-vellum-050: var(--vellum-050);
+    --color-vellum-200: var(--vellum-200);
+    --color-vellum-400: var(--vellum-400);
+    --color-ink-mark: var(--ink-mark);
+    --color-ink-faded: var(--ink-faded);
+    --color-brass-500: var(--brass-500);
+    --color-brass-300: var(--brass-300);
+    --color-brass-700: var(--brass-700);
+    --color-castle-ink: var(--castle-ink);
+    --color-castle-leaf: var(--castle-leaf);
+    --color-necro-ink: var(--necro-ink);
+    --color-necro-bone: var(--necro-bone);
+    --color-seal-red: var(--seal-red);
+    --color-seal-blue: var(--seal-blue);
+    --color-seal-amber: var(--seal-amber);
+
+    --font-sans: var(--font-pixelify);
+    --font-mono: var(--font-pixelify);
+    --font-display: var(--font-jacquard);
+    --font-pxcap: var(--font-tiny5);
+}
+
+body {
+    background: var(--ink-900);
+    color: var(--ink-300);
+    font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: grayscale;
+    font-smooth: never;
+}
+
+@keyframes sigil-stamp {
+    0%   { transform: scale(0.5); opacity: 0; }
+    25%  { transform: scale(0.7); opacity: 0.4; }
+    50%  { transform: scale(0.85); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    @keyframes sigil-stamp {
+        0%, 100% { transform: none; opacity: 1; }
+    }
+}
+
+/* Reaction rail enter — stepped 3-frame slide-up over 220ms */
+@keyframes reaction-rail-enter {
+    0%   { transform: translateY(24px); opacity: 0; }
+    33%  { transform: translateY(16px); opacity: 0.5; }
+    66%  { transform: translateY(8px);  opacity: 1; }
+    100% { transform: translateY(0);    opacity: 1; }
+}
+
+/* Reaction rail exit — stepped 2-frame collapse over 150ms */
+@keyframes reaction-rail-exit {
+    0%   { transform: translateY(0);    opacity: 1; }
+    50%  { transform: translateY(8px);  opacity: 0.5; }
+    100% { transform: translateY(24px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    @keyframes reaction-rail-enter {
+        0%, 100% { transform: none; opacity: 1; }
+    }
+    @keyframes reaction-rail-exit {
+        0%, 100% { transform: none; opacity: 1; }
+    }
+}
